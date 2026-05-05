@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SVM UI Test</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body { background: #0a0a1a; padding: 20px; color: white; }
+    #app { max-width: 480px; margin: 0 auto; }
+    .mock-section { border: 1px dashed #444; padding: 20px; margin-bottom: 20px; border-radius: 12px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Header Mock -->
+    <header class="app-header" style="display:flex;">
+      <div class="header-left">
+        <h1>SVM Tracker</h1>
+        <div class="greeting">Good morning, Admin</div>
+      </div>
+      <div class="header-center" id="header-nav" style="display:flex;">
+        <button class="nav-tab active">My Tasks</button>
+        <button class="nav-tab">Team</button>
+      </div>
+      <div class="header-right">
+        <button class="header-btn">+</button>
+        <button class="header-btn">☀️</button>
+        <button class="logout-btn">
+          <span>Logout</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="mock-section" style="margin-top: 100px;">
+       <h3>Team View Mock</h3>
+       <div class="dashboard-grid">
+         <div class="kpi-card" style="padding:16px;">
+            <div style="font-weight:600;">Lakshmi</div>
+            <div style="font-size:0.8rem; color:var(--accent-emerald);">Score: 85 | Completion: 92%</div>
+         </div>
+         <div class="kpi-card" style="padding:16px;">
+            <div style="font-weight:600;">Ankit</div>
+            <div style="font-size:0.8rem; color:var(--accent-amber);">Score: 45 | Completion: 60%</div>
+         </div>
+       </div>
+    </div>
+
+    <div class="mock-section">
+       <h3>Member Actions Mock</h3>
+       <div class="modal-card" style="position:relative; transform:none; max-width:100%;">
+          <div class="modal-header">
+            <h3>Ankit Actions</h3>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:12px; padding:10px 0;">
+            <button class="btn-primary" style="background:var(--bg-card); border:1px solid var(--border-glass); color:var(--text-primary); margin:0;">✍️ Write Manually</button>
+            <button class="btn-primary" style="margin:0;">🎙️ Assign via Mic (AI)</button>
+            <button class="btn-secondary" style="margin:0;">📋 View Active Tasks</button>
+          </div>
+       </div>
+    </div>
+  </div>
+</body>
+</html>

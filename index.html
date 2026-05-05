@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="SVM Task Tracker — Daily task management for the Saraswati Vidya Mandir team. Track tasks, measure performance, and stay on top of your work.">
+  <meta name="theme-color" content="#6366f1">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>SVM Task Tracker</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => console.log('Service Worker registered'))
+          .catch(err => console.log('Service Worker failed', err));
+      });
+    }
+  </script>
+</head>
+<body>
+
+  <!-- Loading Screen -->
+  <div class="loading-screen" id="loading-screen">
+    <div class="loading-logo">SVM</div>
+    <div class="loading-spinner"></div>
+  </div>
+
+  <!-- Auth Overlay -->
+  <div class="auth-overlay" id="auth-overlay" style="display:none;">
+    <div class="auth-card">
+      <h2 id="auth-title">Welcome to SVM</h2>
+      <p id="auth-subtitle">Sign in to manage your tasks</p>
+      
+      <form id="auth-form" class="auth-form">
+        <div class="form-group">
+          <label for="auth-email">Email</label>
+          <input type="email" id="auth-email" placeholder="you@example.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="auth-password">Password</label>
+          <input type="password" id="auth-password" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <div style="text-align: right; margin-top: -10px; margin-bottom: var(--space-md);" id="auth-forgot-password-group">
+          <button type="button" class="btn-link" id="auth-reset-btn" style="font-size: 0.8rem;">Forgot Password?</button>
+        </div>
+        <div class="form-group" id="auth-name-group" style="display:none;">
+          <label for="auth-name">Full Name (as in Google Sheet)</label>
+          <input type="text" id="auth-name" placeholder="E.g. Lakshmi" autocomplete="name">
+        </div>
+        <div class="form-group" id="auth-role-group" style="display:none;">
+          <label for="auth-role">Role</label>
+          <select id="auth-role">
+            <option value="member">Member</option>
+            <option value="coordinator">Coordinator</option>
+            <option value="process_coordinator">Process Coordinator</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        
+        <div class="auth-error" id="auth-error" style="display:none;"></div>
+        
+        <button type="submit" class="btn-primary auth-submit-btn" id="auth-submit">Sign In</button>
+      </form>
+      
+      <div class="auth-footer">
+        <p id="auth-toggle-text">Don't have an account? <button class="btn-link" id="auth-toggle-btn">Sign Up</button></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset Password Modal -->
+  <div class="modal-overlay" id="reset-password-modal" style="display:none; z-index: 1000;">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <h3>Forgot Password?</h3>
+        <button class="modal-close" id="reset-close-btn" aria-label="Close" type="button">✕</button>
+      </div>
+      
+      <!-- Step 1: Request OTP -->
+      <div id="reset-step-1">
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="reset-email" placeholder="Enter your registered email" required>
+        </div>
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: var(--space-sm);">
+          We will send a 6-digit verification code to your email.
+        </p>
+        <div id="reset-error-1" class="error-msg" style="display:none; color: var(--accent-red); margin-bottom: 10px;"></div>
+        <button type="button" class="btn-primary" id="btn-send-otp" style="width:100%;">Send Verification Code</button>
+      </div>
+
+      <!-- Step 2: Verify OTP and Set Password -->
+      <div id="reset-step-2" style="display:none;">
+        <div class="form-group">
+          <label>Verification Code</label>
+          <input type="text" id="reset-otp" placeholder="Enter 6-digit code" maxlength="6">
+        </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="password" id="reset-new-password" placeholder="Enter new password">
+        </div>
+        <div id="reset-error-2" class="error-msg" style="display:none; color: var(--accent-red); margin-bottom: 10px;"></div>
+        <button type="button" class="btn-primary" id="btn-verify-reset" style="width:100%;">Update Password</button>
+        <button type="button" class="btn-ghost" id="btn-back-to-step1" style="width:100%; margin-top:10px; background:none; border:none; color:var(--text-secondary); cursor:pointer;">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Confetti Canvas -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <!-- Main App -->
+  <div id="app">
+
+    <!-- Header -->
+    <header class="app-header" id="app-header" style="display:none;">
+      <div class="header-left">
+        <h1>SVM</h1>
+        <div class="greeting" id="greeting-text"></div>
+      </div>
+
+      <div class="header-center" id="header-nav" style="display:none;">
+        <button class="nav-tab active" id="tab-my-tasks">My Tasks</button>
+        <button class="nav-tab" id="tab-team" style="position:relative;">Team <span id="team-badge" style="display:none; position:absolute; top:-5px; right:-5px; background:var(--accent-red); color:white; font-size:0.6rem; padding:2px 5px; border-radius:10px; border:2px solid var(--bg-primary);">!</span></button>
+        <button class="nav-tab" id="tab-tests">Test Tracker</button>
+      </div>
+
+      <div class="header-right">
+        <button class="header-btn" id="header-add-task" style="display:none;" title="Add Task">+</button>
+        <button class="header-btn" id="theme-toggle" title="Toggle Theme">
+          <span class="theme-sun">☀️</span>
+          <span class="theme-moon">🌙</span>
+        </button>
+        <button class="logout-btn" id="logout-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          <span>Logout</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Broadcast Banner -->
+    <div id="broadcast-banner" class="broadcast-banner" style="display:none;">
+      <div class="broadcast-content">
+        <span class="broadcast-icon">📢</span>
+        <span id="broadcast-text">Staff meeting today at 2 PM.</span>
+      </div>
+      <button class="broadcast-close" id="broadcast-close-btn">✕</button>
+    </div>
+
+    <!-- Error Banner (hidden by default) -->
+    <div class="error-banner" id="error-banner" style="display:none;">
+      <span class="error-icon">!</span>
+      <span id="error-text">Could not connect to the server.</span>
+      <button class="retry-btn" id="retry-btn">Retry</button>
+    </div>
+
+    <div id="task-view-container" style="display:none;">
+      <!-- Monitoring Header -->
+      <div id="monitoring-header" class="monitoring-header" style="display:none; margin-bottom: 20px; padding: 15px; border-radius: var(--radius-lg); background: var(--accent-purple-glow); border: 1px solid var(--accent-purple); color: var(--accent-purple); font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
+        <div id="monitoring-title" style="display:flex; align-items:center; gap:10px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span id="monitoring-user-name"></span>
+        </div>
+        <button onclick="handleExitMonitoring()" class="btn-sm" style="background:var(--accent-purple); color:white; border:none; border-radius:var(--radius-sm); padding:4px 10px; cursor:pointer;">Exit View</button>
+      </div>
+
+      <!-- AI Briefing -->
+      <div id="briefing-section" style="display:none;"></div>
+
+      <!-- Controls (Search & Filter) -->
+      <div class="controls-section" id="controls-section" style="display:none;">
+        <div class="search-box">
+          <input type="text" id="task-search" placeholder="Search tasks..." autocomplete="off">
+        </div>
+        <div class="filter-box">
+          <select id="status-filter">
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="in-progress">In Progress</option>
+            <option value="stuck">Stuck</option>
+            <option value="overdue">Overdue</option>
+            <option value="done">Completed</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Recurring Tasks Section -->
+      <div id="recurring-section" style="display:none;"></div>
+
+      <!-- One-Time Tasks Section -->
+      <div id="onetime-section" style="display:none;"></div>
+
+      <!-- Stats Section -->
+      <div id="stats-section" style="display:none;"></div>
+    </div>
+
+    <!-- Test Tracker Section -->
+    <div id="test-tracker-container" style="display:none;">
+      <div class="section-header" style="padding: 0 var(--space-md); display: flex; justify-content: space-between; align-items: center;">
+        <h2 style="font-size:1.2rem; font-weight:700;">Test Progress Tracker</h2>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn-secondary btn-sm" id="btn-test-settings" style="width:auto; display: flex; align-items: center; gap: 5px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1V15a2 2 0 0 1-2-2 2 2 0 0 1 2-2v-.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2v.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            Settings
+          </button>
+          <button class="btn-primary btn-sm" id="btn-add-test" style="width:auto;">+ Add Test</button>
+        </div>
+      </div>
+      <div id="test-list-content" class="dashboard-content" style="padding-top: var(--space-sm);">
+        <!-- Tests will be rendered here -->
+      </div>
+    </div>
+
+    <!-- Admin Dashboard Section -->
+    <div id="admin-dashboard-container" style="display:none;">
+      <div id="dashboard-content" class="dashboard-content">
+        <div class="dashboard-header-inline" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-md);">
+          <h2 style="font-size:1.2rem; font-weight:700;">Team Analytics</h2>
+          <div style="display:flex; gap:var(--space-sm);">
+            <input type="file" id="bulk-upload-file" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" style="display:none;">
+            <button class="btn-export" id="btn-import-tasks" style="display:flex; align-items:center; gap:var(--space-xs); background:transparent; border:1px solid var(--border-glass); border-radius:var(--radius-md); padding:var(--space-xs) var(--space-sm); color:var(--text-primary); cursor:pointer; font-size:0.85rem;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+              Import
+            </button>
+            <button class="btn-export" id="btn-export-dashboard" style="display:flex; align-items:center; gap:var(--space-xs); background:transparent; border:1px solid var(--border-glass); border-radius:var(--radius-md); padding:var(--space-xs) var(--space-sm); color:var(--text-primary); cursor:pointer; font-size:0.85rem;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Export
+            </button>
+            <button id="btn-reset-passwords" style="display:none; align-items:center; gap:var(--space-xs); background:var(--danger-color); border:none; border-radius:var(--radius-md); padding:var(--space-xs) var(--space-sm); color:white; cursor:pointer; font-size:0.85rem;">
+              Reset Passwords
+            </button>
+          </div>
+        </div>
+        
+        <!-- Performance Trend Chart -->
+        <div class="kpi-card" id="dashboard-trend-section" style="margin-bottom: var(--space-xl); padding: var(--space-lg); display:none;">
+          <h3 style="font-size: 0.95rem; margin-bottom: var(--space-md); color: var(--text-muted);">Team Completion Trend</h3>
+          <div style="height: 200px; width: 100%;">
+            <canvas id="performanceChart"></canvas>
+          </div>
+        </div>
+        
+        <!-- Broadcast Composer -->
+        <div class="kpi-card" id="dashboard-broadcast-section" style="margin-bottom: var(--space-xl); padding: var(--space-lg); display:none;">
+          <h3 style="font-size: 0.95rem; margin-bottom: var(--space-md); color: var(--text-muted);">Urgent Broadcast</h3>
+          <div style="display:flex; gap:10px;">
+            <input type="text" id="broadcast-input" placeholder="Type an announcement for the whole team..." style="flex:1; padding:10px; border-radius:var(--radius-md); border:1px solid var(--border-glass); background:rgba(255,255,255,0.05); color:var(--text-primary);">
+            <button class="btn-primary" id="btn-send-broadcast" style="width:auto; padding:0 20px;">Send 📢</button>
+          </div>
+          <p style="font-size:0.75rem; color:var(--text-muted); margin-top:8px;">This will appear at the top of everyone's screen for 24 hours.</p>
+        </div>
+
+        <div class="dashboard-grid" id="dashboard-grid">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer" id="app-footer" style="display:none;">
+      SVM Task Tracker · Powered by AI
+    </footer>
+
+  </div>
+
+
+
+  <!-- Add Task Modal -->
+  <div class="modal-overlay" id="add-task-modal" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="task-modal-title">New Task</h3>
+        <button class="modal-close" id="modal-close-btn" aria-label="Close">✕</button>
+      </div>
+      <form id="add-task-form">
+        <div class="form-group">
+          <label for="new-task-name">Task Name</label>
+          <div class="input-with-icon">
+            <input type="text" id="new-task-name" placeholder="e.g. Submit attendance report" required autocomplete="off">
+            <button type="button" class="voice-btn" id="voice-btn" onclick="startVoiceInput()" title="Voice Input">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="form-group" id="admin-assign-group" style="display:none;">
+          <label for="new-task-assigned-to">Assign To</label>
+          <select id="new-task-assigned-to"></select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="new-task-type">Task Type</label>
+            <select id="new-task-type">
+              <option value="daily">Daily (Every Day)</option>
+              <option value="weekly">Weekly (Every Monday)</option>
+              <option value="one-time">One-time Task</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="new-task-priority">Priority</label>
+            <select id="new-task-priority">
+              <option value="Low">Low</option>
+              <option value="Medium" selected>Medium</option>
+              <option value="High">High</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" id="planned-date-group">
+            <label for="new-task-date">Planned Date</label>
+            <input type="date" id="new-task-date">
+          </div>
+          <div class="form-group" id="planned-time-group">
+            <label for="new-task-time">Time (optional)</label>
+            <input type="time" id="new-task-time">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="new-task-notes">Notes (optional)</label>
+          <input type="text" id="new-task-notes" placeholder="Any extra details..." autocomplete="off">
+        </div>
+        <button type="submit" class="btn-primary" id="add-task-submit">Add Task</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div class="modal-overlay" id="delete-confirm-modal" style="display:none;">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <h3>Delete Task</h3>
+      </div>
+      <p class="modal-body-text" id="delete-task-name">Are you sure?</p>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="delete-cancel-btn">Cancel</button>
+        <button class="btn-danger" id="delete-confirm-btn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transfer Task Modal -->
+  <div class="modal-overlay" id="shift-task-modal" style="display:none;">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <h3>Transfer Task</h3>
+        <button class="modal-close" id="shift-cancel-btn-top" aria-label="Close">✕</button>
+      </div>
+      <p class="modal-body-text" style="font-size: 0.9rem; margin-bottom: var(--space-md); color: var(--text-muted);">
+        Assign this task to another member for today. <strong style="color: var(--accent-amber);">You will lose 5 points</strong> as a penalty for the transfer.
+      </p>
+      <div class="form-group">
+        <label for="shift-task-assignee">Transfer To</label>
+        <select id="shift-task-assignee"></select>
+      </div>
+      <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">
+        Note: Recurring tasks will automatically return to you in the next cycle.
+      </p>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="shift-cancel-btn">Cancel</button>
+        <button class="btn-primary" id="shift-confirm-btn">Transfer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task Comments Modal -->
+  <div class="modal-overlay" id="comments-modal" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="comments-task-name">Task Comments</h3>
+        <button class="modal-close" id="comments-close-btn" aria-label="Close" type="button">✕</button>
+      </div>
+      <div id="comments-list" style="max-height: 300px; overflow-y: auto; margin-bottom: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-sm);">
+        <!-- Comments will be injected here -->
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="new-comment-text">Add a comment</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="new-comment-text" placeholder="Type your message..." autocomplete="off">
+          <button class="btn-primary" id="comment-submit-btn" style="width: auto; padding: 0 20px;">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Member Confirmation Modal -->
+  <div class="modal-overlay" id="delete-member-modal" style="display:none;">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <h3>Remove Member</h3>
+      </div>
+      <p class="modal-body-text">To remove <strong id="delete-member-target-name"></strong>, type their name below to confirm:</p>
+      <div class="form-group">
+        <input type="text" id="delete-member-confirm-input" placeholder="Type name here..." autocomplete="off">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="delete-member-cancel-btn">Cancel</button>
+        <button class="btn-danger" id="delete-member-confirm-btn" disabled>Remove</button>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- Leave Request Modal -->
+  <div class="modal-overlay" id="leave-modal" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Request Leave</h3>
+        <button class="modal-close" id="leave-close-btn" aria-label="Close" type="button">✕</button>
+      </div>
+      <div class="form-group">
+        <label for="leave-start-date">Start Date</label>
+        <input type="date" id="leave-start-date">
+      </div>
+      <div class="form-group">
+        <label for="leave-end-date">End Date</label>
+        <input type="date" id="leave-end-date">
+      </div>
+      <div class="form-group">
+        <label for="leave-reason">Reason (Optional)</label>
+        <input type="text" id="leave-reason" placeholder="e.g. Family function, Health...">
+      </div>
+      <div class="form-group">
+        <label for="leave-buddy">Task Buddy (Optional)</label>
+        <select id="leave-buddy">
+          <option value="">No Buddy</option>
+        </select>
+        <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Buddy will manage your tasks while you are away.</p>
+      </div>
+      <p class="modal-body-text" style="font-size: 0.75rem; color: var(--accent-amber);">Note: Leave must be approved by Admin to skip task generation.</p>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="leave-cancel-btn">Cancel</button>
+        <button class="btn-primary" id="leave-submit-btn">Submit Request</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk Import Progress Overlay -->
+  <div class="modal-overlay" id="bulk-import-overlay" style="display:none; z-index: 1000;">
+    <div class="modal-card modal-card-sm" style="text-align:center;">
+      <h3 style="margin-bottom:var(--space-md);">Importing Tasks</h3>
+      <div class="loading-spinner" style="margin: 0 auto var(--space-md) auto;"></div>
+      <p class="modal-body-text" id="bulk-import-status">Processing 0 / 0 tasks...</p>
+    </div>
+  </div>
+
+  <!-- Add Test Modal -->
+  <div class="modal-overlay" id="add-test-modal" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Track New Test</h3>
+        <button class="modal-close" id="add-test-close-btn" aria-label="Close">✕</button>
+      </div>
+      <form id="add-test-form">
+        <div class="form-group">
+          <label for="test-form-name">Test Name</label>
+          <input type="text" id="test-form-name" placeholder="e.g. Maths - Chapter 1" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="test-form-class">Class</label>
+            <input type="text" id="test-form-class" placeholder="e.g. 10">
+          </div>
+          <div class="form-group">
+            <label for="test-form-max">Max Score</label>
+            <input type="number" id="test-form-max" placeholder="e.g. 50">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="test-form-held-on">Held On</label>
+            <input type="date" id="test-form-held-on" required>
+          </div>
+          <div class="form-group">
+            <label for="test-form-type">Type</label>
+            <select id="test-form-type">
+              <option value="Sheet">Sheet (Paper)</option>
+              <option value="App">App (Classpro)</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="btn-primary">Start Tracking</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Supabase JS Client -->
+  <!-- Test Settings Modal -->
+  <div class="modal-overlay" id="test-settings-modal" style="display:none;">
+    <div class="modal-card modal-card-lg">
+      <div class="modal-header">
+        <h3>Test Tracker Settings</h3>
+        <button class="modal-close" id="test-settings-close-btn">✕</button>
+      </div>
+      <p class="modal-body-text">Configure the stages for the test tracker pipeline. These stages will apply to all tests.</p>
+      <div id="test-settings-list" style="max-height: 400px; overflow-y: auto; margin-bottom: var(--space-md); padding-right: 5px;">
+        <!-- Settings rows will be rendered here -->
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn-ghost" id="btn-add-setting-row">+ Add Stage</button>
+        <button class="btn-primary" id="btn-save-test-settings" style="flex: 1;">Save Configuration</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <!-- Member Actions Modal -->
+  <div class="modal-overlay" id="member-actions-modal" style="display:none;">
+    <div class="modal-card" style="max-width: 350px;">
+      <div class="modal-header">
+        <h3 id="member-actions-title">Member Actions</h3>
+        <button class="modal-close" id="member-actions-close-btn">✕</button>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <button class="btn-primary" id="btn-manual-task-member" style="background:var(--bg-card); border:1px solid var(--border-glass); color:var(--text-primary); margin-top:0;">
+          ✍️ Write Manually
+        </button>
+        <button class="btn-primary" id="btn-voice-task-member" style="margin-top:0;">
+          🎙️ Assign via Mic (AI)
+        </button>
+        <button class="btn-secondary" id="btn-view-member-tasks" style="margin-top:0;">
+          📋 View Active Tasks
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Voice Modal -->
+  <div class="modal-overlay" id="voice-modal" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>AI Task Assistant</h3>
+        <button class="modal-close" id="voice-close-btn">✕</button>
+      </div>
+      <div id="voice-status" style="text-align:center; margin-bottom:20px;">
+        <div class="pulse-mic" style="font-size:3rem; margin-bottom:10px;">🎙️</div>
+        <p id="voice-instruction">Listening...</p>
+      </div>
+      <div id="voice-transcript" style="font-style:italic; color:var(--text-muted); margin-bottom:20px; text-align:center; min-height:40px; padding:10px; background:rgba(0,0,0,0.1); border-radius:var(--radius-md);"></div>
+      
+      <div id="voice-result" style="display:none; background:rgba(255,255,255,0.05); padding:15px; border-radius:var(--radius-md); border:1px solid var(--border-glass); animation: fadeIn 0.3s ease;">
+        <div class="form-group">
+          <label>Task Name</label>
+          <input type="text" id="voice-res-name">
+        </div>
+        <div class="form-group">
+          <label>Assign To</label>
+          <input type="text" id="voice-res-user">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="voice-res-date">
+          </div>
+          <div class="form-group">
+            <label>Time</label>
+            <input type="time" id="voice-res-time">
+          </div>
+          <div class="form-group">
+            <label>Type</label>
+            <select id="voice-res-type">
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="one-time">One-Time</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn-primary" id="btn-confirm-voice-task">Create Task</button>
+      </div>
+    </div>
+  </div>
+  <!-- Member Tasks Modal -->
+  <div class="modal-overlay" id="member-tasks-modal" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="member-tasks-title">Member Tasks</h3>
+        <button class="modal-close" id="member-tasks-close-btn">✕</button>
+      </div>
+      <div id="member-tasks-list" class="task-list" style="max-height: 60vh; overflow-y: auto; padding: 10px 0;">
+        <!-- Tasks will be injected here -->
+      </div>
+    </div>
+  </div>
+  
+  <style>
+    .member-task-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      margin-bottom: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .member-task-name { font-weight: 600; font-size: 0.9rem; }
+    .member-task-meta { font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 8px; }
+  </style>
+</body>
+</html>
