@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   //  REPLACE THIS with your deployed Apps Script Web App URL
-  API_URL: 'https://script.google.com/macros/s/AKfycbxc_w6_Tufemb_MFYZreaBvwKvpvAw7KVGm6RZp6KepDGlIyGlDx-87MwV0od9-gi4Y/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbwt9z2SaGt_pcHb6XSpWSn5-jTWGFBY9iRYBeOnuqiii19wyZmYil3jmxeRCRM6COgk/exec',
 
   // Retry settings
   MAX_RETRIES: 2,
@@ -762,6 +762,19 @@ function renderTasks(tasks) {
     return matchesSearch && matchesStatus;
   });
 
+  // Sort tasks chronologically (Date, then Time)
+  filteredTasks.sort((a, b) => {
+    // 1. Date comparison (Earliest first)
+    const dateA = a.plannedDate || '9999-12-31';
+    const dateB = b.plannedDate || '9999-12-31';
+    if (dateA !== dateB) return dateA.localeCompare(dateB);
+
+    // 2. Time comparison (Morning to Night)
+    const timeA = a.time || '23:59';
+    const timeB = b.time || '23:59';
+    return timeA.localeCompare(timeB);
+  });
+
   const recurring = filteredTasks.filter(t => t.taskType === 'daily' || t.taskType === 'weekly');
   const oneTime = filteredTasks.filter(t => t.taskType === 'one-time');
 
@@ -925,6 +938,12 @@ function renderTaskCard(task) {
           ${isInProgress ? `<span class="task-badge badge-in-progress">in progress</span>` : ''}
           ${isStuck ? `<span class="task-badge badge-stuck">stuck</span>` : ''}
           ${isDone && task.completedDate ? `<span>Done at ${formatTime(task.completedDate)}</span>` : ''}
+          ${task.recurrence && task.recurrence !== 'one-time' ? `
+            <div class="recurrence-info" title="Recurring task">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h12.8"/><path d="M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H4.2"/></svg>
+              ${task.recurrence}
+            </div>
+          ` : ''}
         </div>
       </div>
       <div class="task-actions">
@@ -1868,6 +1887,35 @@ function openAddTaskModal(defaultAssignee = null) {
     const type = e.target.value;
     // Show date only for one-time tasks
     $('planned-date-group').style.display = (type === 'one-time') ? 'block' : 'none';
+    // Show recurrence input for custom recurring
+    $('recurrence-pattern-group').style.display = (type === 'recurring') ? 'block' : 'none';
+
+    // Auto-fill recurrence for shortcuts
+    if (type === 'daily') $('new-task-recurrence').value = 'daily';
+    else if (type === 'weekly') $('new-task-recurrence').value = 'weekly';
+    else if (type === 'one-time') $('new-task-recurrence').value = 'one-time';
+    else if (type === 'recurring') $('new-task-recurrence').value = '';
+  };
+
+  // Bind AI Parse button
+  $('btn-ai-parse-recurrence').onclick = async () => {
+    const text = $('new-task-recurrence').value.trim();
+    if (!text) return;
+    const btn = $('btn-ai-parse-recurrence');
+    btn.textContent = '...';
+    btn.disabled = true;
+    try {
+      const res = await apiFetch('parseRecurrence', { text });
+      if (res.success && res.data.pattern) {
+        $('new-task-recurrence').value = res.data.pattern;
+        showToast('AI parsed: ' + res.data.pattern);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      btn.textContent = 'AI Parse';
+      btn.disabled = false;
+    }
   };
 
   if (state.userRole === 'admin' || state.userRole === 'coordinator') {
@@ -2023,6 +2071,7 @@ async function handleTaskSubmit(e) {
   const time = $('new-task-time').value || '';
   const notes = $('new-task-notes').value.trim();
   const priority = $('new-task-priority').value;
+  const recurrence = $('new-task-recurrence').value.trim() || type;
 
   if (!name) return;
 
@@ -2055,7 +2104,8 @@ async function handleTaskSubmit(e) {
       time: time,
       notes: notes,
       priority: priority,
-      assignedTo: assignedToUser
+      assignedTo: assignedToUser,
+      recurrence: recurrence
     };
     if (isEdit) payload.taskId = state.editingTaskId;
 

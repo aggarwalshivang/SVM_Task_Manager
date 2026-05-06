@@ -306,8 +306,17 @@
             <select id="new-task-type">
               <option value="daily">Daily (Every Day)</option>
               <option value="weekly">Weekly (Every Monday)</option>
+              <option value="recurring">Custom Recurring...</option>
               <option value="one-time">One-time Task</option>
             </select>
+          </div>
+          <div class="form-group" id="recurrence-pattern-group" style="display:none;">
+            <label for="new-task-recurrence">Recurrence Pattern</label>
+            <div style="display:flex; gap:8px;">
+              <input type="text" id="new-task-recurrence" placeholder="e.g. every 5 days, every first Monday" autocomplete="off">
+              <button type="button" class="btn-sm btn-secondary" id="btn-ai-parse-recurrence" style="width:auto; padding:0 10px; font-size:0.7rem;">AI Parse</button>
+            </div>
+            <p id="recurrence-hint" style="font-size:0.65rem; color:var(--text-muted); margin-top:4px;">Type in plain English and click "AI Parse".</p>
           </div>
           <div class="form-group">
             <label for="new-task-priority">Priority</label>
@@ -610,6 +619,7 @@
     }
     .member-task-name { font-weight: 600; font-size: 0.9rem; }
     .member-task-meta { font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 8px; }
+    .recurrence-info { font-size: 0.7rem; color: var(--accent-indigo); background: rgba(99, 102, 241, 0.1); padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; }
   </style>
 </body>
 </html>
