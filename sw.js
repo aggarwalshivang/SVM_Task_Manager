@@ -22,7 +22,12 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
-    ).then(() => self.clients.claim()) // Take control of all open pages
+    ).then(async () => {
+      await self.clients.claim();
+      // Force all open tabs to reload so they get the fresh app.js
+      const allClients = await self.clients.matchAll({ type: 'window' });
+      allClients.forEach((client) => client.navigate(client.url));
+    })
   );
 });
 
