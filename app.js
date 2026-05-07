@@ -1188,12 +1188,15 @@ function renderDashboard(scores, pendingMembers = [], leaves = [], perfData = []
                   <span>Type:</span> <span style="color:var(--text-primary);">${m.newData.shiftMode} ${m.newData.shiftMode === 'temporary' ? `(${m.newData.shiftDays} days)` : ''}</span>
                 </div>
               </div>
-            ` : `
-              <div style="font-size:0.75rem; color:var(--accent-red); padding:10px; background:rgba(239,68,68,0.05); border-radius:6px; border:1px solid rgba(239,68,68,0.1); display:flex; align-items:center; gap:8px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                Requesting permanent deletion.
-              </div>
             `}
+            
+            ${m.newData && m.newData.reason ? `
+              <div style="margin-top:10px; font-size:0.75rem; color:var(--text-secondary); background:rgba(255,255,255,0.03); padding:10px; border-radius:6px; border:1px solid var(--border-glass);">
+                <div style="font-weight:700; color:var(--text-dim); font-size:0.6rem; text-transform:uppercase; margin-bottom:4px;">Reason:</div>
+                <div style="font-style:italic;">"${m.newData.reason}"</div>
+              </div>
+            ` : ''}
+
             <div style="display:flex; gap:10px; margin-top:15px;">
               <button class="btn-success btn-sm approve-mod-btn" data-id="${m.id}" style="flex:1; padding:10px; font-size:0.8rem;">Approve</button>
               <button class="btn-danger btn-sm reject-mod-btn" data-id="${m.id}" style="flex:1; padding:10px; font-size:0.8rem; background:none; border:1px solid rgba(239,68,68,0.3); color:var(--accent-red);">Reject</button>
@@ -2058,10 +2061,13 @@ function updateRecurrenceValue() {
   const type = $('recurrence-type-select').value;
   const val = $('recurrence-val').value || 1;
   const day = $('recurrence-day-val').value || 1;
+  const weekday = $('recurrence-weekday-val').value || 1;
 
   let pattern = '';
   if (type === 'dayOfMonth') {
     pattern = `dayOfMonth:${day}`;
+  } else if (type === 'dayOfWeek') {
+    pattern = `dayOfWeek:${weekday}`;
   } else {
     const unit = type.split(':')[1];
     pattern = `interval:${val}:${unit}`;
@@ -2073,13 +2079,20 @@ function syncRecurrenceUI() {
   const type = $('recurrence-type-select').value;
   const intervalRow = $('recurrence-interval-row');
   const dayRow = $('recurrence-day-row');
+  const weekdayRow = $('recurrence-weekday-row');
 
   if (type === 'dayOfMonth') {
     if (intervalRow) intervalRow.style.display = 'none';
+    if (weekdayRow) weekdayRow.style.display = 'none';
     if (dayRow) dayRow.style.display = 'flex';
+  } else if (type === 'dayOfWeek') {
+    if (intervalRow) intervalRow.style.display = 'none';
+    if (dayRow) dayRow.style.display = 'none';
+    if (weekdayRow) weekdayRow.style.display = 'flex';
   } else {
     if (intervalRow) intervalRow.style.display = 'flex';
     if (dayRow) dayRow.style.display = 'none';
+    if (weekdayRow) weekdayRow.style.display = 'none';
     const unit = type.split(':')[1];
     if ($('recurrence-suffix')) $('recurrence-suffix').textContent = unit.charAt(0).toUpperCase() + unit.slice(1);
   }
@@ -2096,6 +2109,9 @@ function setRecurrenceUI(pattern) {
   } else if (pattern.startsWith('dayOfMonth:')) {
     $('recurrence-type-select').value = 'dayOfMonth';
     $('recurrence-day-val').value = pattern.split(':')[1];
+  } else if (pattern.startsWith('dayOfWeek:')) {
+    $('recurrence-type-select').value = 'dayOfWeek';
+    $('recurrence-weekday-val').value = pattern.split(':')[1];
   } else if (pattern === 'daily') {
     $('recurrence-type-select').value = 'interval:days';
     $('recurrence-val').value = 1;
@@ -2137,9 +2153,13 @@ function openAddTaskModal(defaultAssignee = null) {
   $('recurrence-type-select').onchange = syncRecurrenceUI;
   $('recurrence-val').oninput = updateRecurrenceValue;
   $('recurrence-day-val').onchange = updateRecurrenceValue;
+  $('recurrence-weekday-val').onchange = updateRecurrenceValue;
 
   // Initialize UI
   syncRecurrenceUI();
+
+  if ($('change-reason-group')) $('change-reason-group').style.display = 'none';
+  if ($('change-reason')) $('change-reason').value = '';
 
   if (state.userRole === 'admin' || state.userRole === 'coordinator') {
     $('admin-assign-group').style.display = 'block';
@@ -2286,6 +2306,14 @@ function openEditTaskModal(taskId) {
     populateRecurrenceDays();
     setRecurrenceUI(task.recurrence);
   }
+
+  // Show reason field for members
+  if (state.userRole === 'member') {
+    $('change-reason-group').style.display = 'block';
+    $('change-reason').value = '';
+  } else {
+    $('change-reason-group').style.display = 'none';
+  }
 }
 
 function closeAddTaskModal() {
@@ -2340,6 +2368,15 @@ async function handleTaskSubmit(e) {
 
     // If it's a member trying to edit, send for approval instead
     if (isEdit && state.userRole === 'member') {
+      const reason = $('change-reason').value.trim();
+      if (!reason) {
+        showToast('Please provide a reason for the change', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Changes';
+        return;
+      }
+      
+      payload.reason = reason; // Include reason in payload for approval
       showToast('Edit request sent for approval');
       await apiFetch('requestTaskChange', {
         taskId: state.editingTaskId,
@@ -2390,6 +2427,14 @@ let pendingDeleteTaskId = null;
 function showDeleteConfirm(taskId, taskName) {
   pendingDeleteTaskId = taskId;
   $('delete-task-name').textContent = `"${taskName}" will be permanently removed.`;
+  
+  if (state.userRole === 'member') {
+    $('delete-reason-group').style.display = 'block';
+    $('delete-reason').value = '';
+  } else {
+    $('delete-reason-group').style.display = 'none';
+  }
+  
   $('delete-confirm-modal').style.display = 'flex';
 }
 
@@ -2440,22 +2485,32 @@ async function handleResetAllPasswords() {
 async function handleDeleteTask() {
   if (!pendingDeleteTaskId) return;
   const taskId = pendingDeleteTaskId;
-  closeDeleteConfirm();
-
   if (state.userRole === 'member') {
+    const reason = $('delete-reason').value.trim();
+    if (!reason) {
+      showToast('Please provide a reason for deletion', 'error');
+      // Don't close modal yet
+      $('delete-confirm-modal').style.display = 'flex'; 
+      return;
+    }
+
     try {
       showToast('Deletion request sent for approval...');
       await apiFetch('requestTaskChange', {
         taskId,
         type: 'delete',
+        newData: { reason }, // Store reason in newData
         requestedBy: state.currentUser
       }, 'POST');
+      closeDeleteConfirm();
     } catch (err) {
       console.error('Failed to request deletion:', err);
       showToast('Request failed', 'error');
     }
     return;
   }
+  
+  closeDeleteConfirm();
 
   // Optimistic removal from UI (Admin/Coord only)
   const card = document.querySelector(`[data-task-id="${taskId}"]`);

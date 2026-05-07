@@ -321,6 +321,7 @@
                   <option value="interval:days">Every X Day(s)</option>
                   <option value="interval:weeks">Every X Week(s)</option>
                   <option value="interval:months">Every X Month(s)</option>
+                  <option value="dayOfWeek">Every Week on Day X</option>
                   <option value="dayOfMonth">Every Month on Day X</option>
                 </select>
               </div>
@@ -329,6 +330,19 @@
                 <span id="recurrence-prefix" style="font-size:0.85rem; color:var(--text-secondary); min-width:60px;">Every:</span>
                 <input type="number" id="recurrence-val" value="1" min="1" style="width:80px;">
                 <span id="recurrence-suffix" style="font-size:0.85rem; color:var(--text-secondary);">Day(s)</span>
+              </div>
+
+              <div id="recurrence-weekday-row" style="display:none; gap:10px; align-items:center;">
+                <span style="font-size:0.85rem; color:var(--text-secondary); min-width:60px;">On Day:</span>
+                <select id="recurrence-weekday-val" class="form-select" style="width:120px;">
+                  <option value="1">Monday</option>
+                  <option value="2">Tuesday</option>
+                  <option value="3">Wednesday</option>
+                  <option value="4">Thursday</option>
+                  <option value="5">Friday</option>
+                  <option value="6">Saturday</option>
+                  <option value="0">Sunday</option>
+                </select>
               </div>
 
               <div id="recurrence-day-row" style="display:none; gap:10px; align-items:center;">
@@ -341,6 +355,10 @@
 
             </div>
             <input type="hidden" id="new-task-recurrence">
+          </div>
+          <div class="form-group" id="change-reason-group" style="display:none;">
+            <label for="change-reason">Reason for Change (Required)</label>
+            <textarea id="change-reason" placeholder="Why are you editing this task?" rows="2"></textarea>
           </div>
           <div class="form-group">
             <label for="new-task-priority">Priority</label>
@@ -377,6 +395,10 @@
         <h3>Delete Task</h3>
       </div>
       <p class="modal-body-text" id="delete-task-name">Are you sure?</p>
+      <div class="form-group" id="delete-reason-group" style="display:none; margin: 15px 0;">
+        <label for="delete-reason" style="font-size:0.85rem; color:var(--text-secondary);">Reason for Deletion (Required)</label>
+        <textarea id="delete-reason" placeholder="Why are you deleting this task?" rows="2" style="width:100%; margin-top:5px;"></textarea>
+      </div>
       <div class="modal-actions">
         <button class="btn-secondary" id="delete-cancel-btn">Cancel</button>
         <button class="btn-danger" id="delete-confirm-btn">Delete</button>
