@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   //  REPLACE THIS with your deployed Apps Script Web App URL
-  API_URL: 'https://script.google.com/macros/s/AKfycbyl5uuPQazTBJkxlec0KUzB-S-FOp6wJ01N6hyH5QE2WNBsfHtHFU-Htw7Y0MlAzvmg/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbwc2zQGE4EAjE-WrYzfoSiKxeHuuB4ZY0s_kEQP44InZBjmg8n1yb1nUKln4mDesVND/exec',
 
   // Retry settings
   MAX_RETRIES: 2,
@@ -129,8 +129,8 @@ async function apiFetch(action, params = {}, method = 'GET') {
   if (method === 'GET') {
     url.searchParams.set('action', action);
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-    options = { 
-      method: 'GET', 
+    options = {
+      method: 'GET',
       redirect: 'follow',
       credentials: 'omit' // Often helps with Apps Script CORS on localhost
     };
