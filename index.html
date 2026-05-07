@@ -8,6 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SVM Tasks">
   <title>SVM Task Tracker</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-192.png">
@@ -311,12 +312,35 @@
             </select>
           </div>
           <div class="form-group" id="recurrence-pattern-group" style="display:none;">
-            <label for="new-task-recurrence">Recurrence Pattern</label>
-            <div style="display:flex; gap:8px;">
-              <input type="text" id="new-task-recurrence" placeholder="e.g. every 5 days, every first Monday" autocomplete="off">
-              <button type="button" class="btn-sm btn-secondary" id="btn-ai-parse-recurrence" style="width:auto; padding:0 10px; font-size:0.7rem;">AI Parse</button>
+            <label>Recurrence Schedule</label>
+            <div style="display:flex; flex-direction:column; gap:12px; background:rgba(255,255,255,0.03); padding:12px; border-radius:var(--radius-md); border:1px solid var(--border-glass);">
+              
+              <div style="display:flex; gap:10px; align-items:center;">
+                <span style="font-size:0.85rem; color:var(--text-secondary); min-width:60px;">Repeat:</span>
+                <select id="recurrence-type-select" class="form-select" style="flex:1;">
+                  <option value="interval:days">Every X Day(s)</option>
+                  <option value="interval:weeks">Every X Week(s)</option>
+                  <option value="interval:months">Every X Month(s)</option>
+                  <option value="dayOfMonth">Every Month on Day X</option>
+                </select>
+              </div>
+
+              <div id="recurrence-interval-row" style="display:flex; gap:10px; align-items:center;">
+                <span id="recurrence-prefix" style="font-size:0.85rem; color:var(--text-secondary); min-width:60px;">Every:</span>
+                <input type="number" id="recurrence-val" value="1" min="1" style="width:80px;">
+                <span id="recurrence-suffix" style="font-size:0.85rem; color:var(--text-secondary);">Day(s)</span>
+              </div>
+
+              <div id="recurrence-day-row" style="display:none; gap:10px; align-items:center;">
+                <span style="font-size:0.85rem; color:var(--text-secondary); min-width:60px;">On Day:</span>
+                <select id="recurrence-day-val" class="form-select" style="width:100px;">
+                  <!-- Will be populated 1-31 -->
+                </select>
+                <span style="font-size:0.85rem; color:var(--text-secondary);">of the month</span>
+              </div>
+
             </div>
-            <p id="recurrence-hint" style="font-size:0.65rem; color:var(--text-muted); margin-top:4px;">Type in plain English and click "AI Parse".</p>
+            <input type="hidden" id="new-task-recurrence">
           </div>
           <div class="form-group">
             <label for="new-task-priority">Priority</label>
@@ -374,9 +398,24 @@
         <label for="shift-task-assignee">Transfer To</label>
         <select id="shift-task-assignee"></select>
       </div>
-      <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">
-        Note: Recurring tasks will automatically return to you in the next cycle.
-      </p>
+
+      <div class="form-group">
+        <label>Shift Type</label>
+        <div style="display: flex; gap: 20px; margin-top: 8px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem;">
+            <input type="radio" name="shift-mode" value="permanent" checked> Permanent
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem;">
+            <input type="radio" name="shift-mode" value="temporary"> Temporary
+          </label>
+        </div>
+      </div>
+
+      <div id="shift-days-group" class="form-group" style="display: none;">
+        <label for="shift-days">For how many days?</label>
+        <input type="number" id="shift-days" min="1" value="1">
+        <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Task returns to you after these days.</p>
+      </div>
       <div class="modal-actions">
         <button class="btn-secondary" id="shift-cancel-btn">Cancel</button>
         <button class="btn-primary" id="shift-confirm-btn">Transfer</button>
@@ -409,14 +448,24 @@
     <div class="modal-card modal-card-sm">
       <div class="modal-header">
         <h3>Remove Member</h3>
+        <button class="modal-close" id="delete-member-close-btn" aria-label="Close">✕</button>
       </div>
-      <p class="modal-body-text">To remove <strong id="delete-member-target-name"></strong>, type their name below to confirm:</p>
+      <p class="modal-body-text">To remove <strong id="delete-member-target-name"></strong>, you must select a person to take over their assigned tasks permanent.</p>
+      
+      <div class="form-group">
+        <label for="delete-member-transfer-to">Transfer All Tasks To:</label>
+        <select id="delete-member-transfer-to" required>
+          <option value="" disabled selected>Select Successor</option>
+        </select>
+      </div>
+
+      <p class="modal-body-text" style="font-size: 0.8rem; margin-top: var(--space-md);">Type member name <strong id="delete-member-confirm-name-hint"></strong> to confirm:</p>
       <div class="form-group">
         <input type="text" id="delete-member-confirm-input" placeholder="Type name here..." autocomplete="off">
       </div>
       <div class="modal-actions">
         <button class="btn-secondary" id="delete-member-cancel-btn">Cancel</button>
-        <button class="btn-danger" id="delete-member-confirm-btn" disabled>Remove</button>
+        <button class="btn-danger" id="delete-member-confirm-btn" disabled>Remove & Transfer</button>
       </div>
     </div>
   </div>
@@ -439,13 +488,13 @@
         <input type="date" id="leave-end-date">
       </div>
       <div class="form-group">
-        <label for="leave-reason">Reason (Optional)</label>
-        <input type="text" id="leave-reason" placeholder="e.g. Family function, Health...">
+        <label for="leave-reason">Reason (Required)</label>
+        <input type="text" id="leave-reason" placeholder="e.g. Family function, Health..." required>
       </div>
       <div class="form-group">
-        <label for="leave-buddy">Task Buddy (Optional)</label>
-        <select id="leave-buddy">
-          <option value="">No Buddy</option>
+        <label for="leave-buddy">Task Buddy (Required)</label>
+        <select id="leave-buddy" required>
+          <option value="" disabled selected>Select Buddy</option>
         </select>
         <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Buddy will manage your tasks while you are away.</p>
       </div>

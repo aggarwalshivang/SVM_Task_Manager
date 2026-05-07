@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   //  REPLACE THIS with your deployed Apps Script Web App URL
-  API_URL: 'https://script.google.com/macros/s/AKfycbxGzBFYKeiMxijXXknOh1Wwn0ld0juQkD3VhBHgnBzSOWAoks6z7_2k-I8e-V1RRMDb/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbzwqVkv69uieoq0UL8m3STRuiNdBj1DXHMJd7jqhiwIUZIghRMh64acD19GF_tezfk1/exec',
 
   // Retry settings
   MAX_RETRIES: 2,
@@ -427,6 +427,11 @@ function handleUserSignedIn(userData) {
   renderHeader(state.currentUser);
   initForUser(state.currentUser);
 
+  // Request notification permission
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+
   // Bind tab events
   $('tab-my-tasks').onclick = () => {
     state.currentView = 'tasks';
@@ -764,23 +769,34 @@ function renderTasks(tasks) {
 
   // Sort tasks chronologically (Date, then Time)
   filteredTasks.sort((a, b) => {
-    // 1. Date comparison (Earliest first)
-    const dateA = a.plannedDate || '9999-12-31';
-    const dateB = b.plannedDate || '9999-12-31';
+    // 1. Status comparison (Active tasks first, Completed/Missed last)
+    const statusOrder = { 'in-progress': 0, 'stuck': 1, 'pending': 2, 'overdue': 3, 'done': 4, 'missed': 5 };
+    const orderA = statusOrder[a.status] ?? 2;
+    const orderB = statusOrder[b.status] ?? 2;
+    if (orderA !== orderB) return orderA - orderB;
+
+    // 2. Date comparison (Earliest first)
+    const dateA = a.plannedDate ? a.plannedDate.substring(0, 10) : '9999-12-31';
+    const dateB = b.plannedDate ? b.plannedDate.substring(0, 10) : '9999-12-31';
     if (dateA !== dateB) return dateA.localeCompare(dateB);
 
-    // 2. Time comparison (Morning to Night)
-    const timeA = a.time || '23:59';
-    const timeB = b.time || '23:59';
-    return timeA.localeCompare(timeB);
+    // 3. Time comparison (Morning to Night)
+    const padTime = (t) => {
+      if (!t) return '23:59';
+      // Ensure HH:mm format for reliable comparison
+      return t.split(':').map(p => p.trim().padStart(2, '0')).join(':');
+    };
+    return padTime(a.time).localeCompare(padTime(b.time));
   });
 
   const recurring = filteredTasks.filter(t => t.taskType === 'daily' || t.taskType === 'weekly');
   const oneTime = filteredTasks.filter(t => t.taskType === 'one-time');
 
   $('controls-section').style.display = 'flex';
-  renderTaskSection('recurring-section', '', 'Daily & Weekly', recurring);
-  renderTaskSection('onetime-section', '', 'One-Time Tasks', oneTime);
+
+  // Consolidate all tasks into one main list for accurate chronological sorting across all types
+  renderTaskSection('recurring-section', '📋', 'Your Tasks', filteredTasks);
+  $('onetime-section').style.display = 'none';
 
   // Check if all done
   const allDone = tasks.length > 0 && tasks.every(t => t.status === 'done');
@@ -955,7 +971,7 @@ function renderTaskCard(task) {
         <button class="task-comment-btn" data-comment-id="${task.taskId}" title="Comments" aria-label="Task comments">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 1 1-7.6-13.5 8.38 8.38 0 0 1 3.8.9L21 3z"></path></svg>
         </button>
-        ${(!isDone && !isMissed && !isOverdue) ? `
+        ${(!isDone) ? `
           <button onclick="handleUpdateTaskStatus('${task.taskId}', 'in-progress', event)" title="Mark In Progress" style="background:none; border:none; color:var(--accent-blue); cursor:pointer; padding:4px; display:flex; align-items:center;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
           </button>
@@ -963,7 +979,7 @@ function renderTaskCard(task) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
           </button>
         ` : ''}
-        ${(!isDone && !isMissed && !isOverdue) ? `<button class="task-shift-btn" data-shift-id="${task.taskId}" title="Shift task" aria-label="Shift task">
+        ${(!isDone) ? `<button class="task-shift-btn" data-shift-id="${task.taskId}" title="Shift task" aria-label="Shift task">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </button>` : ''}
         ${(isAdminOrCoord || task.assignedTo === state.currentUser) ? `
@@ -1162,6 +1178,14 @@ function renderDashboard(scores, pendingMembers = [], leaves = [], perfData = []
                   <span>Task:</span> <span style="color:var(--text-primary); font-weight:600;">${m.newData.taskName}</span>
                   <span>Type:</span> <span style="color:var(--text-primary);">${m.newData.taskType}</span>
                   <span>Due:</span> <span style="color:var(--text-primary);">${m.newData.plannedDate} ${m.newData.time ? `at ${m.newData.time}` : ''}</span>
+                </div>
+              </div>
+            ` : m.type === 'shift' ? `
+              <div style="font-size:0.75rem; color:var(--text-muted); background:rgba(79,70,229,0.05); padding:10px; border-radius:6px; border:1px solid rgba(79,70,229,0.1);">
+                <div style="color:var(--accent-indigo); font-weight:700; margin-bottom:6px; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.05em;">Transfer Details:</div>
+                <div style="display:grid; grid-template-columns: 80px 1fr; gap:6px;">
+                  <span>Assign To:</span> <span style="color:var(--text-primary); font-weight:600;">${m.newData.newAssignee}</span>
+                  <span>Type:</span> <span style="color:var(--text-primary);">${m.newData.shiftMode} ${m.newData.shiftMode === 'temporary' ? `(${m.newData.shiftDays} days)` : ''}</span>
                 </div>
               </div>
             ` : `
@@ -1653,37 +1677,76 @@ async function handleViewMemberTasks(userName) {
   }
 }
 
-async function handleRemoveMemberPrompt(memberName, event) {
+let pendingRemoveMemberName = null;
+
+function handleRemoveMemberPrompt(memberName, event) {
   if (event) event.stopPropagation();
 
-  if (!confirm(`Are you sure you want to remove ${memberName}? This will deactivate their account.`)) {
+  pendingRemoveMemberName = memberName;
+  $('delete-member-target-name').textContent = memberName;
+  $('delete-member-confirm-name-hint').textContent = memberName;
+  $('delete-member-confirm-input').value = '';
+  $('delete-member-confirm-btn').disabled = true;
+
+  // Populate successors
+  const select = $('delete-member-transfer-to');
+  if (select) {
+    select.innerHTML = '<option value="" disabled selected>Select Successor</option>';
+    state.teamMembers
+      .filter(m => m.name !== memberName && (m.active === true || m.active === 'TRUE'))
+      .forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.name;
+        opt.textContent = m.name;
+        select.appendChild(opt);
+      });
+  }
+
+  $('delete-member-modal').style.display = 'flex';
+}
+
+function closeDeleteMemberModal() {
+  $('delete-member-modal').style.display = 'none';
+  pendingRemoveMemberName = null;
+}
+
+async function handleDeleteMemberSubmit() {
+  const successor = $('delete-member-transfer-to').value;
+  const confirmName = $('delete-member-confirm-input').value.trim();
+
+  if (!successor) {
+    showToast('Please select a successor to take over tasks.', 'error');
     return;
   }
 
-  // Security Verification (Math Challenge)
-  const n1 = Math.floor(Math.random() * 9) + 2;
-  const n2 = Math.floor(Math.random() * 9) + 2;
-  const answer = n1 + n2;
-  const userInput = prompt(`Verification Required: What is ${n1} + ${n2}? (Confirming removal of ${memberName})`);
-
-  if (parseInt(userInput) !== answer) {
-    showToast('Incorrect verification answer. Removal cancelled.', 'error');
+  if (confirmName.toLowerCase() !== pendingRemoveMemberName.toLowerCase()) {
+    showToast('Confirmation name does not match.', 'error');
     return;
   }
+
+  const btn = $('delete-member-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'Removing...';
 
   try {
-    showToast(`Removing ${memberName}...`);
-    const res = await apiFetch('removeMember', { name: memberName }, 'POST');
+    showToast(`Removing ${pendingRemoveMemberName}...`);
+    const res = await apiFetch('removeMember', {
+      name: pendingRemoveMemberName,
+      transferTo: successor
+    }, 'POST');
+
     if (res.success) {
-      showToast(`${memberName} has been removed.`);
-      // Reload dashboard
+      showToast(`${pendingRemoveMemberName} removed. Tasks transferred to ${successor}.`);
+      closeDeleteMemberModal();
       openDashboard();
     } else {
       throw new Error(res.error);
     }
   } catch (err) {
     console.error('Failed to remove member:', err);
-    showToast('Failed to remove member: ' + err.message, 'error');
+    showToast('Removal failed: ' + (err.message || 'Unknown error'), 'error');
+    btn.disabled = false;
+    btn.textContent = 'Remove & Transfer';
   }
 }
 
@@ -1780,10 +1843,75 @@ function launchConfetti() {
 }
 
 // =============================================
+// iOS PWA OPTIMIZATION
+// =============================================
+function detectIOS() {
+  return [
+    'iPad Simulator',
+    'iPhone Simulator',
+    'iPod Simulator',
+    'iPad',
+    'iPhone',
+    'iPod'
+  ].includes(navigator.platform)
+    // iPad on iOS 13 detection
+    || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
+}
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+}
+
+function initIOSInstallPrompt() {
+  // Only show if it's iOS and NOT already in standalone mode
+  if (detectIOS() && !isStandalone()) {
+    // Also check if they've already dismissed it in this session
+    if (localStorage.getItem('ios_prompt_dismissed')) return;
+
+    const prompt = document.createElement('div');
+    prompt.className = 'ios-install-prompt';
+    prompt.id = 'ios-install-prompt';
+    prompt.innerHTML = `
+      <img src="icon-192.png" alt="App Icon" class="ios-install-icon">
+      <div class="ios-install-content">
+        <h4>Install SVM Tasks</h4>
+        <p>Tap <svg class="ios-share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg> then <strong>"Add to Home Screen"</strong> for a better experience.</p>
+      </div>
+      <button class="ios-install-close" id="ios-prompt-close" aria-label="Dismiss">✕</button>
+    `;
+
+    document.body.appendChild(prompt);
+
+    const closeBtn = prompt.querySelector('#ios-prompt-close');
+    const dismissPrompt = () => {
+      prompt.style.opacity = '0';
+      prompt.style.transform = 'translate(-50%, 20px)';
+      setTimeout(() => prompt.remove(), 500);
+      localStorage.setItem('ios_prompt_dismissed', 'true');
+    };
+
+    closeBtn.addEventListener('click', dismissPrompt);
+    closeBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      dismissPrompt();
+    }, { passive: false });
+  }
+}
+
+// =============================================
 // INITIALIZATION
 // =============================================
 async function init() {
   applyTheme();
+  initIOSInstallPrompt();
+
+  // Shift Mode Toggle
+  document.querySelectorAll('input[name="shift-mode"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const daysGroup = $('shift-days-group');
+      if (daysGroup) daysGroup.style.display = (e.target.value === 'temporary') ? 'block' : 'none';
+    });
+  });
 
   try {
     const teamRes = await apiFetch('getTeam');
@@ -1811,12 +1939,37 @@ async function init() {
 }
 
 async function initForUser(user) {
+  if (!user) return;
   state.currentUser = user;
   hideError();
-  // renderHeader is already called in handleUserSignedIn
 
-  // Show briefing skeleton
-  renderBriefingSkeleton();
+  // 1. Load from cache immediately to prevent "disappearing tasks" glitch
+  const cacheKey = `svm_cache_${user}`;
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) {
+    try {
+      const { tasks, stats, briefing } = JSON.parse(cached);
+      if (tasks && tasks.length > 0) {
+        state.tasks = tasks;
+        renderTasks(state.tasks);
+      }
+      if (stats) {
+        state.stats = stats;
+        renderStats(state.stats);
+      }
+      if (briefing) {
+        state.briefing = briefing;
+        renderBriefing(state.briefing);
+      }
+    } catch (e) {
+      console.warn('Cache load failed', e);
+    }
+  }
+
+  // 2. Show briefing skeleton ONLY if we don't have a cached briefing
+  if (!state.briefing) {
+    renderBriefingSkeleton();
+  }
 
   try {
     // Fetch tasks, stats and team in parallel
@@ -1826,11 +1979,11 @@ async function initForUser(user) {
       apiFetch('getTeam'),
     ]);
 
-    state.tasks = tasksRes.data;
+    state.tasks = tasksRes.data || [];
     state.stats = statsRes.data;
-    state.team = teamRes.data;
+    state.teamMembers = teamRes.data || []; // Note: state property is teamMembers based on init()
 
-    // Render tasks
+    // Render fresh tasks
     if (state.tasks.length === 0) {
       renderEmptyState();
     } else {
@@ -1846,12 +1999,27 @@ async function initForUser(user) {
       state.briefing = briefRes.data.briefing;
       renderBriefing(state.briefing);
     } catch {
-      // Fall back to local briefing
-      renderBriefing(getMockBriefing(user, state.tasks));
+      // Fall back to local briefing calculation if API fails
+      state.briefing = getMockBriefing(user, state.tasks);
+      renderBriefing(state.briefing);
     }
 
+    // 3. Update Cache for next visit
+    localStorage.setItem(cacheKey, JSON.stringify({
+      tasks: state.tasks,
+      stats: state.stats,
+      briefing: state.briefing,
+      timestamp: Date.now()
+    }));
+
   } catch (err) {
-    showError('Could not load tasks. ' + (err.message || ''));
+    console.error('Fetch error:', err);
+    // If we have cached tasks, don't show a hard error banner that blocks the UI
+    if (state.tasks && state.tasks.length > 0) {
+      showToast('Showing cached tasks (Server unreachable)', 'warning');
+    } else {
+      showError('Could not load tasks. Please check your connection.');
+    }
   }
 }
 
@@ -1870,6 +2038,73 @@ function renderEmptyState() {
 // =============================================
 // ADD TASK
 // =============================================
+// ============ RECURRENCE UI HELPERS ============
+function populateRecurrenceDays() {
+  const select = $('recurrence-day-val');
+  if (!select) return;
+  let html = '';
+  for (let i = 1; i <= 31; i++) {
+    let suffix = 'th';
+    if (i === 1 || i === 21 || i === 31) suffix = 'st';
+    else if (i === 2 || i === 22) suffix = 'nd';
+    else if (i === 3 || i === 23) suffix = 'rd';
+    html += `<option value="${i}">${i}${suffix}</option>`;
+  }
+  select.innerHTML = html;
+}
+
+function updateRecurrenceValue() {
+  const type = $('recurrence-type-select').value;
+  const val = $('recurrence-val').value || 1;
+  const day = $('recurrence-day-val').value || 1;
+
+  let pattern = '';
+  if (type === 'dayOfMonth') {
+    pattern = `dayOfMonth:${day}`;
+  } else {
+    const unit = type.split(':')[1];
+    pattern = `interval:${val}:${unit}`;
+  }
+  $('new-task-recurrence').value = pattern;
+}
+
+function syncRecurrenceUI() {
+  const type = $('recurrence-type-select').value;
+  const intervalRow = $('recurrence-interval-row');
+  const dayRow = $('recurrence-day-row');
+
+  if (type === 'dayOfMonth') {
+    if (intervalRow) intervalRow.style.display = 'none';
+    if (dayRow) dayRow.style.display = 'flex';
+  } else {
+    if (intervalRow) intervalRow.style.display = 'flex';
+    if (dayRow) dayRow.style.display = 'none';
+    const unit = type.split(':')[1];
+    if ($('recurrence-suffix')) $('recurrence-suffix').textContent = unit.charAt(0).toUpperCase() + unit.slice(1);
+  }
+  updateRecurrenceValue();
+}
+
+function setRecurrenceUI(pattern) {
+  if (!pattern || pattern === 'one-time') return;
+
+  if (pattern.startsWith('interval:')) {
+    const parts = pattern.split(':');
+    $('recurrence-type-select').value = `interval:${parts[2]}`;
+    $('recurrence-val').value = parts[1];
+  } else if (pattern.startsWith('dayOfMonth:')) {
+    $('recurrence-type-select').value = 'dayOfMonth';
+    $('recurrence-day-val').value = pattern.split(':')[1];
+  } else if (pattern === 'daily') {
+    $('recurrence-type-select').value = 'interval:days';
+    $('recurrence-val').value = 1;
+  } else if (pattern === 'weekly') {
+    $('recurrence-type-select').value = 'interval:weeks';
+    $('recurrence-val').value = 1;
+  }
+  syncRecurrenceUI();
+}
+
 function openAddTaskModal(defaultAssignee = null) {
   const modal = $('add-task-modal');
   if (!modal) return;
@@ -1882,41 +2117,28 @@ function openAddTaskModal(defaultAssignee = null) {
   $('planned-date-group').style.display = 'none'; // Default is Daily
   $('planned-time-group').style.display = 'block';
 
+  // Populate days 1-31
+  populateRecurrenceDays();
+
   // Handle type change
   $('new-task-type').onchange = (e) => {
     const type = e.target.value;
-    // Show date only for one-time tasks
     $('planned-date-group').style.display = (type === 'one-time') ? 'block' : 'none';
-    // Show recurrence input for custom recurring
     $('recurrence-pattern-group').style.display = (type === 'recurring') ? 'block' : 'none';
 
-    // Auto-fill recurrence for shortcuts
     if (type === 'daily') $('new-task-recurrence').value = 'daily';
     else if (type === 'weekly') $('new-task-recurrence').value = 'weekly';
     else if (type === 'one-time') $('new-task-recurrence').value = 'one-time';
-    else if (type === 'recurring') $('new-task-recurrence').value = '';
+    else if (type === 'recurring') syncRecurrenceUI();
   };
 
-  // Bind AI Parse button
-  $('btn-ai-parse-recurrence').onclick = async () => {
-    const text = $('new-task-recurrence').value.trim();
-    if (!text) return;
-    const btn = $('btn-ai-parse-recurrence');
-    btn.textContent = '...';
-    btn.disabled = true;
-    try {
-      const res = await apiFetch('parseRecurrence', { text });
-      if (res.success && res.data.pattern) {
-        $('new-task-recurrence').value = res.data.pattern;
-        showToast('AI parsed: ' + res.data.pattern);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      btn.textContent = 'AI Parse';
-      btn.disabled = false;
-    }
-  };
+  // Recurrence UI events
+  $('recurrence-type-select').onchange = syncRecurrenceUI;
+  $('recurrence-val').oninput = updateRecurrenceValue;
+  $('recurrence-day-val').onchange = updateRecurrenceValue;
+
+  // Initialize UI
+  syncRecurrenceUI();
 
   if (state.userRole === 'admin' || state.userRole === 'coordinator') {
     $('admin-assign-group').style.display = 'block';
@@ -2057,6 +2279,12 @@ function openEditTaskModal(taskId) {
 
   // Ensure date group is visible if it's a one-time task
   $('planned-date-group').style.display = (task.taskType === 'one-time') ? 'block' : 'none';
+  $('recurrence-pattern-group').style.display = (task.taskType === 'recurring') ? 'block' : 'none';
+
+  if (task.taskType === 'recurring') {
+    populateRecurrenceDays();
+    setRecurrenceUI(task.recurrence);
+  }
 }
 
 function closeAddTaskModal() {
@@ -2294,6 +2522,10 @@ async function openShiftTaskModal(taskId) {
     return;
   }
 
+  document.querySelector('input[name="shift-mode"][value="permanent"]').checked = true;
+  $('shift-days-group').style.display = 'none';
+  $('shift-days').value = 1;
+
   $('shift-task-modal').style.display = 'flex';
 }
 
@@ -2397,7 +2629,6 @@ $('comment-submit-btn')?.addEventListener('click', handleCommentSubmit);
 $('new-comment-text')?.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') handleCommentSubmit();
 });
-
 async function handleShiftTaskSubmit() {
   if (!pendingShiftTaskId) return;
   const assigneeSelect = $('shift-task-assignee');
@@ -2405,6 +2636,38 @@ async function handleShiftTaskSubmit() {
   if (!newAssignee) return;
 
   const taskId = pendingShiftTaskId;
+  const shiftMode = document.querySelector('input[name="shift-mode"]:checked').value;
+  const shiftDays = parseInt($('shift-days').value) || 1;
+
+  // If it's a member trying to shift, send for approval instead
+  if (state.userRole === 'member') {
+    const btn = $('shift-confirm-btn');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+
+    try {
+      showToast('Transfer request sent for approval');
+      await apiFetch('requestTaskChange', {
+        taskId: taskId,
+        type: 'shift',
+        newData: {
+          newAssignee: newAssignee,
+          shiftMode: shiftMode,
+          shiftDays: shiftDays,
+          fromUser: state.currentUser
+        },
+        requestedBy: state.currentUser
+      }, 'POST');
+      closeShiftTaskModal();
+    } catch (err) {
+      showToast('Failed to send request.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Confirm Transfer';
+    }
+    return;
+  }
+
   const btn = $('shift-confirm-btn');
   btn.disabled = true;
   btn.textContent = 'Transferring...';
@@ -2413,7 +2676,9 @@ async function handleShiftTaskSubmit() {
     await apiFetch('shiftTask', {
       taskId: taskId,
       fromUser: state.currentUser,
-      newAssignee: newAssignee
+      newAssignee: newAssignee,
+      shiftMode: shiftMode,
+      shiftDays: shiftDays
     }, 'POST');
 
     // Update local task state (remove from current view as it's no longer yours)
@@ -2511,6 +2776,18 @@ $('delete-cancel-btn')?.addEventListener('click', closeDeleteConfirm);
 $('delete-confirm-btn')?.addEventListener('click', handleDeleteTask);
 $('delete-confirm-modal')?.addEventListener('click', (e) => {
   if (e.target === $('delete-confirm-modal')) closeDeleteConfirm();
+});
+
+// Member Removal
+$('delete-member-confirm-input')?.addEventListener('input', (e) => {
+  const val = e.target.value.trim();
+  $('delete-member-confirm-btn').disabled = (val.toLowerCase() !== pendingRemoveMemberName?.toLowerCase());
+});
+$('delete-member-confirm-btn')?.addEventListener('click', handleDeleteMemberSubmit);
+$('delete-member-cancel-btn')?.addEventListener('click', closeDeleteMemberModal);
+$('delete-member-close-btn')?.addEventListener('click', closeDeleteMemberModal);
+$('delete-member-modal')?.addEventListener('click', (e) => {
+  if (e.target === $('delete-member-modal')) closeDeleteMemberModal();
 });
 
 // Shift Task confirmation
@@ -2818,7 +3095,7 @@ function openLeaveModal() {
   // Populate Buddy list
   const buddySelect = $('leave-buddy');
   if (buddySelect) {
-    buddySelect.innerHTML = '<option value="">No Buddy</option>';
+    buddySelect.innerHTML = '<option value="" disabled selected>Select Buddy</option>';
     if (state.team) {
       state.team
         .filter(m => m.name !== state.currentUser && m.active)
@@ -2846,6 +3123,16 @@ async function handleLeaveSubmit() {
 
   if (!startDate || !endDate) {
     showToast('Please select dates', 'error');
+    return;
+  }
+
+  if (!taskBuddy) {
+    showToast('Please select a Task Buddy', 'error');
+    return;
+  }
+
+  if (!reason) {
+    showToast('Please provide a reason for leave', 'error');
     return;
   }
 
@@ -3246,7 +3533,6 @@ function startBackgroundSync() {
   setInterval(async () => {
     if (state.currentView === 'tests') {
       const container = $("test-list-content");
-      // Only refresh if not actively loading to avoid flicker
       if (container && !container.querySelector('.loading-spinner')) {
         const [settingsRes, testsRes] = await Promise.all([
           apiFetch('getTestSettings'),
@@ -3259,7 +3545,67 @@ function startBackgroundSync() {
     } else if (state.currentView === 'tasks' && state.currentUser) {
       initForUser(state.currentUser);
     }
+
+    // Always check for upcoming tasks if logged in
+    if (state.currentUser) {
+      checkUpcomingTasks();
+    }
   }, 60000); // Sync every 60 seconds
+}
+
+function checkUpcomingTasks() {
+  if (!("Notification" in window) || Notification.permission !== 'granted') return;
+  if (!state.tasks || state.tasks.length === 0) return;
+
+  const now = new Date();
+
+  state.tasks.forEach(task => {
+    // Only check active tasks
+    if (task.status === 'done' || task.status === 'missed') return;
+    if (!task.plannedDate || !task.time) return;
+
+    try {
+      // Parse task time. task.time is "HH:mm"
+      const [hours, minutes] = task.time.split(':');
+      const taskDate = new Date(task.plannedDate);
+      taskDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+      const diffMs = taskDate - now;
+      const diffMin = diffMs / (1000 * 60);
+
+      // Notify if task is due in 50-70 minutes (approx 1 hour)
+      if (diffMin > 0 && diffMin <= 65) {
+        const notifiedKey = `notified_1hr_${task.taskId}_${task.plannedDate}`;
+        if (!localStorage.getItem(notifiedKey)) {
+          showBrowserNotification(
+            `Task Reminder: ${task.taskName}`,
+            `This task is due in about 1 hour (${task.time}). Please complete it!`
+          );
+          localStorage.setItem(notifiedKey, 'true');
+        }
+      }
+    } catch (e) {
+      console.error('Error checking task time:', e);
+    }
+  });
+}
+
+function showBrowserNotification(title, body) {
+  if (Notification.permission === 'granted') {
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.ready.then(registration => {
+        registration.showNotification(title, {
+          body,
+          icon: 'icon-192.png',
+          badge: 'icon-192.png',
+          vibrate: [200, 100, 200],
+          tag: 'task-reminder'
+        });
+      });
+    } else {
+      new Notification(title, { body, icon: 'icon-192.png' });
+    }
+  }
 }
 
 function bindModificationEvents() {

@@ -24,9 +24,8 @@ self.addEventListener('activate', (e) => {
       Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
     ).then(async () => {
       await self.clients.claim();
-      // Force all open tabs to reload so they get the fresh app.js
-      const allClients = await self.clients.matchAll({ type: 'window' });
-      allClients.forEach((client) => client.navigate(client.url));
+      // Removed forced reload to prevent "sudden loading" glitch
+      // allClients.forEach((client) => client.navigate(client.url));
     })
   );
 });
