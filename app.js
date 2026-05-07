@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   //  REPLACE THIS with your deployed Apps Script Web App URL
-  API_URL: 'https://script.google.com/macros/s/AKfycbwc2zQGE4EAjE-WrYzfoSiKxeHuuB4ZY0s_kEQP44InZBjmg8n1yb1nUKln4mDesVND/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbzinkKGdc5ox4BDrRC4Yy-m72aRWoL2YfESInaeHBHtbjfvokyLmwuCPPoCUJmWFeU/exec',
 
   // Retry settings
   MAX_RETRIES: 2,
@@ -407,7 +407,7 @@ function handleUserSignedIn(userData) {
 
   $('auth-overlay').style.display = 'none';
   $('app-header').style.display = 'flex';
-  
+
   const isPrivileged = ['admin', 'coordinator', 'process_coordinator'].includes(state.userRole);
   $('header-view-all').style.display = isPrivileged ? 'flex' : 'none';
   $('header-add-task').style.display = 'flex';
@@ -1257,9 +1257,11 @@ function renderDashboard(scores, pendingMembers = [], leaves = [], perfData = []
     adminActions.style = 'display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;';
     adminActions.innerHTML = `
       <button class="btn-secondary" id="btn-reset-passwords">Reset All Passwords</button>
+      <button class="btn-danger" id="btn-cleanup-tasks" style="background:none; border:1px solid rgba(239,68,68,0.3); color:var(--accent-red);">Cleanup Old Tasks (30d+)</button>
     `;
     container.appendChild(adminActions);
     $('btn-reset-passwords')?.addEventListener('click', handleResetAllPasswords);
+    $('btn-cleanup-tasks')?.addEventListener('click', handleCleanupOldTasks);
   }
 
   // Process Coordinator & Admin Actions
@@ -2493,6 +2495,32 @@ async function handleResetAllPasswords() {
   } finally {
     btn.textContent = originalText;
     btn.disabled = false;
+  }
+}
+
+async function handleCleanupOldTasks() {
+  if (!confirm('Are you sure? This will permanently delete all DONE and MISSED tasks older than 30 days.')) return;
+
+  const btn = $('btn-cleanup-tasks');
+  const originalText = btn.textContent;
+
+  try {
+    btn.disabled = true;
+    btn.textContent = 'Cleaning up...';
+
+    const res = await apiFetch('cleanupTasks', {}, 'POST');
+    if (res.success) {
+      showToast(`Success! Deleted ${res.count} old tasks.`);
+      // Refresh if we are in a view that might have changed
+      if (state.currentView === 'all-tasks') handleViewAllTasks();
+      else if (state.currentView === 'team') renderDashboard();
+    }
+  } catch (err) {
+    console.error('Cleanup failed:', err);
+    showToast('Cleanup failed', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
   }
 }
 
