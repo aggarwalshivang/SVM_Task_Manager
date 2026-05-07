@@ -407,6 +407,9 @@ function handleUserSignedIn(userData) {
 
   $('auth-overlay').style.display = 'none';
   $('app-header').style.display = 'flex';
+  
+  const isPrivileged = ['admin', 'coordinator', 'process_coordinator'].includes(state.userRole);
+  $('header-view-all').style.display = isPrivileged ? 'flex' : 'none';
   $('header-add-task').style.display = 'flex';
 
   // Show navigation tabs to all roles (Admin, Coordinator, Member)
@@ -1259,8 +1262,9 @@ function renderDashboard(scores, pendingMembers = [], leaves = [], perfData = []
     $('btn-reset-passwords')?.addEventListener('click', handleResetAllPasswords);
   }
 
-  // Process Coordinator Actions
-  const isPrivileged = state.userRole === 'admin' || state.userRole === 'coordinator' || state.userRole === 'process_coordinator';
+  // Process Coordinator & Admin Actions
+  const roleLower = state.userRole?.toLowerCase();
+  const isPrivileged = roleLower === 'admin' || roleLower === 'coordinator' || roleLower === 'process_coordinator';
   if (isPrivileged) {
     const processActions = document.createElement('div');
     processActions.className = 'admin-actions-bar';
@@ -2806,6 +2810,7 @@ $('retry-btn')?.addEventListener('click', () => {
 $('tab-my-tasks')?.addEventListener('click', () => switchView('tasks'));
 $('tab-team')?.addEventListener('click', () => switchView('team'));
 $('header-add-task')?.addEventListener('click', () => openAddTaskModal());
+$('header-view-all')?.addEventListener('click', () => handleViewAllTasks());
 
 async function switchView(view) {
   if (state.currentView === view && view === 'team') return; // Already there
