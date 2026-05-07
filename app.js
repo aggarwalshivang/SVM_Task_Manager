@@ -129,11 +129,16 @@ async function apiFetch(action, params = {}, method = 'GET') {
   if (method === 'GET') {
     url.searchParams.set('action', action);
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-    options = { method: 'GET', redirect: 'follow' };
+    options = { 
+      method: 'GET', 
+      redirect: 'follow',
+      credentials: 'omit' // Often helps with Apps Script CORS on localhost
+    };
   } else {
     options = {
       method: 'POST',
       redirect: 'follow',
+      credentials: 'omit',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action, ...params }),
     };
