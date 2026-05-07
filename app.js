@@ -1247,7 +1247,8 @@ function renderDashboard(scores, pendingMembers = [], leaves = [], perfData = []
   }
 
   // Process Coordinator Actions
-  if (state.userRole === 'process_coordinator') {
+  const isPrivileged = state.userRole === 'admin' || state.userRole === 'coordinator' || state.userRole === 'process_coordinator';
+  if (isPrivileged) {
     const processActions = document.createElement('div');
     processActions.className = 'admin-actions-bar';
     processActions.style = 'display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;';
