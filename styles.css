@@ -753,9 +753,10 @@ body::before {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 0.75rem;
   color: var(--text-dim);
+  flex-wrap: wrap; /* Allow wrapping */
 }
 
 .task-badge {
@@ -1445,10 +1446,14 @@ body::before {
 /* ---------- Task Card Action Buttons ---------- */
 .task-actions {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-left: auto;
+  flex-direction: row; /* Changed to row */
+  flex-wrap: wrap;    /* Allow wrapping */
+  gap: 4px;
+  margin-left: var(--space-sm);
   align-items: center;
+  justify-content: flex-end;
+  min-width: 60px;
+  max-width: 110px; /* Prevents pushing too far left */
 }
 
 .task-edit-btn, .task-shift-btn, .task-comment-btn {

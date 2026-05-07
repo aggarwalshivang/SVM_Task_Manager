@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   //  REPLACE THIS with your deployed Apps Script Web App URL
-  API_URL: 'https://script.google.com/macros/s/AKfycbzwqVkv69uieoq0UL8m3STRuiNdBj1DXHMJd7jqhiwIUZIghRMh64acD19GF_tezfk1/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbwcc2o_9eE7QkGHKeylquXyjwBFdDc6SotmTG35MsoRk1XLRDRJ0paUbQ35JEm0H66Z/exec',
 
   // Retry settings
   MAX_RETRIES: 2,
@@ -2380,7 +2380,7 @@ async function handleTaskSubmit(e) {
         submitBtn.textContent = 'Save Changes';
         return;
       }
-      
+
       payload.reason = reason; // Include reason in payload for approval
       showToast('Edit request sent for approval');
       await apiFetch('requestTaskChange', {
@@ -2432,14 +2432,14 @@ let pendingDeleteTaskId = null;
 function showDeleteConfirm(taskId, taskName) {
   pendingDeleteTaskId = taskId;
   $('delete-task-name').textContent = `"${taskName}" will be permanently removed.`;
-  
+
   if (state.userRole === 'member') {
     $('delete-reason-group').style.display = 'block';
     $('delete-reason').value = '';
   } else {
     $('delete-reason-group').style.display = 'none';
   }
-  
+
   $('delete-confirm-modal').style.display = 'flex';
 }
 
@@ -2495,7 +2495,7 @@ async function handleDeleteTask() {
     if (!reason) {
       showToast('Please provide a reason for deletion', 'error');
       // Don't close modal yet
-      $('delete-confirm-modal').style.display = 'flex'; 
+      $('delete-confirm-modal').style.display = 'flex';
       return;
     }
 
@@ -2514,7 +2514,7 @@ async function handleDeleteTask() {
     }
     return;
   }
-  
+
   closeDeleteConfirm();
 
   // Optimistic removal from UI (Admin/Coord only)
