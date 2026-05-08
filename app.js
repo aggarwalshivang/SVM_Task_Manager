@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   //  REPLACE THIS with your deployed Apps Script Web App URL
-  API_URL: 'https://script.google.com/macros/s/AKfycbzinkKGdc5ox4BDrRC4Yy-m72aRWoL2YfESInaeHBHtbjfvokyLmwuCPPoCUJmWFeU/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbypvjhhPQ65z1qIj0NI1_PCy6yzIQQsWjKgnBmDVB-qVogA3FjznvcgcDODQ3yQUkny/exec',
 
   // Retry settings
   MAX_RETRIES: 2,
@@ -771,7 +771,9 @@ function renderTasks(tasks) {
   // Apply Search and Status Filters
   const filteredTasks = tasks.filter(t => {
     const matchesSearch = t.taskName.toLowerCase().includes(state.filters.search.toLowerCase());
-    const matchesStatus = state.filters.status === 'all' || t.status === state.filters.status;
+    const matchesStatus = state.filters.status === 'all' ||
+      t.status === state.filters.status ||
+      (state.filters.status === 'overdue' && t.status === 'missed');
     return matchesSearch && matchesStatus;
   });
 
@@ -958,7 +960,7 @@ function renderTaskCard(task) {
             </span>
           ` : ''}
           ${task.plannedDate ? `<span class="task-date-text" style="color:var(--text-dim); font-size:0.75rem;">• ${formatDate(task.plannedDate, task.time)}</span>` : ''}
-          ${isOverdue ? `<span class="task-badge badge-overdue">${isMissed || task.taskType === 'daily' ? 'missed' : 'overdue'}</span>` : ''}
+          ${isOverdue ? `<span class="task-badge badge-overdue">overdue</span>` : ''}
           ${isInProgress ? `<span class="task-badge badge-in-progress">in progress</span>` : ''}
           ${isStuck ? `<span class="task-badge badge-stuck">stuck</span>` : ''}
           ${isDone && task.completedDate ? `<span>Done at ${formatTime(task.completedDate)}</span>` : ''}
