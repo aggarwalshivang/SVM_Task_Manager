@@ -7,14 +7,14 @@
 // =============================================
 const CONFIG = {
   //  REPLACE THIS with your deployed Apps Script Web App URL
-  API_URL: 'https://script.google.com/macros/s/AKfycbzIxJ2CrNpm7HIxPi8dy4y3oo9uB9REgg92visudYvA7Z9eG4UQ6nlRLN6XloVSnG8v/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbwYc8xU2mWSO5DCNDdyq7FkKc4Tl_piQKrv8w4PRDl_DCpCve_Hmbsw1tBpIvpjEKUq/exec',
 
   // Retry settings
   MAX_RETRIES: 2,
   RETRY_DELAY: 1000,
 
   // Anti-spam settings
-  TASK_COOLDOWN_MS: 60000, // 1 minute between task completions
+  TASK_COOLDOWN_MS: 2000, // 2 seconds between task completions
 
   // Demo mode — set to true to use mock data without a backend
   DEMO_MODE: false,
@@ -1616,8 +1616,8 @@ async function handleTaskComplete(taskId) {
 
   // Optimistic UI update
   card.classList.add('completing');
-  const statusIcon = card.querySelector('.task-status-icon');
-  if (statusIcon) statusIcon.textContent = '✓';
+  const statusIcon = card.querySelector('.check-icon');
+  if (statusIcon) statusIcon.style.opacity = '1';
   const checkbox = card.querySelector('.task-checkbox');
   if (checkbox) checkbox.innerHTML = '<span class="check-icon" style="opacity:1;transform:scale(1)">✓</span>';
 
@@ -2226,10 +2226,12 @@ function setRecurrenceUI(pattern) {
 }
 
 function openAddTaskModal(defaultAssignee = null) {
+  state.editingTaskId = null; // Clear edit mode
   const modal = $('add-task-modal');
   if (!modal) return;
   $('add-task-form').reset();
-  $('task-modal-title').textContent = defaultAssignee ? `Assign to ${defaultAssignee}` : 'New Task';
+  $('task-modal-title').textContent = defaultAssignee ? `Assign to ${defaultAssignee}` : 'Add New Task';
+  $('add-task-submit').textContent = 'Add Task';
 
   // Set default date to today
   $('new-task-date').value = getTodayStr();
@@ -2276,46 +2278,6 @@ function openAddTaskModal(defaultAssignee = null) {
 
 function openAddTaskForMember(name) {
   openAddTaskModal(name);
-}
-
-async function handleAddTaskSubmit(e) {
-  e.preventDefault();
-  const name = $('new-task-name').value.trim();
-  const assignedTo = (state.userRole === 'admin' || state.userRole === 'coordinator')
-    ? $('new-task-assigned-to').value
-    : state.currentUser;
-  const type = $('new-task-type').value;
-  const date = (type === 'one-time') ? $('new-task-date').value : getTodayStr();
-
-  if (!name || !assignedTo) {
-    showToast('Please fill all required fields', 'error');
-    return;
-  }
-
-  const btn = $('add-task-submit-btn');
-  const originalText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = 'Creating...';
-
-  try {
-    const res = await apiFetch('addTask', {
-      taskName: name,
-      assignedTo,
-      taskType: type,
-      plannedDate: date
-    }, 'POST');
-
-    if (!res.success) throw new Error(res.error);
-
-    showToast('Task added successfully!');
-    closeAddTaskModal();
-    initForUser(state.currentUser);
-  } catch (err) {
-    showToast(err.message || 'Failed to add task', 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalText;
-  }
 }
 
 function loadAssigneeList(defaultAssignee = null) {
