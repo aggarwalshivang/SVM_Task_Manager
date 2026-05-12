@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   //  REPLACE THIS with your deployed Apps Script Web App URL
-  API_URL: 'https://script.google.com/macros/s/AKfycbwT0bRlMkVuHF-hljrfyX3tO_04IP3R97sKz-vzo53FSFJj3bs3CwnGcr3J1fmzpGI9/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbzdRDGuKZJ0J1gck5CPCKJmTVd-2lBjPOgZWkOUvhhr8L41uFmMfblqCKCDGN-Tahyj/exec',
 
   // Retry settings
   MAX_RETRIES: 2,
@@ -1394,7 +1394,12 @@ function createDashboardCardHTML(s, rank) {
   const comp = s.tasksCompleted || 0;
   const late = s.tasksLate || 0;
   const miss = s.tasksMissed || 0;
-  const compPct = total > 0 ? Math.min(100, (comp / total * 100)) : 0;
+  const compPct = total !== 0 ? Math.min(100, (comp / total * 100)) : 0;
+
+  const compPctStr = total !== 0 ? Math.round(comp / total * 100) : 0;
+  const latePctStr = total !== 0 ? Math.round(late / total * 100) : 0;
+  const missPctStr = total !== 0 ? Math.round(miss / total * 100) : 0;
+
   const rankClass = rank <= 3 ? `rank-${rank}-card` : '';
 
   return `
@@ -1406,6 +1411,11 @@ function createDashboardCardHTML(s, rank) {
         ${state.userRole === 'admin' ? `
           <button onclick="handleRemoveMemberPrompt('${s.name}', event)" class="member-remove-btn" title="Remove Member">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+        ` : ''}
+        ${(state.userRole === 'admin' || state.userRole === 'coordinator' || state.userRole === 'process_coordinator') ? `
+          <button onclick="handleAdminPenalty('${s.name}', event)" class="member-penalty-btn" title="Give -20 Penalty" style="background:none; border:none; color:var(--accent-red); cursor:pointer; padding:4px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg>
           </button>
         ` : ''}
         <div class="dashboard-card-score">
@@ -1433,15 +1443,15 @@ function createDashboardCardHTML(s, rank) {
         <div class="chart-stats-info">
           <div class="dashboard-stats-row">
             <span>Completed</span>
-            <span class="dashboard-stat-val completed">${comp}</span>
+            <span class="dashboard-stat-val completed">${comp} <span style="font-size:0.75rem; color:var(--text-muted);">(${compPctStr}%)</span></span>
           </div>
           <div class="dashboard-stats-row">
             <span>Late</span>
-            <span class="dashboard-stat-val late">${late}</span>
+            <span class="dashboard-stat-val late">${late} <span style="font-size:0.75rem; color:var(--text-muted);">(${latePctStr}%)</span></span>
           </div>
           <div class="dashboard-stats-row">
             <span>Missed</span>
-            <span class="dashboard-stat-val missed">${miss}</span>
+            <span class="dashboard-stat-val missed">${miss} <span style="font-size:0.75rem; color:var(--text-muted);">(${missPctStr}%)</span></span>
           </div>
         </div>
       </div>
@@ -1477,6 +1487,31 @@ function handleExportCSV(scores) {
   link.click();
   document.body.removeChild(link);
   showToast('Exported successfully!');
+}
+
+async function handleAdminPenalty(memberName, e) {
+  e.stopPropagation();
+  if (!confirm(`Are you sure you want to give a -20 penalty to ${memberName}?`)) return;
+
+  const btn = e.currentTarget;
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = '<div class="loading-spinner" style="width:14px;height:14px;border-width:2px;"></div>';
+  btn.disabled = true;
+
+  try {
+    const res = await apiFetch('adminPenalty', { memberName, amount: -20, fromUser: state.currentUser }, 'POST');
+    if (res.success) {
+      showToast(`Penalty of -20 given to ${memberName}`);
+      openDashboard(); // Refresh dashboard
+    } else {
+      showToast(res.error || 'Failed to apply penalty', 'error');
+    }
+  } catch (err) {
+    showToast('Network error applying penalty', 'error');
+  } finally {
+    btn.innerHTML = originalHtml;
+    btn.disabled = false;
+  }
 }
 
 function closeDashboard() {
