@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   //  REPLACE THIS with your deployed Apps Script Web App URL
-  API_URL: 'https://script.google.com/macros/s/AKfycbzdRDGuKZJ0J1gck5CPCKJmTVd-2lBjPOgZWkOUvhhr8L41uFmMfblqCKCDGN-Tahyj/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbzIxJ2CrNpm7HIxPi8dy4y3oo9uB9REgg92visudYvA7Z9eG4UQ6nlRLN6XloVSnG8v/exec',
 
   // Retry settings
   MAX_RETRIES: 2,
@@ -1394,7 +1394,11 @@ function createDashboardCardHTML(s, rank) {
   const comp = s.tasksCompleted || 0;
   const late = s.tasksLate || 0;
   const miss = s.tasksMissed || 0;
-  const compPct = total !== 0 ? Math.min(100, (comp / total * 100)) : 0;
+
+  let rawCompPct = total !== 0 ? ((comp - miss) / total * 100) : 0;
+  if (rawCompPct > 100) rawCompPct = 100;
+  if (rawCompPct < -100) rawCompPct = -100;
+  const compPct = Math.round(rawCompPct);
 
   const compPctStr = total !== 0 ? Math.round(comp / total * 100) : 0;
   const latePctStr = total !== 0 ? Math.round(late / total * 100) : 0;
@@ -1418,9 +1422,19 @@ function createDashboardCardHTML(s, rank) {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg>
           </button>
         ` : ''}
-        <div class="dashboard-card-score">
-          ${s.score || 0}
-          <span class="trend-up" style="font-size: 0.7rem; color: var(--accent-emerald); margin-left: 4px;">↑</span>
+        <div class="dashboard-card-score" style="display: flex; flex-direction: column; align-items: flex-end; font-size: 0.9rem;">
+          <div title="This Week's Score" style="display:flex; align-items:baseline;">
+            <span style="font-size:0.6rem; color:var(--text-muted); margin-right:4px;">WEEK</span>
+            <strong style="font-size:1.1rem;">${s.score || 0}</strong>
+          </div>
+          <div title="Today's Score" style="display:flex; align-items:baseline; margin-top:2px;">
+            <span style="font-size:0.6rem; color:var(--text-muted); margin-right:4px;">TODAY</span>
+            <span style="color:var(--accent-emerald); font-weight:600;">${s.todayScore || 0}</span>
+          </div>
+          <div title="Overall Score" style="display:flex; align-items:baseline; margin-top:2px;">
+            <span style="font-size:0.6rem; color:var(--text-muted); margin-right:4px;">ALL-TIME</span>
+            <span style="color:var(--accent-purple); font-weight:600;">${s.overallScore || 0}</span>
+          </div>
         </div>
       </div>
       
@@ -1432,13 +1446,13 @@ function createDashboardCardHTML(s, rank) {
               a 15.9155 15.9155 0 0 1 0 -31.831"
           />
           <path class="circular-fill"
-            data-percentage="${compPct}"
+            data-percentage="${Math.max(0, compPct)}"
             stroke-dasharray="0, 100"
             d="M18 2.0845
               a 15.9155 15.9155 0 0 1 0 31.831
               a 15.9155 15.9155 0 0 1 0 -31.831"
           />
-          <text x="18" y="20.35" class="circular-text">${Math.round(compPct)}%</text>
+          <text x="18" y="20.35" class="circular-text" style="${compPct < 0 ? 'fill: var(--accent-red);' : ''}">${compPct}%</text>
         </svg>
         <div class="chart-stats-info">
           <div class="dashboard-stats-row">
@@ -1491,26 +1505,62 @@ function handleExportCSV(scores) {
 
 async function handleAdminPenalty(memberName, e) {
   e.stopPropagation();
-  if (!confirm(`Are you sure you want to give a -20 penalty to ${memberName}?`)) return;
 
-  const btn = e.currentTarget;
-  const originalHtml = btn.innerHTML;
-  btn.innerHTML = '<div class="loading-spinner" style="width:14px;height:14px;border-width:2px;"></div>';
-  btn.disabled = true;
+  // Open the penalty selection modal
+  const modal = document.getElementById('admin-penalty-modal');
+  if (!modal) return;
+
+  document.getElementById('penalty-member-name').textContent = memberName;
+  const listContainer = document.getElementById('penalty-tasks-list');
+  listContainer.innerHTML = '<div class="loading-spinner" style="margin: 20px auto;"></div>';
+  modal.style.display = 'flex';
 
   try {
-    const res = await apiFetch('adminPenalty', { memberName, amount: -20, fromUser: state.currentUser }, 'POST');
+    const res = await apiFetch('getTasks', { user: memberName, all: true });
     if (res.success) {
-      showToast(`Penalty of -20 given to ${memberName}`);
+      // Show only completed tasks to penalize
+      const doneTasks = res.data.filter(t => t.status === 'done');
+
+      if (doneTasks.length === 0) {
+        listContainer.innerHTML = '<p class="modal-body-text" style="text-align:center;">No completed tasks found for this member.</p>';
+      } else {
+        listContainer.innerHTML = doneTasks.map(t => `
+          <div class="task-card done" style="margin-bottom: 10px; cursor: pointer; border: 1px solid var(--border-glass);" 
+               onclick="confirmAdminTaskPenalty('${t.taskId}', '${memberName}', '${t.taskName.replace(/'/g, "\\'")}')">
+            <div class="task-info">
+              <div class="task-name" style="text-decoration: none;">${t.taskName}</div>
+              <div class="task-meta">
+                <span class="task-badge">${t.taskType}</span>
+                <span class="priority-badge priority-${t.priority.toLowerCase()}">${t.priority}</span>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      }
+    } else {
+      listContainer.innerHTML = '<p class="modal-body-text" style="color:var(--accent-red);">Failed to load tasks.</p>';
+    }
+  } catch (err) {
+    listContainer.innerHTML = '<p class="modal-body-text" style="color:var(--accent-red);">Network error.</p>';
+  }
+}
+
+async function confirmAdminTaskPenalty(taskId, memberName, taskName) {
+  if (!confirm(`Are you sure you want to mark "${taskName}" as undone and apply a penalty to ${memberName}?`)) return;
+
+  document.getElementById('admin-penalty-modal').style.display = 'none';
+  showToast('Applying penalty...', 'info');
+
+  try {
+    const res = await apiFetch('adminTaskPenalty', { taskId, memberName, fromUser: state.currentUser }, 'POST');
+    if (res.success) {
+      showToast(`Penalty applied to ${memberName}.`);
       openDashboard(); // Refresh dashboard
     } else {
       showToast(res.error || 'Failed to apply penalty', 'error');
     }
   } catch (err) {
     showToast('Network error applying penalty', 'error');
-  } finally {
-    btn.innerHTML = originalHtml;
-    btn.disabled = false;
   }
 }
 

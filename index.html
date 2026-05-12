@@ -668,6 +668,22 @@
       </div>
     </div>
   </div>
+  <!-- Admin Penalty Modal -->
+  <div class="modal-overlay" id="admin-penalty-modal" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Penalty Selection</h3>
+        <button class="modal-close" onclick="document.getElementById('admin-penalty-modal').style.display='none'">✕</button>
+      </div>
+      <p class="modal-body-text" style="font-size:0.9rem; margin-bottom:var(--space-sm);">
+        Select a completed task for <strong id="penalty-member-name"></strong>. This task will be marked as undone and a -20 penalty will be applied.
+      </p>
+      <div id="penalty-tasks-list" class="task-list" style="max-height: 50vh; overflow-y: auto; padding: 10px 0;">
+        <!-- Tasks will be injected here -->
+      </div>
+    </div>
+  </div>
+
   <!-- Member Tasks Modal -->
   <div class="modal-overlay" id="member-tasks-modal" style="display:none;">
     <div class="modal-card">
