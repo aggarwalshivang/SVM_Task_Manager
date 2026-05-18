@@ -200,10 +200,34 @@
         </div>
       </div>
 
-      <!-- Recurring Tasks Section -->
+      <!-- Task Type Tab Bar -->
+      <div id="task-type-tabs" class="task-type-tabs" style="display:none;">
+        <button class="task-type-tab" id="ttab-all" onclick="setTaskTab('all')">
+          📋 All
+          <span class="ttab-badge" id="ttab-badge-all"></span>
+        </button>
+        <button class="task-type-tab active" id="ttab-daily" onclick="setTaskTab('daily')">
+          🔁 Daily
+          <span class="ttab-badge" id="ttab-badge-daily"></span>
+        </button>
+        <button class="task-type-tab" id="ttab-recurring" onclick="setTaskTab('recurring')">
+          📅 Recurring
+          <span class="ttab-badge" id="ttab-badge-recurring"></span>
+        </button>
+        <button class="task-type-tab" id="ttab-week" onclick="setTaskTab('week')">
+          🗓 This Week
+          <span class="ttab-badge" id="ttab-badge-week"></span>
+        </button>
+        <button class="task-type-tab" id="ttab-onetime" onclick="setTaskTab('onetime')">
+          ✅ One-Time
+          <span class="ttab-badge" id="ttab-badge-onetime"></span>
+        </button>
+      </div>
+
+      <!-- Task List Section (single unified) -->
       <div id="recurring-section" style="display:none;"></div>
 
-      <!-- One-Time Tasks Section -->
+      <!-- One-Time Tasks Section (kept for legacy compat) -->
       <div id="onetime-section" style="display:none;"></div>
 
       <!-- Stats Section -->

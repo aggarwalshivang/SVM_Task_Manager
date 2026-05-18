@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   //  REPLACE THIS with your deployed Apps Script Web App URL
-  API_URL: 'https://script.google.com/macros/s/AKfycbwYc8xU2mWSO5DCNDdyq7FkKc4Tl_piQKrv8w4PRDl_DCpCve_Hmbsw1tBpIvpjEKUq/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbxc_j60bzXgAbHDHdvwaZt3GVWwwBGIu8irN89dxVon8SmjqCpIcNGVEZzeGwOQ6hNi/exec',
 
   // Retry settings
   MAX_RETRIES: 2,
@@ -38,6 +38,7 @@ const state = {
     search: '',
     status: 'all'
   },
+  taskTab: 'daily', // 'daily' | 'recurring' | 'week' | 'onetime'
   theme: localStorage.getItem('theme') === 'light' ? 'light' : 'dark',
   editingTaskId: null,
   tests: [],
@@ -777,41 +778,108 @@ function renderTasks(tasks) {
     return matchesSearch && matchesStatus;
   });
 
-  // Sort tasks chronologically (Date, then Time)
+  // Sort by: Date → Time → Status (active before done within same date)
   filteredTasks.sort((a, b) => {
-    // 1. Status comparison (Active tasks first, Completed/Missed last)
-    const statusOrder = { 'in-progress': 0, 'stuck': 1, 'pending': 2, 'overdue': 3, 'done': 4, 'missed': 5 };
-    const orderA = statusOrder[a.status] ?? 2;
-    const orderB = statusOrder[b.status] ?? 2;
-    if (orderA !== orderB) return orderA - orderB;
-
-    // 2. Date comparison (Earliest first)
+    // 1. Date first (earliest date first, no date goes last)
     const dateA = a.plannedDate ? a.plannedDate.substring(0, 10) : '9999-12-31';
     const dateB = b.plannedDate ? b.plannedDate.substring(0, 10) : '9999-12-31';
     if (dateA !== dateB) return dateA.localeCompare(dateB);
 
-    // 3. Time comparison (Morning to Night)
+    // 2. Time (morning first, no-time goes last)
     const padTime = (t) => {
-      if (!t) return '23:59';
-      // Ensure HH:mm format for reliable comparison
+      if (!t) return '99:99';
       return t.split(':').map(p => p.trim().padStart(2, '0')).join(':');
     };
-    return padTime(a.time).localeCompare(padTime(b.time));
-  });
+    const timeCmp = padTime(a.time).localeCompare(padTime(b.time));
+    if (timeCmp !== 0) return timeCmp;
 
-  const recurring = filteredTasks.filter(t => t.taskType === 'daily' || t.taskType === 'weekly');
-  const oneTime = filteredTasks.filter(t => t.taskType === 'one-time');
+    // 3. Status within same date+time (active first, done last)
+    const statusOrder = { 'in-progress': 0, 'stuck': 1, 'pending': 2, 'overdue': 3, 'missed': 4, 'done': 5 };
+    return (statusOrder[a.status] ?? 2) - (statusOrder[b.status] ?? 2);
+  });
 
   $('controls-section').style.display = 'flex';
 
-  // Consolidate all tasks into one main list for accurate chronological sorting across all types
-  renderTaskSection('recurring-section', '📋', 'Your Tasks', filteredTasks);
+  // --- Update tab badge counts ---
+  const todayStr = getTodayStr();
+  // ISO week bounds
+  const nowD = new Date();
+  const dayOfWeek = nowD.getDay() === 0 ? 7 : nowD.getDay(); // Mon=1 Sun=7
+  const monday = new Date(nowD);
+  monday.setDate(nowD.getDate() - dayOfWeek + 1);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  const allForTab = (tab) => filteredTasks.filter(t => matchesTab(t, tab, monday, sunday));
+  const pendingCountForTab = (tab) => allForTab(tab).filter(t => t.status !== 'done').length;
+
+  ['all', 'daily', 'recurring', 'week', 'onetime'].forEach(tab => {
+    const badge = $(`ttab-badge-${tab}`);
+    if (!badge) return;
+    const count = tab === 'all'
+      ? filteredTasks.filter(t => t.status !== 'done').length
+      : pendingCountForTab(tab);
+    badge.textContent = count > 0 ? count : '';
+    badge.style.display = count > 0 ? 'inline-flex' : 'none';
+  });
+
+  // Show tab bar
+  $('task-type-tabs').style.display = 'flex';
+
+  // Filter by active tab
+  const tabTasks = filteredTasks.filter(t => matchesTab(t, state.taskTab, monday, sunday));
+
+  // Determine nice tab label
+  const tabLabels = { all: 'All Tasks', daily: 'Daily Tasks', recurring: 'Recurring Tasks', week: 'This Week', onetime: 'One-Time Tasks' };
+  const tabLabel = tabLabels[state.taskTab] || 'Tasks';
+
+  renderTaskSection('recurring-section', '📋', tabLabel, tabTasks);
   $('onetime-section').style.display = 'none';
 
-  // Check if all done
+  // Check if all done for active tab
   const allDone = tasks.length > 0 && tasks.every(t => t.status === 'done');
-  if (allDone) {
-    showAllDoneCelebration();
+  if (allDone) showAllDoneCelebration();
+}
+
+/** Returns true if a task belongs to the given tab */
+function matchesTab(t, tab, monday, sunday) {
+  switch (tab) {
+    case 'all':
+      return true; // show everything
+    case 'daily':
+      return t.taskType === 'daily';
+    case 'recurring': {
+      if (t.taskType === 'weekly') return true;
+      if (t.taskType === 'recurring') return true;
+      const rec = (t.recurrence || '').toLowerCase();
+      if (rec && rec !== 'one-time' && t.taskType !== 'daily' && t.taskType !== 'one-time') return true;
+      return false;
+    }
+    case 'week': {
+      if (!t.plannedDate) return false;
+      const d = new Date(t.plannedDate.substring(0, 10) + 'T00:00:00');
+      return d >= monday && d <= sunday;
+    }
+    case 'onetime':
+      return t.taskType === 'one-time';
+    default:
+      return true;
+  }
+}
+
+/** Switch active tab and re-render */
+function setTaskTab(tab) {
+  state.taskTab = tab;
+  // Update active class on tab buttons
+  ['all', 'daily', 'recurring', 'week', 'onetime'].forEach(t => {
+    const btn = $(`ttab-${t}`);
+    if (btn) btn.classList.toggle('active', t === tab);
+  });
+  // Re-render with the new tab filter
+  if (state.tasks && state.tasks.length > 0) {
+    renderTasks(state.tasks);
   }
 }
 
@@ -1232,18 +1300,53 @@ function renderDashboard(scores, pendingMembers = [], leaves = [], perfData = []
   if (healthData && (state.userRole === 'admin' || state.userRole === 'process_coordinator')) {
     const healthSec = document.createElement('div');
     healthSec.className = 'workflow-health-card';
+
+    const stuckList = healthData.stuckTasksList || [];
+    const overdueList = healthData.longOverdueList || [];
+
     healthSec.innerHTML = `
       <h3 style="margin-bottom:15px; font-size:1rem; color:var(--accent-purple);">Workflow Health Report</h3>
-      <div class="health-item">
-        <span class="health-label">Stuck Tasks</span>
-        <span class="health-value ${healthData.stuckTasks > 0 ? 'danger' : 'good'}">${healthData.stuckTasks}</span>
+
+      <!-- Stuck Tasks -->
+      <div class="health-item health-item-clickable" onclick="toggleHealthDetail('health-stuck-detail')">
+        <span class="health-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px; opacity:0.6; vertical-align:middle;"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+          Stuck Tasks
+        </span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="health-value ${healthData.stuckTasks > 0 ? 'danger' : 'good'}">${healthData.stuckTasks}</span>
+          ${stuckList.length > 0 ? `<svg class="health-chevron" id="chevron-health-stuck-detail" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.5; transition:transform 0.2s;"><polyline points="6 9 12 15 18 9"/></svg>` : ''}
+        </div>
       </div>
-      <div class="health-item">
-        <span class="health-label">Long-overdue Tasks (>48h)</span>
-        <span class="health-value ${healthData.longOverdue > 2 ? 'danger' : healthData.longOverdue > 0 ? 'warning' : 'good'}">${healthData.longOverdue}</span>
+      <div id="health-stuck-detail" class="health-task-detail" style="display:none;">
+        ${stuckList.length === 0
+        ? `<div class="health-detail-empty">No stuck tasks right now 🎉</div>`
+        : stuckList.map(t => renderHealthTaskCard(t)).join('')}
       </div>
-      <div class="health-item">
-        <span class="health-label">Bottleneck Members (≥3 Overdue)</span>
+
+      <!-- Long-overdue Tasks -->
+      <div class="health-item health-item-clickable" onclick="toggleHealthDetail('health-overdue-detail')" style="margin-top:4px;">
+        <span class="health-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px; opacity:0.6; vertical-align:middle;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Long-overdue Tasks (&gt;48h)
+        </span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="health-value ${healthData.longOverdue > 2 ? 'danger' : healthData.longOverdue > 0 ? 'warning' : 'good'}">${healthData.longOverdue}</span>
+          ${overdueList.length > 0 ? `<svg class="health-chevron" id="chevron-health-overdue-detail" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.5; transition:transform 0.2s;"><polyline points="6 9 12 15 18 9"/></svg>` : ''}
+        </div>
+      </div>
+      <div id="health-overdue-detail" class="health-task-detail" style="display:none;">
+        ${overdueList.length === 0
+        ? `<div class="health-detail-empty">No long-overdue tasks 🎉</div>`
+        : overdueList.map(t => renderHealthTaskCard(t)).join('')}
+      </div>
+
+      <!-- Bottleneck Members -->
+      <div class="health-item" style="margin-top:4px;">
+        <span class="health-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px; opacity:0.6; vertical-align:middle;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Bottleneck Members (≥3 Overdue)
+        </span>
         <span class="health-value ${healthData.bottleneckUsers.length > 0 ? 'warning' : 'good'}">
           ${healthData.bottleneckUsers.length > 0 ? healthData.bottleneckUsers.join(', ') : 'None'}
         </span>
@@ -1387,6 +1490,36 @@ function renderDashboard(scores, pendingMembers = [], leaves = [], perfData = []
       if (target) ring.style.strokeDasharray = `${target}, 100`;
     });
   }, 50);
+}
+
+function toggleHealthDetail(detailId) {
+  const detail = document.getElementById(detailId);
+  if (!detail) return;
+  const isOpen = detail.style.display !== 'none';
+  detail.style.display = isOpen ? 'none' : 'block';
+
+  // Rotate chevron arrow
+  const chevronId = 'chevron-' + detailId;
+  const chevron = document.getElementById(chevronId);
+  if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+
+function renderHealthTaskCard(t) {
+  const badgeColor = t.status === 'stuck' ? 'var(--accent-amber)' : 'var(--accent-red)';
+  const daysLabel = t.daysOverdue ? `<span style="color:var(--accent-red); font-size:0.7rem; font-weight:600;">${t.daysOverdue}d overdue</span>` : '';
+  return `
+    <div class="health-task-item" onclick="handleViewMemberTasks('${t.assignedTo}')" title="Click to view ${t.assignedTo}'s tasks">
+      <div style="flex:1; min-width:0;">
+        <div class="health-task-name">${t.taskName}</div>
+        <div class="health-task-meta">
+          <span style="color:var(--accent-purple); font-weight:600;">@${t.assignedTo}</span>
+          ${t.plannedDate ? `<span>• ${formatDate(t.plannedDate)}</span>` : ''}
+          ${daysLabel}
+        </div>
+      </div>
+      <span style="background:${badgeColor}22; color:${badgeColor}; padding:2px 8px; border-radius:12px; font-size:0.65rem; font-weight:700; text-transform:uppercase; white-space:nowrap; border:1px solid ${badgeColor}44;">${t.status}</span>
+    </div>
+  `;
 }
 
 function createDashboardCardHTML(s, rank) {
@@ -2050,7 +2183,7 @@ async function initForUser(user) {
   state.currentUser = user;
   hideError();
 
-  // 1. Load from cache immediately to prevent "disappearing tasks" glitch
+  // 1. Load from cache immediately — tasks show right away, no blank flash
   const cacheKey = `svm_cache_${user}`;
   const cached = localStorage.getItem(cacheKey);
   if (cached) {
@@ -2079,7 +2212,7 @@ async function initForUser(user) {
   }
 
   try {
-    // Fetch tasks, stats and team in parallel
+    // Fetch tasks, stats and team in parallel — no sequential blocking
     const [tasksRes, statsRes, teamRes] = await Promise.all([
       apiFetch('getTasks', { user }),
       apiFetch('getScores', { user }),
@@ -2088,7 +2221,7 @@ async function initForUser(user) {
 
     state.tasks = tasksRes.data || [];
     state.stats = statsRes.data;
-    state.teamMembers = teamRes.data || []; // Note: state property is teamMembers based on init()
+    state.teamMembers = teamRes.data || [];
 
     // Render fresh tasks
     if (state.tasks.length === 0) {
@@ -2100,33 +2233,104 @@ async function initForUser(user) {
     // Render stats
     renderStats(state.stats);
 
-    // Fetch briefing (can be slower)
-    try {
-      const briefRes = await apiFetch('getBriefing', { user });
-      state.briefing = briefRes.data.briefing;
-      renderBriefing(state.briefing);
-    } catch {
-      // Fall back to local briefing calculation if API fails
-      state.briefing = getMockBriefing(user, state.tasks);
-      renderBriefing(state.briefing);
-    }
-
-    // 3. Update Cache for next visit
-    localStorage.setItem(cacheKey, JSON.stringify({
-      tasks: state.tasks,
-      stats: state.stats,
-      briefing: state.briefing,
-      timestamp: Date.now()
-    }));
+    // Briefing: try AI API first, fall back to local — non-blocking
+    apiFetch('getBriefing', { user })
+      .then(briefRes => {
+        state.briefing = briefRes.data.briefing;
+        renderBriefing(state.briefing);
+      })
+      .catch(() => {
+        state.briefing = getMockBriefing(user, state.tasks);
+        renderBriefing(state.briefing);
+      })
+      .finally(() => {
+        // Update cache after briefing resolves
+        localStorage.setItem(cacheKey, JSON.stringify({
+          tasks: state.tasks,
+          stats: state.stats,
+          briefing: state.briefing,
+          timestamp: Date.now()
+        }));
+      });
 
   } catch (err) {
     console.error('Fetch error:', err);
-    // If we have cached tasks, don't show a hard error banner that blocks the UI
+    // If we have cached tasks, don't show a hard error — just warn
     if (state.tasks && state.tasks.length > 0) {
       showToast('Showing cached tasks (Server unreachable)', 'warning');
     } else {
       showError('Could not load tasks. Please check your connection.');
     }
+  }
+}
+
+/**
+ * Silent background refresh — fetches new task data WITHOUT wiping the DOM.
+ * Only patches tasks whose status or data actually changed.
+ * Called by the background sync interval to avoid the "tasks vanishing" flash.
+ */
+let _syncInProgress = false;
+async function silentRefreshTasks(user) {
+  if (!user || _syncInProgress) return;
+  if (state.currentView !== 'tasks' || state.tasksFilterUser || state.currentGlobalView) return;
+
+  _syncInProgress = true;
+  try {
+    const [tasksRes, statsRes] = await Promise.all([
+      apiFetch('getTasks', { user }),
+      apiFetch('getScores', { user }),
+    ]);
+
+    if (!tasksRes.success) return;
+
+    const freshTasks = tasksRes.data || [];
+    const oldTaskMap = new Map(state.tasks.map(t => [t.taskId, t]));
+    const freshTaskMap = new Map(freshTasks.map(t => [t.taskId, t]));
+
+    // Detect changes: new tasks added, old tasks removed, or status changed
+    let hasStructuralChange = freshTasks.length !== state.tasks.length;
+    if (!hasStructuralChange) {
+      for (const [id, fresh] of freshTaskMap) {
+        const old = oldTaskMap.get(id);
+        if (!old || old.status !== fresh.status) {
+          hasStructuralChange = true;
+          break;
+        }
+      }
+    }
+
+    // Update state regardless
+    state.tasks = freshTasks;
+    if (statsRes.success) state.stats = statsRes.data;
+
+    if (hasStructuralChange) {
+      // Re-render tasks — only when something actually changed
+      if (state.tasks.length === 0) {
+        renderEmptyState();
+      } else {
+        renderTasks(state.tasks);
+      }
+      if (state.stats) renderStats(state.stats);
+    } else {
+      // Nothing changed — just silently update stats bar
+      if (state.stats) renderStats(state.stats);
+    }
+
+    // Update cache quietly
+    const cacheKey = `svm_cache_${user}`;
+    const existing = localStorage.getItem(cacheKey);
+    const briefing = existing ? (JSON.parse(existing).briefing || state.briefing) : state.briefing;
+    localStorage.setItem(cacheKey, JSON.stringify({
+      tasks: state.tasks,
+      stats: state.stats,
+      briefing,
+      timestamp: Date.now()
+    }));
+  } catch (err) {
+    // Silent fail — don't show errors on background refresh
+    console.warn('Background sync failed silently:', err);
+  } finally {
+    _syncInProgress = false;
   }
 }
 
@@ -3691,7 +3895,9 @@ function startBackgroundSync() {
         renderTests(state.tests);
       }
     } else if (state.currentView === 'tasks' && state.currentUser) {
-      initForUser(state.currentUser);
+      // Use silent refresh — does NOT wipe/re-render the DOM unless data actually changed
+      // This prevents the "tasks vanishing" flash on every sync cycle
+      await silentRefreshTasks(state.currentUser);
     }
 
     // Always check for upcoming tasks if logged in
