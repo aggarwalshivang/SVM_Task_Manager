@@ -1585,7 +1585,10 @@ function createDashboardCardHTML(s, rank) {
               a 15.9155 15.9155 0 0 1 0 31.831
               a 15.9155 15.9155 0 0 1 0 -31.831"
           />
-          <text x="18" y="20.35" class="circular-text" style="${compPct < 0 ? 'fill: var(--accent-red);' : ''}">${compPct}%</text>
+          <text x="18" y="20.35" class="circular-text" style="${compPct < 0 ? 'fill: var(--accent-red);' : ''}">
+            ${compPct}%
+            ${s.todayScore < 0 ? `<tspan fill="var(--accent-red)" font-size="0.4em" dx="1">(${s.todayScore})</tspan>` : ''}
+          </text>
         </svg>
         <div class="chart-stats-info">
           <div class="dashboard-stats-row">
@@ -1600,6 +1603,12 @@ function createDashboardCardHTML(s, rank) {
             <span>Missed</span>
             <span class="dashboard-stat-val missed">${miss} <span style="font-size:0.75rem; color:var(--text-muted);">(${missPctStr}%)</span></span>
           </div>
+          ${s.todayScore < 0 ? `
+          <div class="dashboard-stats-row" style="border-top: 1px dashed rgba(255,255,255,0.05); padding-top: 4px; margin-top: 4px;">
+            <span style="color:var(--accent-red); font-size: 0.75rem;">Negative Today</span>
+            <span class="dashboard-stat-val" style="color:var(--accent-red); font-size: 0.85rem;">${s.todayScore}</span>
+          </div>
+          ` : ''}
         </div>
       </div>
       <div class="dashboard-stats-row" style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
