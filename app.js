@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   //  REPLACE THIS with your deployed Apps Script Web App URL
-  API_URL: 'https://script.google.com/macros/s/AKfycbxc_j60bzXgAbHDHdvwaZt3GVWwwBGIu8irN89dxVon8SmjqCpIcNGVEZzeGwOQ6hNi/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbwYKfgNfKux-q9dNBk6pPBf5exd9FmKTU2uuZtlXH8MK5xAEoU04Rgxws2rZ3l1uAdt/exec',
 
   // Retry settings
   MAX_RETRIES: 2,
@@ -1559,14 +1559,17 @@ function createDashboardCardHTML(s, rank) {
           <div title="This Week's Score" style="display:flex; align-items:baseline;">
             <span style="font-size:0.6rem; color:var(--text-muted); margin-right:4px;">WEEK</span>
             <strong style="font-size:1.1rem;">${s.score || 0}</strong>
+            ${s.negativeWeek ? `<span style="color:var(--accent-red); font-size:0.75rem; margin-left:4px;" title="Week Penalties">(${s.negativeWeek})</span>` : ''}
           </div>
           <div title="Today's Score" style="display:flex; align-items:baseline; margin-top:2px;">
             <span style="font-size:0.6rem; color:var(--text-muted); margin-right:4px;">TODAY</span>
             <span style="color:var(--accent-emerald); font-weight:600;">${s.todayScore || 0}</span>
+            ${s.negativeToday ? `<span style="color:var(--accent-red); font-size:0.75rem; margin-left:4px;" title="Today Penalties">(${s.negativeToday})</span>` : ''}
           </div>
           <div title="Overall Score" style="display:flex; align-items:baseline; margin-top:2px;">
             <span style="font-size:0.6rem; color:var(--text-muted); margin-right:4px;">ALL-TIME</span>
             <span style="color:var(--accent-purple); font-weight:600;">${s.overallScore || 0}</span>
+            ${s.negativeAllTime ? `<span style="color:var(--accent-red); font-size:0.75rem; margin-left:4px;" title="All-Time Penalties">(${s.negativeAllTime})</span>` : ''}
           </div>
         </div>
       </div>
@@ -1587,7 +1590,6 @@ function createDashboardCardHTML(s, rank) {
           />
           <text x="18" y="20.35" class="circular-text" style="${compPct < 0 ? 'fill: var(--accent-red);' : ''}">
             ${compPct}%
-            <tspan fill="var(--accent-red)" font-size="0.4em" dx="1">(${s.negativeToday || 0})</tspan>
           </text>
         </svg>
         <div class="chart-stats-info">
