@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   //  REPLACE THIS with your deployed Apps Script Web App URL
-  API_URL: 'https://script.google.com/macros/s/AKfycbyC7IaqEUamaxEuJUJ_TFMxHcgWU-vmMuSg-wWvuBXh0yQCb44drMZY97PigtbJtstJ/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbxE_lvh0Dh5RbIZpSQgqRPU3JprnavHxnNHPFWbAn8iXlSk5mjX6f5e5P45wRIBtuaf/exec',
 
   // Retry settings
   MAX_RETRIES: 2,
@@ -505,7 +505,7 @@ async function openTestTracker() {
 function getTestStages(test) {
   const globalSettings = state.testSettings || [];
   const testStages = test.stages || [];
-  
+
   if (testStages.length === 0) {
     return globalSettings.map(s => ({
       id: s.id,
@@ -536,11 +536,11 @@ function getTestStages(test) {
 
 function renderTests(tests) {
   const container = $('test-list-content');
-  
+
   // Apply complete/in-progress/sheet/app/search filters
   const filter = state.testFmsFilter || 'all';
   const searchQuery = state.testFmsSearch || '';
-  
+
   let filteredTests = tests.filter(test => {
     const testStages = getTestStages(test);
     const totalStages = testStages.length;
@@ -646,17 +646,17 @@ function renderTests(tests) {
                 </span>
                 <div style="background: rgba(255,255,255,0.06); height: 6px; border-radius: 3px; margin-top: 4px; overflow: hidden; display: flex; gap: 2px; border: 1px solid var(--border-glass);">
                   ${testStages.map(stage => {
-                    const plannedDate = new Date(heldOnDate);
-                    plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
-                    plannedDate.setHours(23, 59, 59, 999);
-                    const isDelayed = stage.status !== 'done' && new Date() > plannedDate;
-                    
-                    let bg = 'rgba(255,255,255,0.12)';
-                    if (stage.status === 'done') bg = 'var(--accent-emerald)';
-                    else if (isDelayed) bg = 'var(--accent-red)';
-                    
-                    return `<div style="flex: 1; background: ${bg}; height: 100%;" title="${stage.label || 'Stage'}: ${stage.status === 'done' ? 'Completed' : (isDelayed ? 'Overdue' : 'Pending')}"></div>`;
-                  }).join('')}
+      const plannedDate = new Date(heldOnDate);
+      plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
+      plannedDate.setHours(23, 59, 59, 999);
+      const isDelayed = stage.status !== 'done' && new Date() > plannedDate;
+
+      let bg = 'rgba(255,255,255,0.12)';
+      if (stage.status === 'done') bg = 'var(--accent-emerald)';
+      else if (isDelayed) bg = 'var(--accent-red)';
+
+      return `<div style="flex: 1; background: ${bg}; height: 100%;" title="${stage.label || 'Stage'}: ${stage.status === 'done' ? 'Completed' : (isDelayed ? 'Overdue' : 'Pending')}"></div>`;
+    }).join('')}
                 </div>
               </div>
               ` : ''}
@@ -698,15 +698,15 @@ function renderTests(tests) {
         
         <div class="test-pipeline">
           ${testStages.map((stage, sIdx) => {
-            const plannedDate = new Date(heldOnDate);
-            plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
+      const plannedDate = new Date(heldOnDate);
+      plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
 
-            const pDateCheck = new Date(plannedDate);
-            pDateCheck.setHours(23, 59, 59, 999);
-            const isDelayed = stage.status !== 'done' && new Date() > pDateCheck;
-            const statusClass = stage.status === 'done' ? 'done' : (isDelayed ? 'delayed' : 'pending');
+      const pDateCheck = new Date(plannedDate);
+      pDateCheck.setHours(23, 59, 59, 999);
+      const isDelayed = stage.status !== 'done' && new Date() > pDateCheck;
+      const statusClass = stage.status === 'done' ? 'done' : (isDelayed ? 'delayed' : 'pending');
 
-            return `
+      return `
               <div class="pipeline-step ${statusClass}" 
                    onclick="handleToggleTestStage('${test.testId}', ${stage.id})"
                    title="Click to toggle status.">
@@ -730,7 +730,7 @@ function renderTests(tests) {
                 </div>
               </div>
             `;
-          }).join('')}
+    }).join('')}
         </div>
       </div>
     `;
@@ -872,23 +872,23 @@ function saveCurrentSettingsFromDOM() {
   });
 }
 
-window.handleSettingDragStart = function(e) {
+window.handleSettingDragStart = function (e) {
   saveCurrentSettingsFromDOM();
   draggedIdx = parseInt(e.currentTarget.getAttribute('data-index'));
   e.dataTransfer.effectAllowed = 'move';
   e.currentTarget.style.opacity = '0.5';
 };
 
-window.handleSettingDragOver = function(e) {
+window.handleSettingDragOver = function (e) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
 };
 
-window.handleSettingDrop = function(e) {
+window.handleSettingDrop = function (e) {
   e.preventDefault();
   const targetIdx = parseInt(e.currentTarget.getAttribute('data-index'));
   e.currentTarget.style.opacity = '1';
-  
+
   if (draggedIdx !== null && targetIdx !== null && draggedIdx !== targetIdx) {
     const [draggedItem] = state.testSettings.splice(draggedIdx, 1);
     state.testSettings.splice(targetIdx, 0, draggedItem);
@@ -2411,9 +2411,9 @@ const MASTER_SYLLABUS = {
 };
 
 function initTestFormSyllabus() {
-  const classSelect   = $('test-form-class');
+  const classSelect = $('test-form-class');
   const subjectSelect = $('test-form-subject');
-  const chapterInput  = $('test-form-chapter'); // now a hidden input
+  const chapterInput = $('test-form-chapter'); // now a hidden input
   const customChapterGroup = $('custom-chapter-group');
   const customChapterInput = $('test-form-custom-chapter');
   const testNameInput = $('test-form-name');
@@ -2465,7 +2465,7 @@ function initTestFormSyllabus() {
 
   function updateTestName() {
     const sub = subjectSelect.value;
-    const ch  = chapterInput.value;
+    const ch = chapterInput.value;
     if (!sub || !ch) { testNameInput.value = ''; return; }
     let chName = ch === 'custom' ? (customChapterInput.value.trim() || 'Custom') : ch;
     const subName = sub === 'Math' ? 'Maths' : sub;
@@ -2480,7 +2480,7 @@ function initTestFormSyllabus() {
   window._updateTestFormName = updateTestName;
 
   // Close chapter dropdown on outside click
-  document.addEventListener('click', function(e) {
+  document.addEventListener('click', function (e) {
     const wrapper = $('chapter-dropdown-wrapper');
     if (wrapper && !wrapper.contains(e.target)) {
       const menu = $('chapter-dropdown-menu');
@@ -2491,19 +2491,19 @@ function initTestFormSyllabus() {
   });
 }
 
-window.toggleChapterDropdown = function() {
-  const menu  = $('chapter-dropdown-menu');
-  const chev  = $('chapter-dropdown-chevron');
+window.toggleChapterDropdown = function () {
+  const menu = $('chapter-dropdown-menu');
+  const chev = $('chapter-dropdown-chevron');
   if (!menu) return;
   const isOpen = menu.style.display !== 'none';
   menu.style.display = isOpen ? 'none' : 'block';
   if (chev) chev.style.transform = isOpen ? '' : 'rotate(180deg)';
 };
 
-window.selectChapterOption = function(el) {
+window.selectChapterOption = function (el) {
   const value = el.dataset.value;
   const label = $('chapter-dropdown-label');
-  const btn   = $('chapter-dropdown-btn');
+  const btn = $('chapter-dropdown-btn');
   const input = $('test-form-chapter');
   const customGroup = $('custom-chapter-group');
   const customInput = $('test-form-custom-chapter');
@@ -4039,7 +4039,7 @@ function renderIndividualFormStages() {
   `).join('');
 }
 
-window.addIndividualTestStageRow = function() {
+window.addIndividualTestStageRow = function () {
   saveCurrentFormStagesFromDOM();
   const nextId = currentFormStages.length > 0 ? Math.max(...currentFormStages.map(s => s.id)) + 1 : 1;
   currentFormStages.push({
@@ -4055,7 +4055,7 @@ window.addIndividualTestStageRow = function() {
   renderIndividualFormStages();
 };
 
-window.removeIndividualTestStageRow = function(idx) {
+window.removeIndividualTestStageRow = function (idx) {
   saveCurrentFormStagesFromDOM();
   currentFormStages.splice(idx, 1);
   renderIndividualFormStages();
@@ -4081,7 +4081,7 @@ function saveCurrentFormStagesFromDOM() {
 let formDraggedIdx = null;
 
 // Enable drag only when user grabs the ☰ handle
-window.enableFormRowDrag = function(handle) {
+window.enableFormRowDrag = function (handle) {
   const row = handle.closest('.form-stage-row');
   if (!row) return;
   row.setAttribute('draggable', 'true');
@@ -4092,28 +4092,28 @@ window.enableFormRowDrag = function(handle) {
   }, { once: true });
 };
 
-window.handleFormStageDragStart = function(e) {
+window.handleFormStageDragStart = function (e) {
   saveCurrentFormStagesFromDOM();
   formDraggedIdx = parseInt(e.currentTarget.getAttribute('data-index'));
   e.dataTransfer.effectAllowed = 'move';
   e.currentTarget.style.opacity = '0.5';
 };
 
-window.handleFormStageDragEnd = function(e) {
+window.handleFormStageDragEnd = function (e) {
   e.currentTarget.style.opacity = '1';
   e.currentTarget.setAttribute('draggable', 'false');
 };
 
-window.handleFormStageDragOver = function(e) {
+window.handleFormStageDragOver = function (e) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
 };
 
-window.handleFormStageDrop = function(e) {
+window.handleFormStageDrop = function (e) {
   e.preventDefault();
   const targetIdx = parseInt(e.currentTarget.getAttribute('data-index'));
   e.currentTarget.style.opacity = '1';
-  
+
   if (formDraggedIdx !== null && targetIdx !== null && formDraggedIdx !== targetIdx) {
     const [draggedItem] = currentFormStages.splice(formDraggedIdx, 1);
     currentFormStages.splice(targetIdx, 0, draggedItem);
@@ -4125,7 +4125,7 @@ window.handleFormStageDrop = function(e) {
 function openAddTestModal() {
   $('add-test-form').reset();
   $('test-form-held-on').value = getTodayStr();
-  
+
   // Clear dynamically populated fields
   $('test-form-chapter').value = '';
   const chBtn = $('chapter-dropdown-btn');
@@ -4166,7 +4166,7 @@ function closeAddTestModal() {
   $('add-test-modal').style.display = 'none';
 }
 
-window.setTestFmsFilter = function(filter) {
+window.setTestFmsFilter = function (filter) {
   document.querySelectorAll('.test-fms-tabs .tab-btn').forEach(btn => {
     if (btn.getAttribute('data-filter') === filter) {
       btn.classList.add('active');
@@ -4178,37 +4178,37 @@ window.setTestFmsFilter = function(filter) {
   renderTests(state.tests);
 };
 
-window.handleTestFmsSearch = function(query) {
+window.handleTestFmsSearch = function (query) {
   state.testFmsSearch = (query || '').toLowerCase().trim();
   renderTests(state.tests);
 };
 
-window.handleTestFmsSort = function(sortType) {
+window.handleTestFmsSort = function (sortType) {
   state.testFmsSort = sortType;
   renderTests(state.tests);
 };
 
 // ── Custom Sort Dropdown ──────────────────────────
 const SORT_LABELS = {
-  'held-desc':    'Date Held ↓',
-  'held-asc':     'Date Held ↑',
-  'subject-asc':  'Subject A–Z',
+  'held-desc': 'Date Held ↓',
+  'held-asc': 'Date Held ↑',
+  'subject-asc': 'Subject A–Z',
   'subject-desc': 'Subject Z–A',
-  'class-asc':    'Class ↑',
-  'class-desc':   'Class ↓',
-  'max-desc':     'Max Marks ↓',
-  'max-asc':      'Max Marks ↑'
+  'class-asc': 'Class ↑',
+  'class-desc': 'Class ↓',
+  'max-desc': 'Max Marks ↓',
+  'max-asc': 'Max Marks ↑'
 };
 
-window.toggleSortDropdown = function() {
-  const menu     = $('sort-dropdown-menu');
-  const chevron  = $('sort-dropdown-chevron');
-  const isOpen   = menu.style.display !== 'none';
+window.toggleSortDropdown = function () {
+  const menu = $('sort-dropdown-menu');
+  const chevron = $('sort-dropdown-chevron');
+  const isOpen = menu.style.display !== 'none';
   menu.style.display = isOpen ? 'none' : 'block';
   chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
 };
 
-window.selectSortOption = function(el) {
+window.selectSortOption = function (el) {
   const value = el.getAttribute('data-value');
   // Update active state
   document.querySelectorAll('.sort-option').forEach(o => o.classList.remove('active-sort'));
@@ -4224,7 +4224,7 @@ window.selectSortOption = function(el) {
 };
 
 // Close dropdown when clicking outside
-document.addEventListener('click', function(e) {
+document.addEventListener('click', function (e) {
   const wrapper = $('sort-dropdown-wrapper');
   if (wrapper && !wrapper.contains(e.target)) {
     const menu = $('sort-dropdown-menu');
@@ -4244,14 +4244,14 @@ async function handleAddTestSubmit(e) {
   const maxScore = $('test-form-max').value;
   const heldOn = $('test-form-held-on').value;
   const type = $('test-form-type').value;
-  
+
   const subject = $('test-form-subject').value;
   const chapterSelect = $('test-form-chapter').value;
   const chapter = chapterSelect === 'custom' ? $('test-form-custom-chapter').value.trim() : chapterSelect;
 
   const sheetLink = $('test-form-sheet-link').value.trim();
   const folderLink = $('test-form-folder-link').value.trim();
-  
+
   const minScore = $('test-form-min').value.trim();
   const avgScore = $('test-form-avg').value.trim();
 
@@ -4297,11 +4297,11 @@ function handleEditTestDetailsModal(testId) {
   if (!test) return;
 
   editingTestTrackerId = testId;
-  
+
   // Set dropdowns and fields
   $('test-form-class').value = test.className || '10';
   $('test-form-subject').value = test.subject || '';
-  
+
   const classVal = $('test-form-class').value;
   const subVal = $('test-form-subject').value;
   // Rebuild chapter custom dropdown for the edit modal
@@ -4309,14 +4309,14 @@ function handleEditTestDetailsModal(testId) {
   const customChapterGroup = $('custom-chapter-group');
   const customChapterInput = $('test-form-custom-chapter');
   const chMenu = $('chapter-dropdown-menu');
-  const chBtn  = $('chapter-dropdown-btn');
+  const chBtn = $('chapter-dropdown-btn');
   const chLabel = $('chapter-dropdown-label');
 
   chapterHiddenInput.value = '';
   customChapterGroup.style.display = 'none';
   customChapterInput.value = '';
   customChapterInput.removeAttribute('required');
-  if (chBtn)   chBtn.style.color   = 'var(--text-muted)';
+  if (chBtn) chBtn.style.color = 'var(--text-muted)';
   if (chLabel) chLabel.textContent = '-- Select Chapter --';
 
   if (chMenu) {
@@ -4360,7 +4360,7 @@ function handleEditTestDetailsModal(testId) {
   $('test-form-max').value = test.maxScore;
   $('test-form-held-on').value = test.heldOn.substring(0, 10);
   $('test-form-type').value = test.type;
-  
+
   // Set sheet & folder links
   $('test-form-sheet-link').value = test.sheetLink || '';
   $('test-form-folder-link').value = test.folderLink || '';
@@ -4381,7 +4381,7 @@ function handleEditTestDetailsModal(testId) {
   const originalHandler = handleAddTestSubmit;
   form.onsubmit = async (e) => {
     e.preventDefault();
-    
+
     const className = $('test-form-class').value;
     const subject = $('test-form-subject').value;
     const chapterSel = $('test-form-chapter').value;
