@@ -1743,7 +1743,7 @@ body::before {
 
 /* ---------- Form Elements ---------- */
 .form-group {
-  margin-bottom: var(--space-md);
+  margin-bottom: 12px;
 }
 
 .form-group label {
@@ -1762,10 +1762,10 @@ body::before {
   background: var(--bg-card);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-md);
-  padding: var(--space-sm) var(--space-md);
+  padding: 7px var(--space-md);
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   transition: border-color var(--transition-fast);
   outline: none;
 }
@@ -2145,6 +2145,145 @@ body::before {
   animation: fadeIn 0.4s ease;
 }
 
+/* Section Header */
+.test-fms-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-md) var(--space-md) var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.test-fms-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.test-fms-title-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(167,139,250,0.1));
+  border: 1px solid rgba(124,58,237,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.test-fms-title h2 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #c4b5fd, #7c3aed);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
+}
+
+.test-fms-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Search & Sort Bar */
+.test-fms-toolbar {
+  display: flex;
+  gap: 10px;
+  padding: 0 var(--space-md);
+  margin-bottom: var(--space-sm);
+  align-items: center;
+}
+
+.test-fms-search-wrap {
+  position: relative;
+  flex: 2;
+  min-width: 0;
+}
+
+.test-fms-search-wrap svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.test-fms-search-input {
+  width: 100%;
+  padding: 9px 12px 9px 36px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  outline: none;
+  transition: all var(--transition-base);
+  font-family: inherit;
+}
+
+.test-fms-search-input:focus {
+  border-color: rgba(124,58,237,0.4);
+  background: rgba(124,58,237,0.05);
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.08);
+}
+
+.test-fms-search-input::placeholder { color: var(--text-muted); }
+
+.test-fms-sort-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 150px;
+}
+
+/* Filter Tabs — pill style */
+.test-fms-tabs {
+  display: flex;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  margin-bottom: var(--space-md);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.test-fms-tabs::-webkit-scrollbar { display: none; }
+
+.test-fms-tabs .tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-glass);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+
+.test-fms-tabs .tab-btn:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--text-secondary);
+  border-color: var(--border-glass-active);
+}
+
+.test-fms-tabs .tab-btn.active {
+  background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(167,139,250,0.1));
+  border-color: rgba(124,58,237,0.4);
+  color: #c4b5fd;
+  box-shadow: 0 0 12px rgba(124,58,237,0.15);
+}
+
 /* Premium Subject Badges */
 .subject-badge {
   display: inline-flex;
@@ -2172,6 +2311,63 @@ body::before {
   color: var(--accent-indigo);
   border: 1px solid rgba(99, 102, 241, 0.25);
   box-shadow: 0 0 10px rgba(99, 102, 241, 0.05);
+}
+
+/* Type pill (App / Sheet) on test card */
+.test-type-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-muted);
+}
+
+/* 2-column meta grid inside test cards */
+.test-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 16px;
+  margin-bottom: 8px;
+}
+
+.meta-col {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.meta-kv {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.meta-k {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.meta-v {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-align: right;
+}
+
+.meta-v.meta-bold {
+  color: var(--text-primary);
+  font-weight: 800;
 }
 
 /* Drag and Drop list styling in Settings */
@@ -2213,28 +2409,79 @@ select option:hover {
   color: #fff;
 }
 
-/* Custom Sort Dropdown */
-.sort-option {
-  padding: 10px 14px;
-  font-size: 0.83rem;
-  color: var(--text-muted);
+/* =============================================
+   Unified Custom Dropdown Menu & Options
+   (sort dropdown, chapter dropdown, etc.)
+   ============================================= */
+.custom-dropdown-menu {
+  background: #0f0f23;
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Shared option style for ALL custom dropdowns */
+.sort-option,
+.chapter-option {
+  padding: 9px 14px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.13s ease, color 0.13s ease, border-left-color 0.13s ease;
   border-left: 2px solid transparent;
   white-space: nowrap;
+  line-height: 1.4;
+  font-family: inherit;
 }
 
-.sort-option:hover {
-  background: rgba(139, 92, 246, 0.1);
-  color: var(--text-normal);
-  border-left-color: rgba(139, 92, 246, 0.4);
+.sort-option:hover,
+.chapter-option:hover {
+  background: rgba(124, 58, 237, 0.1);
+  color: var(--text-primary);
+  border-left-color: rgba(124, 58, 237, 0.5);
 }
 
-.sort-option.active-sort {
-  background: rgba(139, 92, 246, 0.12);
+.sort-option.active-sort,
+.chapter-option.selected {
+  background: rgba(124, 58, 237, 0.12);
   color: var(--accent-purple);
   font-weight: 600;
   border-left-color: var(--accent-purple);
+}
+
+.chapter-option.custom-option {
+  color: var(--accent-purple);
+  border-top: 1px solid var(--border-glass);
+}
+
+/* Trigger button shared style for custom dropdowns */
+.custom-dropdown-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  cursor: pointer;
+  outline: none;
+  transition: all var(--transition-base);
+  font-family: inherit;
+  text-align: left;
+}
+
+.custom-dropdown-btn:hover,
+.custom-dropdown-btn:focus {
+  border-color: rgba(124,58,237,0.35);
+  background: rgba(124,58,237,0.05);
+  color: var(--text-primary);
 }
 
 /* Test FMS Premium Tabs */
@@ -2277,17 +2524,18 @@ select option:hover {
   border-bottom-color: var(--accent-purple);
   text-shadow: 0 0 10px rgba(139, 92, 246, 0.15);
 }
-
+/* =============================================
+   Test Cards
+   ============================================= */
 .test-card {
-  background: var(--gradient-card);
-  background-color: var(--bg-secondary);
+  background: linear-gradient(145deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015));
   border: 1px solid var(--border-glass);
-  border-radius: var(--radius-lg);
-  padding: var(--space-lg);
-  margin-bottom: var(--space-lg);
+  border-radius: var(--radius-xl);
+  padding: var(--space-md) var(--space-md) var(--space-sm);
+  margin-bottom: var(--space-md);
   display: flex;
   flex-direction: column;
-  gap: 0; /* No gap when collapsed, transitioned on expanded */
+  gap: 0;
   transition: all var(--transition-slow) ease, gap var(--transition-base) ease;
   cursor: pointer;
   position: relative;
@@ -2295,9 +2543,9 @@ select option:hover {
 }
 
 .test-card:hover {
-  border-color: var(--border-glass-active);
+  border-color: rgba(124,58,237,0.2);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(124,58,237,0.08);
 }
 
 /* Expand / Collapse pipeline animations */
@@ -2333,153 +2581,181 @@ select option:hover {
 
 
 .test-card.overdue {
-  border-left: 4px solid var(--accent-red);
+  border-left: 3px solid rgba(239,68,68,0.7);
+  background: linear-gradient(145deg, rgba(239,68,68,0.04), rgba(255,255,255,0.01));
 }
 
-.test-card.overdue::after {
+.test-card.overdue::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 4px;
-  background: var(--accent-red);
-  animation: pulse-opacity 2s ease-in-out infinite;
+  inset: 0;
+  background: radial-gradient(ellipse at left center, rgba(239,68,68,0.06), transparent 60%);
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 .test-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: var(--space-md);
 }
 
 .test-title-group {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
 }
 
 .test-name {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .test-meta-info {
   display: flex;
-  gap: var(--space-md);
-  margin-top: 4px;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 2px;
+  align-items: center;
 }
 
 .meta-item {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 4px;
 }
 
 .meta-item .label {
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   color: var(--text-dim);
   font-weight: 700;
 }
 
 .meta-item .val {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: var(--text-secondary);
-  font-weight: 500;
+  font-weight: 600;
+  background: rgba(255,255,255,0.05);
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255,255,255,0.06);
 }
 
 .test-pipeline {
   display: flex;
   flex-direction: column;
   position: relative;
-  gap: var(--space-sm);
-  margin-top: var(--space-md);
-  padding-bottom: var(--space-sm);
+  gap: 6px;
+  padding-top: var(--space-sm);
+  padding-bottom: var(--space-xs);
 }
 
 .pipeline-step {
   display: flex;
   flex-direction: row;
-  align-items: flex-start;
-  gap: var(--space-md);
+  align-items: stretch;
+  gap: 10px;
   width: 100%;
   position: relative;
   z-index: 1;
-  padding: 4px 0;
 }
 
-/* Connecting Line - Vertical on each step */
-.pipeline-step::after {
+.pipeline-step-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+  width: 28px;
+}
+
+/* Connecting line */
+.pipeline-step-left::after {
   content: '';
-  position: absolute;
-  top: 36px; /* starting from bottom of circle (32px + 4px top padding) */
-  left: 15px; /* center of the 32px indicator */
-  bottom: -12px; /* extends down to touch the next step's indicator */
+  flex: 1;
   width: 2px;
   background: var(--border-glass);
-  z-index: 0;
+  margin-top: 4px;
+  border-radius: 1px;
+  min-height: 8px;
 }
 
-/* Hide line after the last step */
-.pipeline-step:last-child::after {
+.pipeline-step:last-child .pipeline-step-left::after {
   display: none;
 }
 
 .step-indicator {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: var(--bg-secondary);
   border: 2px solid var(--border-glass);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: var(--text-muted);
   transition: all var(--transition-base);
   flex-shrink: 0;
 }
 
-/* Details Box next to the indicator */
 .step-details {
   flex: 1;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-md);
-  background: rgba(255, 255, 255, 0.02);
+  gap: 6px 12px;
+  background: rgba(255,255,255,0.025);
   border: 1px solid var(--border-glass);
-  padding: var(--space-sm) var(--space-md);
+  padding: 8px 12px;
   border-radius: var(--radius-md);
   transition: all var(--transition-base);
+  margin-bottom: 6px;
+  cursor: pointer;
 }
 
 .pipeline-step:hover .step-details {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255,255,255,0.05);
   border-color: var(--border-glass-active);
+}
+
+.pipeline-step.done .step-details {
+  background: rgba(16,185,129,0.05);
+  border-color: rgba(16,185,129,0.15);
+}
+
+.pipeline-step.delayed .step-details {
+  background: rgba(239,68,68,0.05);
+  border-color: rgba(239,68,68,0.15);
 }
 
 .step-main-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  text-align: left;
 }
 
 .step-label {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-primary);
-  text-align: left;
 }
 
 .step-date {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--text-dim);
 }
 
@@ -2487,14 +2763,13 @@ select option:hover {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--text-secondary);
-  text-align: left;
-  min-width: 180px;
+  text-align: right;
 }
 
 .step-meta-info strong {
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-weight: 500;
 }
 
@@ -2517,10 +2792,10 @@ select option:hover {
 }
 
 .pipeline-step.delayed .step-indicator {
-  background: var(--accent-red);
+  background: rgba(239,68,68,0.15);
   border-color: var(--accent-red);
-  color: white;
-  box-shadow: 0 0 12px var(--accent-red-glow);
+  color: var(--accent-red);
+  box-shadow: 0 0 10px var(--accent-red-glow);
   animation: pulse-opacity 2s ease-in-out infinite;
 }
 

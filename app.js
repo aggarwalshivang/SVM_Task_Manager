@@ -605,113 +605,108 @@ function renderTests(tests) {
 
     return `
       <div class="test-card ${hasOverdueStage ? 'overdue' : ''}" data-test-id="${test.testId}">
-        <div class="test-header">
-          <div class="test-title-group" style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
-            ${test.subject ? `<span class="subject-badge subject-${test.subject.toLowerCase()}">${test.subject === 'Math' ? 'Maths' : test.subject}</span>` : ''}
-            <div class="test-name">${test.testName}</div>
-            <div class="test-meta-info" style="display: flex; flex-wrap: wrap; gap: var(--space-md); align-items: flex-end;">
-              <div class="meta-item">
-                <span class="label">Class</span>
-                <span class="val">${test.className}</span>
-              </div>
-              <div class="meta-item">
-                <span class="label">Max</span>
-                <span class="val">${test.maxScore}</span>
-              </div>
-              ${test.minScore !== undefined && test.minScore !== '' ? `
-              <div class="meta-item">
-                <span class="label">Min</span>
-                <span class="val">${test.minScore}</span>
-              </div>
-              ` : ''}
-              ${test.avgScore !== undefined && test.avgScore !== '' ? `
-              <div class="meta-item">
-                <span class="label">Avg</span>
-                <span class="val">${test.avgScore}</span>
-              </div>
-              ` : ''}
-              <div class="meta-item">
-                <span class="label">Type</span>
-                <span class="val">${test.type}</span>
-              </div>
-              <div class="meta-item">
-                <span class="label">Held</span>
-                <span class="val">${formatDate(test.heldOn)}</span>
-              </div>
-              ${totalStages > 0 ? `
-              <div class="meta-item" style="flex-grow: 1; min-width: 120px; max-width: 200px;">
-                <span class="label" style="display: flex; justify-content: space-between;">
-                  <span>Progress</span>
-                  <span style="font-weight: 800; color: var(--accent-purple);">${completedStages}/${totalStages}</span>
-                </span>
-                <div style="background: rgba(255,255,255,0.06); height: 6px; border-radius: 3px; margin-top: 4px; overflow: hidden; display: flex; gap: 2px; border: 1px solid var(--border-glass);">
-                  ${testStages.map(stage => {
+
+        <!-- Top row: subject badge + actions -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            ${test.subject ? `<span class="subject-badge subject-${test.subject.toLowerCase()}">${test.subject === 'Math' ? 'Maths' : test.subject}</span>` : '<span style="display:inline-block; width:4px;"></span>'}
+            <span class="test-type-pill">${test.type || ''}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button class="btn-ghost btn-sm" onclick="handleEditTestDetailsModal('${test.testId}')">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+              Edit
+            </button>
+            <button class="btn-ghost btn-sm" style="color:var(--accent-red);" onclick="handleDeleteTestTracker('${test.testId}')">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              Delete
+            </button>
+            <div class="expand-chevron" style="transition:transform var(--transition-base); color:var(--text-muted); display:flex; align-items:center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Test name -->
+        <div class="test-name" style="margin-bottom:10px;">${test.testName}</div>
+
+        <!-- 2-column meta grid -->
+        <div class="test-meta-grid">
+          <div class="meta-col">
+            <div class="meta-kv">
+              <span class="meta-k">Class</span>
+              <span class="meta-v meta-bold">${test.className}</span>
+            </div>
+            <div class="meta-kv">
+              <span class="meta-k">Max Marks</span>
+              <span class="meta-v meta-bold">${test.maxScore}</span>
+            </div>
+            ${test.minScore !== undefined && test.minScore !== '' ? `
+            <div class="meta-kv">
+              <span class="meta-k">Min Marks</span>
+              <span class="meta-v">${test.minScore}</span>
+            </div>` : ''}
+            ${test.avgScore !== undefined && test.avgScore !== '' ? `
+            <div class="meta-kv">
+              <span class="meta-k">Avg Marks</span>
+              <span class="meta-v">${test.avgScore}</span>
+            </div>` : ''}
+          </div>
+          <div class="meta-col">
+            <div class="meta-kv">
+              <span class="meta-k">Held On</span>
+              <span class="meta-v meta-bold">${formatDate(test.heldOn)}</span>
+            </div>
+            ${totalStages > 0 ? `
+            <div class="meta-kv">
+              <span class="meta-k">Progress</span>
+              <span class="meta-v" style="color:${completedStages === totalStages ? 'var(--accent-emerald)' : 'var(--accent-purple)'}; font-weight:800;">${completedStages}/${totalStages}</span>
+            </div>
+            <div style="margin-top:6px;">
+              <div style="background:rgba(255,255,255,0.06); height:5px; border-radius:3px; overflow:hidden; display:flex; gap:2px; border:1px solid var(--border-glass);">
+                ${testStages.map(stage => {
       const plannedDate = new Date(heldOnDate);
       plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
       plannedDate.setHours(23, 59, 59, 999);
       const isDelayed = stage.status !== 'done' && new Date() > plannedDate;
-
       let bg = 'rgba(255,255,255,0.12)';
       if (stage.status === 'done') bg = 'var(--accent-emerald)';
       else if (isDelayed) bg = 'var(--accent-red)';
-
-      return `<div style="flex: 1; background: ${bg}; height: 100%;" title="${stage.label || 'Stage'}: ${stage.status === 'done' ? 'Completed' : (isDelayed ? 'Overdue' : 'Pending')}"></div>`;
+      return `<div style="flex:1; background:${bg}; height:100%;" title="${stage.label || 'Stage'}: ${stage.status === 'done' ? 'Done' : (isDelayed ? 'Overdue' : 'Pending')}"></div>`;
     }).join('')}
-                </div>
               </div>
-              ` : ''}
-            </div>
-          </div>
-          <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
-            <div style="display:flex; gap:6px;">
-              <button class="btn-ghost btn-sm" onclick="handleEditTestDetailsModal('${test.testId}')">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                Edit
-              </button>
-              <button class="btn-ghost btn-sm" style="color:var(--accent-red);" onclick="handleDeleteTestTracker('${test.testId}')">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                Delete
-              </button>
-            </div>
-            <div class="expand-chevron" style="transition: transform var(--transition-base); color: var(--text-muted); display: flex; align-items: center; justify-content: center;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-            </div>
+            </div>` : ''}
           </div>
         </div>
 
         ${(test.sheetLink || test.folderLink) ? `
-        <div class="test-resources-row" style="display: flex; gap: var(--space-sm); padding: var(--space-sm) var(--space-md); border-bottom: 1px solid var(--border-glass); background: rgba(255,255,255,0.015);">
+        <div style="display:flex; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border-glass);">
           ${test.sheetLink ? `
-            <a href="${test.sheetLink}" target="_blank" class="btn-ghost btn-xs" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--accent-emerald); font-weight: 700; padding: 4px 8px; font-size: 0.75rem;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-              <span>Google Sheet</span>
-            </a>
-          ` : ''}
+            <a href="${test.sheetLink}" target="_blank" class="btn-ghost btn-xs" style="display:inline-flex; align-items:center; gap:5px; text-decoration:none; color:var(--accent-emerald); font-weight:700; padding:4px 10px; font-size:0.75rem;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+              Sheet
+            </a>` : ''}
           ${test.folderLink ? `
-            <a href="${test.folderLink}" target="_blank" class="btn-ghost btn-xs" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--accent-indigo); font-weight: 700; padding: 4px 8px; font-size: 0.75rem;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-              <span>Drive Folder</span>
-            </a>
-          ` : ''}
-        </div>
-        ` : ''}
+            <a href="${test.folderLink}" target="_blank" class="btn-ghost btn-xs" style="display:inline-flex; align-items:center; gap:5px; text-decoration:none; color:#818cf8; font-weight:700; padding:4px 10px; font-size:0.75rem;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+              Drive
+            </a>` : ''}
+        </div>` : ''}
         
         <div class="test-pipeline">
           ${testStages.map((stage, sIdx) => {
       const plannedDate = new Date(heldOnDate);
       plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
-
       const pDateCheck = new Date(plannedDate);
       pDateCheck.setHours(23, 59, 59, 999);
       const isDelayed = stage.status !== 'done' && new Date() > pDateCheck;
       const statusClass = stage.status === 'done' ? 'done' : (isDelayed ? 'delayed' : 'pending');
+      const doneIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
 
       return `
-              <div class="pipeline-step ${statusClass}" 
-                   onclick="handleToggleTestStage('${test.testId}', ${stage.id})"
-                   title="Click to toggle status.">
-                <div class="step-indicator">
-                  ${sIdx + 1}
+              <div class="pipeline-step ${statusClass}" onclick="handleToggleTestStage('${test.testId}', ${stage.id})" title="Click to toggle status.">
+                <div class="pipeline-step-left">
+                  <div class="step-indicator">${stage.status === 'done' ? doneIcon : (sIdx + 1)}</div>
                 </div>
                 <div class="step-details">
                   <div class="step-main-info">
@@ -722,14 +717,11 @@ function renderTests(tests) {
                     <div><strong>Assigned:</strong> ${stage.doer || 'Unassigned'}</div>
                     ${stage.status === 'done' ? `
                       <div><strong>Done by:</strong> ${stage.doneBy || 'System'}</div>
-                      <div><strong>Date & Time:</strong> ${stage.doneAt || 'N/A'}</div>
-                    ` : `
-                      <div style="color: var(--text-dim);"><strong>Status:</strong> Pending</div>
-                    `}
+                      <div><strong>At:</strong> ${stage.doneAt || 'N/A'}</div>
+                    ` : `<div style="color:var(--text-dim);"><strong>Status:</strong> Pending</div>`}
                   </div>
                 </div>
-              </div>
-            `;
+              </div>`;
     }).join('')}
         </div>
       </div>
@@ -2436,7 +2428,7 @@ function initTestFormSyllabus() {
 
     const menu = $('chapter-dropdown-menu');
     if (!menu) return;
-    menu.innerHTML = `<div class="chapter-option" data-value="" onclick="selectChapterOption(this)" style="padding:9px 12px;font-size:0.82rem;color:var(--text-dim);cursor:pointer;border-left:2px solid transparent;">-- Select Chapter --</div>`;
+    menu.innerHTML = `<div class="chapter-option" data-value="" onclick="selectChapterOption(this)">-- Select Chapter --</div>`;
 
     if (!cls || !sub) { updateTestName(); return; }
 
@@ -2447,17 +2439,15 @@ function initTestFormSyllabus() {
       div.dataset.value = ch;
       div.textContent = ch;
       div.onclick = () => selectChapterOption(div);
-      div.style.cssText = 'padding:9px 12px;font-size:0.82rem;color:var(--text-normal);cursor:pointer;border-left:2px solid transparent;transition:background 0.12s,color 0.12s;';
       menu.appendChild(div);
     });
 
     // Custom option
     const customDiv = document.createElement('div');
-    customDiv.className = 'chapter-option';
+    customDiv.className = 'chapter-option custom-option';
     customDiv.dataset.value = 'custom';
     customDiv.textContent = '✏️ Custom Chapter...';
     customDiv.onclick = () => selectChapterOption(customDiv);
-    customDiv.style.cssText = 'padding:9px 12px;font-size:0.82rem;color:var(--accent-purple);cursor:pointer;border-left:2px solid transparent;border-top:1px solid var(--border-glass);';
     menu.appendChild(customDiv);
 
     updateTestName();
@@ -2508,18 +2498,12 @@ window.selectChapterOption = function (el) {
   const customGroup = $('custom-chapter-group');
   const customInput = $('test-form-custom-chapter');
 
-  // Highlight active
-  document.querySelectorAll('.chapter-option').forEach(o => {
-    o.style.background = '';
-    o.style.borderLeftColor = 'transparent';
-    o.style.color = o.dataset.value === '' ? 'var(--text-dim)' : 'var(--text-normal)';
-  });
-  el.style.background = 'rgba(139,92,246,0.1)';
-  el.style.borderLeftColor = 'var(--accent-purple)';
-  el.style.color = 'var(--accent-purple)';
+  // Highlight active using CSS class
+  document.querySelectorAll('.chapter-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
 
   if (label) label.textContent = value ? el.textContent : '-- Select Chapter --';
-  if (btn) btn.style.color = value ? 'var(--text-normal)' : 'var(--text-muted)';
+  if (btn) btn.style.color = value ? 'var(--text-primary)' : '';
   if (input) input.value = value;
 
   // Handle custom chapter
