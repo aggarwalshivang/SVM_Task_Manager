@@ -1244,21 +1244,35 @@ body::before {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   z-index: 950;
   padding: var(--space-md);
   animation: fadeIn 0.2s ease;
+  overflow-y: auto;
 }
 
 .modal-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-glass);
-  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-lg) var(--radius-lg);
+  border-radius: var(--radius-xl);
   padding: var(--space-lg);
   width: 100%;
   max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   animation: slideUp 0.3s var(--transition-spring);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139,92,246,0.3) transparent;
+}
+
+.modal-card::-webkit-scrollbar {
+  width: 4px;
+}
+.modal-card::-webkit-scrollbar-thumb {
+  background: rgba(139,92,246,0.4);
+  border-radius: 2px;
 }
 
 .modal-card-sm {
@@ -2126,9 +2140,142 @@ body::before {
   100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
 
-/* ---------- Test Tracker ---------- */
+/* ---------- Test FMS ---------- */
 #test-tracker-container {
   animation: fadeIn 0.4s ease;
+}
+
+/* Premium Subject Badges */
+.subject-badge {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  margin-bottom: var(--space-xs);
+  transition: all var(--transition-base);
+}
+
+.subject-badge.subject-science {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--accent-emerald);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.05);
+}
+
+.subject-badge.subject-math {
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--accent-indigo);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.05);
+}
+
+/* Drag and Drop list styling in Settings */
+.setting-row {
+  transition: transform var(--transition-base), box-shadow var(--transition-base), opacity var(--transition-base);
+}
+
+.setting-row:active {
+  cursor: grabbing !important;
+  transform: scale(0.985);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.drag-handle {
+  user-select: none;
+  cursor: grab;
+  transition: color var(--transition-base);
+}
+
+/* =============================================
+   Dark Theme Select / Dropdown Fix
+============================================= */
+select {
+  background-color: #12121f;
+  color: var(--text-normal);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+}
+
+select option {
+  background-color: #12121f;
+  color: var(--text-normal);
+  padding: 6px 12px;
+}
+
+select option:checked,
+select option:hover {
+  background-color: #2d2d4e;
+  color: #fff;
+}
+
+/* Custom Sort Dropdown */
+.sort-option {
+  padding: 10px 14px;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  border-left: 2px solid transparent;
+  white-space: nowrap;
+}
+
+.sort-option:hover {
+  background: rgba(139, 92, 246, 0.1);
+  color: var(--text-normal);
+  border-left-color: rgba(139, 92, 246, 0.4);
+}
+
+.sort-option.active-sort {
+  background: rgba(139, 92, 246, 0.12);
+  color: var(--accent-purple);
+  font-weight: 600;
+  border-left-color: var(--accent-purple);
+}
+
+/* Test FMS Premium Tabs */
+.test-fms-tabs {
+  margin-bottom: var(--space-md);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+
+.test-fms-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.test-fms-tabs .tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: var(--space-xs) var(--space-md);
+  cursor: pointer;
+  position: relative;
+  transition: all var(--transition-base);
+  border-bottom: 2px solid transparent;
+  display: inline-block;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.test-fms-tabs .tab-btn:hover {
+  color: var(--text-normal);
+}
+
+.test-fms-tabs .tab-btn.active {
+  color: var(--accent-purple);
+  border-bottom-color: var(--accent-purple);
+  text-shadow: 0 0 10px rgba(139, 92, 246, 0.15);
 }
 
 .test-card {
@@ -2140,8 +2287,11 @@ body::before {
   margin-bottom: var(--space-lg);
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
-  transition: all var(--transition-base);
+  gap: 0; /* No gap when collapsed, transitioned on expanded */
+  transition: all var(--transition-slow) ease, gap var(--transition-base) ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
 }
 
 .test-card:hover {
@@ -2149,6 +2299,38 @@ body::before {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
+
+/* Expand / Collapse pipeline animations */
+.test-card .test-pipeline {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+              opacity 0.25s ease, 
+              margin-top 0.3s ease, 
+              padding-bottom 0.3s ease;
+  pointer-events: none;
+}
+
+.test-card.expanded {
+  gap: var(--space-md);
+}
+
+.test-card.expanded .test-pipeline {
+  max-height: 2000px; /* high enough for all vertical steps to display without cutoff */
+  opacity: 1;
+  margin-top: var(--space-md);
+  padding-bottom: var(--space-sm);
+  pointer-events: auto;
+}
+
+.test-card.expanded .expand-chevron {
+  transform: rotate(180deg);
+  color: var(--accent-purple) !important;
+}
+
 
 .test-card.overdue {
   border-left: 4px solid var(--accent-red);
@@ -2211,35 +2393,39 @@ body::before {
 
 .test-pipeline {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   position: relative;
+  gap: var(--space-sm);
   margin-top: var(--space-md);
   padding-bottom: var(--space-sm);
-  overflow-x: auto;
-  gap: 10px;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Connecting Line */
-.test-pipeline::before {
-  content: '';
-  position: absolute;
-  top: 15px;
-  left: 20px;
-  right: 20px;
-  height: 2px;
-  background: var(--border-glass);
-  z-index: 0;
 }
 
 .pipeline-step {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-xs);
-  min-width: 80px;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--space-md);
+  width: 100%;
   position: relative;
   z-index: 1;
+  padding: 4px 0;
+}
+
+/* Connecting Line - Vertical on each step */
+.pipeline-step::after {
+  content: '';
+  position: absolute;
+  top: 36px; /* starting from bottom of circle (32px + 4px top padding) */
+  left: 15px; /* center of the 32px indicator */
+  bottom: -12px; /* extends down to touch the next step's indicator */
+  width: 2px;
+  background: var(--border-glass);
+  z-index: 0;
+}
+
+/* Hide line after the last step */
+.pipeline-step:last-child::after {
+  display: none;
 }
 
 .step-indicator {
@@ -2251,11 +2437,70 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: var(--text-muted);
   transition: all var(--transition-base);
+  flex-shrink: 0;
 }
+
+/* Details Box next to the indicator */
+.step-details {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-glass);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
+}
+
+.pipeline-step:hover .step-details {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--border-glass-active);
+}
+
+.step-main-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.step-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.step-date {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.step-meta-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-align: left;
+  min-width: 180px;
+}
+
+.step-meta-info strong {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.pipeline-step.done .step-label { color: var(--accent-emerald); }
+.pipeline-step.current .step-label { color: var(--text-primary); }
+.pipeline-step.delayed .step-label { color: var(--accent-red); }
 
 .pipeline-step.done .step-indicator {
   background: var(--accent-emerald);
@@ -2277,33 +2522,6 @@ body::before {
   color: white;
   box-shadow: 0 0 12px var(--accent-red-glow);
   animation: pulse-opacity 2s ease-in-out infinite;
-}
-
-.step-label {
-  font-size: 0.65rem;
-  font-weight: 600;
-  text-align: center;
-  color: var(--text-muted);
-  width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pipeline-step.done .step-label { color: var(--accent-emerald); }
-.pipeline-step.current .step-label { color: var(--text-primary); }
-.pipeline-step.delayed .step-label { color: var(--accent-red); }
-
-.step-date {
-  font-size: 0.6rem;
-  color: var(--text-dim);
-}
-
-/* Mobile adjustments for pipeline */
-@media (max-width: 480px) {
-  .test-pipeline {
-    justify-content: flex-start;
-  }
 }
 
 /* Button Enhancements */
@@ -2431,4 +2649,97 @@ body::before {
   width: 20px;
   height: 20px;
   margin: 0 4px;
+}
+
+/* ============================================
+   Desktop Layout — PC / Wide Screen Fix
+   ============================================ */
+@media (min-width: 768px) {
+
+  /* Expand the main app content area */
+  #app {
+    max-width: 860px;
+    padding-left: var(--space-xl);
+    padding-right: var(--space-xl);
+    /* Single-row header is ~64px tall on desktop */
+    padding-top: calc(72px + var(--space-md));
+  }
+
+  /* Header spans full viewport width, single row */
+  .app-header {
+    left: 0;
+    transform: none;
+    max-width: 100%;
+    width: 100%;
+    flex-wrap: nowrap;
+    min-height: 64px;
+    padding: 0 var(--space-xl);
+    gap: var(--space-md);
+    align-items: center;
+  }
+
+  /* Remove the forced line-break pseudo-element */
+  .app-header::after {
+    display: none;
+  }
+
+  /* Logo + greeting side-by-side on desktop */
+  .header-left {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-sm);
+    flex: 0 0 auto;
+  }
+
+  .header-left .greeting {
+    margin-top: 0;
+    white-space: nowrap;
+  }
+
+  /* Nav pill stays centered using margin auto */
+  .header-center {
+    order: 0;
+    flex: 1;
+    justify-content: center;
+    margin-top: 0;
+  }
+
+  /* Right controls */
+  .header-right {
+    flex: 0 0 auto;
+  }
+
+  /* Show logout label text on desktop */
+  .logout-btn span {
+    display: inline;
+  }
+
+  /* Widen task cards slightly for better readability */
+  .task-card:hover {
+    transform: translateX(6px);
+  }
+
+  /* Test FMS section header spacing */
+  #test-tracker-container .section-header {
+    padding: 0;
+  }
+
+  /* Broadcast + error banners full width */
+  .broadcast-banner,
+  .error-banner {
+    max-width: 860px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+  }
+}
+
+@media (min-width: 1100px) {
+  #app {
+    max-width: 1000px;
+  }
+  .broadcast-banner,
+  .error-banner {
+    max-width: 1000px;
+  }
 }

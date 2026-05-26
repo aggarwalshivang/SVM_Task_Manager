@@ -42,7 +42,10 @@ const state = {
   theme: localStorage.getItem('theme') === 'light' ? 'light' : 'dark',
   editingTaskId: null,
   tests: [],
-  testSettings: []
+  testSettings: [],
+  testFmsFilter: 'all',
+  testFmsSearch: '',
+  testFmsSort: 'held-desc'
 };
 
 // =============================================
@@ -494,19 +497,93 @@ async function openTestTracker() {
 
     renderTests(state.tests);
   } catch (err) {
-    console.error('Failed to load test tracker:', err);
+    console.error('Failed to load Test FMS:', err);
     container.innerHTML = '<div class="empty-state">Failed to load tests.</div>';
   }
 }
 
+function getTestStages(test) {
+  const globalSettings = state.testSettings || [];
+  const testStages = test.stages || [];
+  
+  if (testStages.length === 0) {
+    return globalSettings.map(s => ({
+      id: s.id,
+      label: s.label,
+      offset: s.offset,
+      doer: s.doer,
+      status: 'pending',
+      actualDate: '',
+      doneBy: '',
+      doneAt: ''
+    }));
+  }
+
+  return testStages.map(s => {
+    const globalStage = globalSettings.find(g => g.id === s.id) || {};
+    return {
+      id: s.id,
+      label: s.label || globalStage.label || 'Step',
+      offset: s.offset !== undefined ? parseInt(s.offset) : (globalStage.offset || 0),
+      doer: s.doer !== undefined ? s.doer : (globalStage.doer || ''),
+      status: s.status || 'pending',
+      actualDate: s.actualDate || '',
+      doneBy: s.doneBy || '',
+      doneAt: s.doneAt || ''
+    };
+  });
+}
+
 function renderTests(tests) {
   const container = $('test-list-content');
-  if (tests.length === 0) {
-    container.innerHTML = '<div class="empty-state">No tests tracked yet.</div>';
+  
+  // Apply complete/in-progress/sheet/app/search filters
+  const filter = state.testFmsFilter || 'all';
+  const searchQuery = state.testFmsSearch || '';
+  
+  let filteredTests = tests.filter(test => {
+    const testStages = getTestStages(test);
+    const totalStages = testStages.length;
+    const completedStages = testStages.filter(s => s.status === 'done').length;
+    const isCompleted = totalStages > 0 && completedStages === totalStages;
+
+    // 1. Tab Filters
+    if (filter === 'complete' && !isCompleted) return false;
+    if (filter === 'progress' && isCompleted) return false;
+    if (filter === 'sheet' && (test.type || '').toLowerCase() !== 'sheet') return false;
+    if (filter === 'app' && (test.type || '').toLowerCase() !== 'app') return false;
+
+    // 2. Search Query Filter
+    if (searchQuery) {
+      const nameMatch = (test.testName || '').toLowerCase().includes(searchQuery);
+      const subMatch = (test.subject || '').toLowerCase().includes(searchQuery);
+      const chapMatch = (test.chapter || '').toLowerCase().includes(searchQuery);
+      if (!nameMatch && !subMatch && !chapMatch) return false;
+    }
+
+    return true;
+  });
+
+  // Apply sorting options
+  const sortType = state.testFmsSort || 'held-desc';
+  filteredTests.sort((a, b) => {
+    if (sortType === 'held-desc') return new Date(b.heldOn) - new Date(a.heldOn);
+    if (sortType === 'held-asc') return new Date(a.heldOn) - new Date(b.heldOn);
+    if (sortType === 'subject-asc') return (a.subject || '').localeCompare(b.subject || '');
+    if (sortType === 'subject-desc') return (b.subject || '').localeCompare(a.subject || '');
+    if (sortType === 'class-asc') return parseInt(a.className || 0) - parseInt(b.className || 0);
+    if (sortType === 'class-desc') return parseInt(b.className || 0) - parseInt(a.className || 0);
+    if (sortType === 'max-desc') return parseFloat(b.maxScore || 0) - parseFloat(a.maxScore || 0);
+    if (sortType === 'max-asc') return parseFloat(a.maxScore || 0) - parseFloat(b.maxScore || 0);
+    return 0;
+  });
+
+  if (filteredTests.length === 0) {
+    container.innerHTML = `<div class="empty-state">No tests match current filters.</div>`;
     return;
   }
 
-  container.innerHTML = tests.map(test => {
+  container.innerHTML = filteredTests.map(test => {
     const heldOnDate = new Date(test.heldOn);
 
     // Check if any stage is overdue to apply card styling
@@ -521,12 +598,18 @@ function renderTests(tests) {
       return new Date() > pDate;
     });
 
+    // Calculate stage stats for the compact progress bar
+    const testStages = getTestStages(test);
+    const totalStages = testStages.length;
+    const completedStages = testStages.filter(s => s.status === 'done').length;
+
     return `
       <div class="test-card ${hasOverdueStage ? 'overdue' : ''}" data-test-id="${test.testId}">
         <div class="test-header">
-          <div class="test-title-group">
+          <div class="test-title-group" style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+            ${test.subject ? `<span class="subject-badge subject-${test.subject.toLowerCase()}">${test.subject === 'Math' ? 'Maths' : test.subject}</span>` : ''}
             <div class="test-name">${test.testName}</div>
-            <div class="test-meta-info">
+            <div class="test-meta-info" style="display: flex; flex-wrap: wrap; gap: var(--space-md); align-items: flex-end;">
               <div class="meta-item">
                 <span class="label">Class</span>
                 <span class="val">${test.className}</span>
@@ -535,6 +618,18 @@ function renderTests(tests) {
                 <span class="label">Max</span>
                 <span class="val">${test.maxScore}</span>
               </div>
+              ${test.minScore !== undefined && test.minScore !== '' ? `
+              <div class="meta-item">
+                <span class="label">Min</span>
+                <span class="val">${test.minScore}</span>
+              </div>
+              ` : ''}
+              ${test.avgScore !== undefined && test.avgScore !== '' ? `
+              <div class="meta-item">
+                <span class="label">Avg</span>
+                <span class="val">${test.avgScore}</span>
+              </div>
+              ` : ''}
               <div class="meta-item">
                 <span class="label">Type</span>
                 <span class="val">${test.type}</span>
@@ -543,58 +638,114 @@ function renderTests(tests) {
                 <span class="label">Held</span>
                 <span class="val">${formatDate(test.heldOn)}</span>
               </div>
+              ${totalStages > 0 ? `
+              <div class="meta-item" style="flex-grow: 1; min-width: 120px; max-width: 200px;">
+                <span class="label" style="display: flex; justify-content: space-between;">
+                  <span>Progress</span>
+                  <span style="font-weight: 800; color: var(--accent-purple);">${completedStages}/${totalStages}</span>
+                </span>
+                <div style="background: rgba(255,255,255,0.06); height: 6px; border-radius: 3px; margin-top: 4px; overflow: hidden; display: flex; gap: 2px; border: 1px solid var(--border-glass);">
+                  ${testStages.map(stage => {
+                    const plannedDate = new Date(heldOnDate);
+                    plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
+                    plannedDate.setHours(23, 59, 59, 999);
+                    const isDelayed = stage.status !== 'done' && new Date() > plannedDate;
+                    
+                    let bg = 'rgba(255,255,255,0.12)';
+                    if (stage.status === 'done') bg = 'var(--accent-emerald)';
+                    else if (isDelayed) bg = 'var(--accent-red)';
+                    
+                    return `<div style="flex: 1; background: ${bg}; height: 100%;" title="${stage.label || 'Stage'}: ${stage.status === 'done' ? 'Completed' : (isDelayed ? 'Overdue' : 'Pending')}"></div>`;
+                  }).join('')}
+                </div>
+              </div>
+              ` : ''}
             </div>
           </div>
-          <div style="display:flex; gap:8px;">
-            <button class="btn-ghost btn-sm" onclick="handleEditTestDetailsModal('${test.testId}')">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-              Edit
-            </button>
-            <button class="btn-ghost btn-sm" style="color:var(--accent-red);" onclick="handleDeleteTestTracker('${test.testId}')">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-              Delete
-            </button>
+          <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
+            <div style="display:flex; gap:6px;">
+              <button class="btn-ghost btn-sm" onclick="handleEditTestDetailsModal('${test.testId}')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                Edit
+              </button>
+              <button class="btn-ghost btn-sm" style="color:var(--accent-red);" onclick="handleDeleteTestTracker('${test.testId}')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                Delete
+              </button>
+            </div>
+            <div class="expand-chevron" style="transition: transform var(--transition-base); color: var(--text-muted); display: flex; align-items: center; justify-content: center;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
           </div>
         </div>
+
+        ${(test.sheetLink || test.folderLink) ? `
+        <div class="test-resources-row" style="display: flex; gap: var(--space-sm); padding: var(--space-sm) var(--space-md); border-bottom: 1px solid var(--border-glass); background: rgba(255,255,255,0.015);">
+          ${test.sheetLink ? `
+            <a href="${test.sheetLink}" target="_blank" class="btn-ghost btn-xs" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--accent-emerald); font-weight: 700; padding: 4px 8px; font-size: 0.75rem;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+              <span>Google Sheet</span>
+            </a>
+          ` : ''}
+          ${test.folderLink ? `
+            <a href="${test.folderLink}" target="_blank" class="btn-ghost btn-xs" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--accent-indigo); font-weight: 700; padding: 4px 8px; font-size: 0.75rem;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+              <span>Drive Folder</span>
+            </a>
+          ` : ''}
+        </div>
+        ` : ''}
         
-          ${(state.testSettings || []).map(stage => {
-      const stages = test.stages || [];
-      const testStage = stages.find(s => s.id === stage.id) || { status: 'pending', actualDate: '' };
-      const plannedDate = new Date(heldOnDate);
-      plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
+        <div class="test-pipeline">
+          ${testStages.map((stage, sIdx) => {
+            const plannedDate = new Date(heldOnDate);
+            plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
 
-      const pDateCheck = new Date(plannedDate);
-      pDateCheck.setHours(23, 59, 59, 999);
-      const isDelayed = testStage.status !== 'done' && new Date() > pDateCheck;
-      const statusClass = testStage.status === 'done' ? 'done' : (isDelayed ? 'delayed' : 'pending');
+            const pDateCheck = new Date(plannedDate);
+            pDateCheck.setHours(23, 59, 59, 999);
+            const isDelayed = stage.status !== 'done' && new Date() > pDateCheck;
+            const statusClass = stage.status === 'done' ? 'done' : (isDelayed ? 'delayed' : 'pending');
 
-      const collabInfo = testStage.status === 'done'
-        ? `\nDone by: ${testStage.doneBy || 'System'} at ${testStage.doneAt || 'N/A'}`
-        : '';
-
-      // Extract initials for the indicator
-      let indicator = stage.id;
-      if (testStage.status === 'done' && testStage.doneBy) {
-        indicator = testStage.doneBy.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-      } else if (testStage.status === 'done') {
-        indicator = '✓';
-      }
-
-      return `
+            return `
               <div class="pipeline-step ${statusClass}" 
                    onclick="handleToggleTestStage('${test.testId}', ${stage.id})"
-                   title="${stage.label || 'Step'} - Assigned to ${stage.doer || 'Unassigned'}.${collabInfo}\nClick to toggle status.">
+                   title="Click to toggle status.">
                 <div class="step-indicator">
-                  ${indicator}
+                  ${sIdx + 1}
                 </div>
-                <div class="step-label">${stage.label || 'Step'}</div>
-                <div class="step-date">${formatDate(plannedDate)}</div>
+                <div class="step-details">
+                  <div class="step-main-info">
+                    <div class="step-label">${stage.label || 'Step'}</div>
+                    <div class="step-date">Planned: ${formatDate(plannedDate)}</div>
+                  </div>
+                  <div class="step-meta-info">
+                    <div><strong>Assigned:</strong> ${stage.doer || 'Unassigned'}</div>
+                    ${stage.status === 'done' ? `
+                      <div><strong>Done by:</strong> ${stage.doneBy || 'System'}</div>
+                      <div><strong>Date & Time:</strong> ${stage.doneAt || 'N/A'}</div>
+                    ` : `
+                      <div style="color: var(--text-dim);"><strong>Status:</strong> Pending</div>
+                    `}
+                  </div>
+                </div>
               </div>
             `;
-    }).join('')}
+          }).join('')}
+        </div>
       </div>
     `;
   }).join('');
+
+  // Bind click handlers to test cards for expand/collapse
+  container.querySelectorAll('.test-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      // If the user clicked a button, a link, or a step inside the card, ignore the expand/collapse toggle
+      if (e.target.closest('button') || e.target.closest('.pipeline-step') || e.target.closest('a')) {
+        return;
+      }
+      card.classList.toggle('expanded');
+    });
+  });
 }
 
 async function handleToggleTestStage(testId, stageId) {
@@ -644,14 +795,14 @@ async function handleToggleTestStage(testId, stageId) {
 }
 
 async function handleDeleteTestTracker(testId) {
-  if (!confirm('Permanently delete this test tracker?')) return;
+  if (!confirm('Permanently delete this Test FMS?')) return;
 
   try {
     const res = await apiFetch('deleteTestTracker', { testId }, 'POST');
     if (res.success) {
       state.tests = state.tests.filter(t => t.testId !== testId);
       renderTests(state.tests);
-      showToast('Test tracker deleted.');
+      showToast('Test FMS deleted.');
     }
   } catch (err) {
     showToast('Failed to delete tracker', 'error');
@@ -674,8 +825,10 @@ function openTestSettingsModal() {
 function renderTestSettingsRows() {
   const container = $('test-settings-list');
   container.innerHTML = state.testSettings.map((s, idx) => `
-    <div class="form-row setting-row" data-index="${idx}" style="align-items: flex-end; margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-      <div class="form-group" style="flex: 2;">
+    <div class="form-row setting-row" data-index="${idx}" draggable="true" ondragstart="handleSettingDragStart(event)" ondragover="handleSettingDragOver(event)" ondrop="handleSettingDrop(event)" style="align-items: flex-end; margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; cursor: move; position: relative;">
+      <!-- Drag handle -->
+      <div class="drag-handle" style="padding: 10px 5px; color: rgba(255,255,255,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; height: 100%;">☰</div>
+      <div class="form-group" style="flex: 2; margin-left: 5px;">
         <label>Label</label>
         <input type="text" class="setting-label" value="${s.label}">
       </div>
@@ -687,7 +840,7 @@ function renderTestSettingsRows() {
         <label>Doer</label>
         <input type="text" class="setting-doer" value="${s.doer}">
       </div>
-      <button class="btn-ghost" onclick="removeSettingRow(${idx})" style="padding: 10px; color: var(--accent-red);">✕</button>
+      <button class="btn-ghost" onclick="removeSettingRow(${idx})" style="padding: 10px; color: var(--accent-red); margin-left: 5px;">✕</button>
     </div>
   `).join('');
 }
@@ -702,6 +855,47 @@ function removeSettingRow(idx) {
   state.testSettings.splice(idx, 1);
   renderTestSettingsRows();
 }
+
+// Drag & Drop reordering support for Test Settings stages
+let draggedIdx = null;
+
+function saveCurrentSettingsFromDOM() {
+  const rows = document.querySelectorAll('.setting-row');
+  state.testSettings = Array.from(rows).map((row, idx) => {
+    const existingId = state.testSettings[idx]?.id;
+    return {
+      id: existingId !== undefined ? existingId : idx + 1,
+      label: row.querySelector('.setting-label').value.trim(),
+      offset: parseInt(row.querySelector('.setting-offset').value) || 0,
+      doer: row.querySelector('.setting-doer').value.trim()
+    };
+  });
+}
+
+window.handleSettingDragStart = function(e) {
+  saveCurrentSettingsFromDOM();
+  draggedIdx = parseInt(e.currentTarget.getAttribute('data-index'));
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.style.opacity = '0.5';
+};
+
+window.handleSettingDragOver = function(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+};
+
+window.handleSettingDrop = function(e) {
+  e.preventDefault();
+  const targetIdx = parseInt(e.currentTarget.getAttribute('data-index'));
+  e.currentTarget.style.opacity = '1';
+  
+  if (draggedIdx !== null && targetIdx !== null && draggedIdx !== targetIdx) {
+    const [draggedItem] = state.testSettings.splice(draggedIdx, 1);
+    state.testSettings.splice(targetIdx, 0, draggedItem);
+    renderTestSettingsRows();
+  }
+  draggedIdx = null;
+};
 
 async function saveTestSettings() {
   const rows = document.querySelectorAll('.setting-row');
@@ -2148,11 +2342,212 @@ function initIOSInstallPrompt() {
 }
 
 // =============================================
+// MASTER SYLLABUS DATA
+// =============================================
+const MASTER_SYLLABUS = {
+  "9": {
+    "Science": [
+      "Exploration: Entering the World of Secondary Science",
+      "Cell: The Building Block of Life",
+      "Tissues in Action",
+      "Describing Motion Around Us",
+      "Exploring Mixtures and their Separation",
+      "How Forces Affect Motion",
+      "Work, Energy, and Simple Machines",
+      "Journey Inside the Atom",
+      "Atomic Foundations of Matter",
+      "Sound Waves: Characteristics and Applications",
+      "Reproduction: How Life Continues",
+      "Patterns in Life: Diversity and Classification",
+      "Earth as a System: Energy, Matter, and Life"
+    ],
+    "Math": [
+      "Orienting Yourself: The Use of Coordinates",
+      "Introduction to Linear Polynomials",
+      "The World of Numbers",
+      "Exploring Algebraic Identities",
+      "Introduction to Euclid's Geometry",
+      "I'm Up and Down, and Round and Round",
+      "Measuring Space: Perimeter and Area",
+      "The Mathematics of Maybe: Introduction to Probability",
+      "Predicting What Comes Next: Exploring Sequences and Progression"
+    ]
+  },
+  "10": {
+    "Science": [
+      "Chemical Reactions and Equations",
+      "Acids, Bases and Salts",
+      "Metals and Non-metals",
+      "Carbon and its Compounds",
+      "Life Processes",
+      "Control and Coordination",
+      "How do Organisms Reproduce?",
+      "Heredity",
+      "Light – Reflection and Refraction",
+      "The Human Eye and the Colourful World",
+      "Electricity",
+      "Magnetic Effects of Electric Current",
+      "Our Environment",
+      "Sources of Energy"
+    ],
+    "Math": [
+      "Real Numbers",
+      "Polynomials",
+      "Pair of Linear Equations in Two Variables",
+      "Quadratic Equations",
+      "Arithmetic Progressions",
+      "Triangles",
+      "Coordinate Geometry",
+      "Introduction to Trigonometry",
+      "Some Applications of Trigonometry",
+      "Circles",
+      "Constructions",
+      "Areas Related to Circles",
+      "Surface Areas and Volumes",
+      "Statistics",
+      "Probability"
+    ]
+  }
+};
+
+function initTestFormSyllabus() {
+  const classSelect   = $('test-form-class');
+  const subjectSelect = $('test-form-subject');
+  const chapterInput  = $('test-form-chapter'); // now a hidden input
+  const customChapterGroup = $('custom-chapter-group');
+  const customChapterInput = $('test-form-custom-chapter');
+  const testNameInput = $('test-form-name');
+
+  if (!classSelect || !subjectSelect || !chapterInput) return;
+
+  function updateChapters() {
+    const cls = classSelect.value;
+    const sub = subjectSelect.value;
+
+    // Reset chapter
+    chapterInput.value = '';
+    const btn = $('chapter-dropdown-btn');
+    const label = $('chapter-dropdown-label');
+    if (btn) btn.style.color = 'var(--text-muted)';
+    if (label) label.textContent = '-- Select Chapter --';
+    customChapterGroup.style.display = 'none';
+    customChapterInput.value = '';
+    customChapterInput.removeAttribute('required');
+
+    const menu = $('chapter-dropdown-menu');
+    if (!menu) return;
+    menu.innerHTML = `<div class="chapter-option" data-value="" onclick="selectChapterOption(this)" style="padding:9px 12px;font-size:0.82rem;color:var(--text-dim);cursor:pointer;border-left:2px solid transparent;">-- Select Chapter --</div>`;
+
+    if (!cls || !sub) { updateTestName(); return; }
+
+    const chapters = (MASTER_SYLLABUS[cls] && MASTER_SYLLABUS[cls][sub]) || [];
+    chapters.forEach(ch => {
+      const div = document.createElement('div');
+      div.className = 'chapter-option';
+      div.dataset.value = ch;
+      div.textContent = ch;
+      div.onclick = () => selectChapterOption(div);
+      div.style.cssText = 'padding:9px 12px;font-size:0.82rem;color:var(--text-normal);cursor:pointer;border-left:2px solid transparent;transition:background 0.12s,color 0.12s;';
+      menu.appendChild(div);
+    });
+
+    // Custom option
+    const customDiv = document.createElement('div');
+    customDiv.className = 'chapter-option';
+    customDiv.dataset.value = 'custom';
+    customDiv.textContent = '✏️ Custom Chapter...';
+    customDiv.onclick = () => selectChapterOption(customDiv);
+    customDiv.style.cssText = 'padding:9px 12px;font-size:0.82rem;color:var(--accent-purple);cursor:pointer;border-left:2px solid transparent;border-top:1px solid var(--border-glass);';
+    menu.appendChild(customDiv);
+
+    updateTestName();
+  }
+
+  function updateTestName() {
+    const sub = subjectSelect.value;
+    const ch  = chapterInput.value;
+    if (!sub || !ch) { testNameInput.value = ''; return; }
+    let chName = ch === 'custom' ? (customChapterInput.value.trim() || 'Custom') : ch;
+    const subName = sub === 'Math' ? 'Maths' : sub;
+    testNameInput.value = `${subName} - ${chName}`;
+  }
+
+  classSelect.addEventListener('change', updateChapters);
+  subjectSelect.addEventListener('change', updateChapters);
+  customChapterInput.addEventListener('input', updateTestName);
+
+  // Expose updateTestName for selectChapterOption
+  window._updateTestFormName = updateTestName;
+
+  // Close chapter dropdown on outside click
+  document.addEventListener('click', function(e) {
+    const wrapper = $('chapter-dropdown-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+      const menu = $('chapter-dropdown-menu');
+      if (menu) menu.style.display = 'none';
+      const chev = $('chapter-dropdown-chevron');
+      if (chev) chev.style.transform = '';
+    }
+  });
+}
+
+window.toggleChapterDropdown = function() {
+  const menu  = $('chapter-dropdown-menu');
+  const chev  = $('chapter-dropdown-chevron');
+  if (!menu) return;
+  const isOpen = menu.style.display !== 'none';
+  menu.style.display = isOpen ? 'none' : 'block';
+  if (chev) chev.style.transform = isOpen ? '' : 'rotate(180deg)';
+};
+
+window.selectChapterOption = function(el) {
+  const value = el.dataset.value;
+  const label = $('chapter-dropdown-label');
+  const btn   = $('chapter-dropdown-btn');
+  const input = $('test-form-chapter');
+  const customGroup = $('custom-chapter-group');
+  const customInput = $('test-form-custom-chapter');
+
+  // Highlight active
+  document.querySelectorAll('.chapter-option').forEach(o => {
+    o.style.background = '';
+    o.style.borderLeftColor = 'transparent';
+    o.style.color = o.dataset.value === '' ? 'var(--text-dim)' : 'var(--text-normal)';
+  });
+  el.style.background = 'rgba(139,92,246,0.1)';
+  el.style.borderLeftColor = 'var(--accent-purple)';
+  el.style.color = 'var(--accent-purple)';
+
+  if (label) label.textContent = value ? el.textContent : '-- Select Chapter --';
+  if (btn) btn.style.color = value ? 'var(--text-normal)' : 'var(--text-muted)';
+  if (input) input.value = value;
+
+  // Handle custom chapter
+  if (value === 'custom') {
+    if (customGroup) customGroup.style.display = 'block';
+    if (customInput) { customInput.setAttribute('required', 'true'); customInput.focus(); }
+  } else {
+    if (customGroup) customGroup.style.display = 'none';
+    if (customInput) { customInput.value = ''; customInput.removeAttribute('required'); }
+  }
+
+  // Close menu
+  const menu = $('chapter-dropdown-menu');
+  if (menu) menu.style.display = 'none';
+  const chev = $('chapter-dropdown-chevron');
+  if (chev) chev.style.transform = '';
+
+  // Update test name
+  if (window._updateTestFormName) window._updateTestFormName();
+};
+
+// =============================================
 // INITIALIZATION
 // =============================================
 async function init() {
   applyTheme();
   initIOSInstallPrompt();
+  initTestFormSyllabus();
 
   // Shift Mode Toggle
   document.querySelectorAll('input[name="shift-mode"]').forEach(radio => {
@@ -3624,17 +4019,220 @@ document.addEventListener('click', e => {
 });
 
 // =============================================
-// TEST TRACKER HANDLERS
+// TEST FMS HANDLERS
 // =============================================
+// Global states for individual stages configuration inside the modal
+let currentFormStages = [];
+
+function renderIndividualFormStages() {
+  const container = $('individual-test-stages-list');
+  if (!container) return;
+
+  container.innerHTML = currentFormStages.map((s, idx) => `
+    <div class="form-stage-row" data-index="${idx}" draggable="false" ondragstart="handleFormStageDragStart(event)" ondragover="handleFormStageDragOver(event)" ondrop="handleFormStageDrop(event)" ondragend="handleFormStageDragEnd(event)" style="display: flex; flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 6px; margin-bottom: 8px; padding: 8px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: 6px;">
+      <div class="drag-handle" onmousedown="enableFormRowDrag(this)" style="flex-shrink: 0; color: rgba(255,255,255,0.4); font-size: 1.1rem; cursor: grab; line-height: 1; padding: 0 4px; user-select: none;">☰</div>
+      <input type="text" class="form-stage-label" value="${s.label || ''}" style="flex: 2; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-normal);" placeholder="Stage name">
+      <input type="number" class="form-stage-offset" value="${s.offset || 0}" style="flex: 0 0 50px; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-normal);" title="Offset days">
+      <input type="text" class="form-stage-doer" value="${s.doer || ''}" style="flex: 1.5; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-normal);" placeholder="Assigned to">
+      <button type="button" onclick="removeIndividualTestStageRow(${idx})" style="flex-shrink: 0; background: none; border: none; color: var(--accent-red); cursor: pointer; font-size: 1rem; line-height: 1; padding: 2px 4px;">✕</button>
+    </div>
+  `).join('');
+}
+
+window.addIndividualTestStageRow = function() {
+  saveCurrentFormStagesFromDOM();
+  const nextId = currentFormStages.length > 0 ? Math.max(...currentFormStages.map(s => s.id)) + 1 : 1;
+  currentFormStages.push({
+    id: nextId,
+    label: '',
+    offset: 0,
+    doer: '',
+    status: 'pending',
+    actualDate: '',
+    doneBy: '',
+    doneAt: ''
+  });
+  renderIndividualFormStages();
+};
+
+window.removeIndividualTestStageRow = function(idx) {
+  saveCurrentFormStagesFromDOM();
+  currentFormStages.splice(idx, 1);
+  renderIndividualFormStages();
+};
+
+function saveCurrentFormStagesFromDOM() {
+  const rows = document.querySelectorAll('.form-stage-row');
+  currentFormStages = Array.from(rows).map((row, idx) => {
+    const existing = currentFormStages[idx] || {};
+    return {
+      id: existing.id || idx + 1,
+      label: row.querySelector('.form-stage-label').value.trim(),
+      offset: parseInt(row.querySelector('.form-stage-offset').value) || 0,
+      doer: row.querySelector('.form-stage-doer').value.trim(),
+      status: existing.status || 'pending',
+      actualDate: existing.actualDate || '',
+      doneBy: existing.doneBy || '',
+      doneAt: existing.doneAt || ''
+    };
+  });
+}
+
+let formDraggedIdx = null;
+
+// Enable drag only when user grabs the ☰ handle
+window.enableFormRowDrag = function(handle) {
+  const row = handle.closest('.form-stage-row');
+  if (!row) return;
+  row.setAttribute('draggable', 'true');
+  // Disable after mouseup so clicking inputs works normally
+  document.addEventListener('mouseup', function cleanup() {
+    row.setAttribute('draggable', 'false');
+    document.removeEventListener('mouseup', cleanup);
+  }, { once: true });
+};
+
+window.handleFormStageDragStart = function(e) {
+  saveCurrentFormStagesFromDOM();
+  formDraggedIdx = parseInt(e.currentTarget.getAttribute('data-index'));
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.style.opacity = '0.5';
+};
+
+window.handleFormStageDragEnd = function(e) {
+  e.currentTarget.style.opacity = '1';
+  e.currentTarget.setAttribute('draggable', 'false');
+};
+
+window.handleFormStageDragOver = function(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+};
+
+window.handleFormStageDrop = function(e) {
+  e.preventDefault();
+  const targetIdx = parseInt(e.currentTarget.getAttribute('data-index'));
+  e.currentTarget.style.opacity = '1';
+  
+  if (formDraggedIdx !== null && targetIdx !== null && formDraggedIdx !== targetIdx) {
+    const [draggedItem] = currentFormStages.splice(formDraggedIdx, 1);
+    currentFormStages.splice(targetIdx, 0, draggedItem);
+    renderIndividualFormStages();
+  }
+  formDraggedIdx = null;
+};
+
 function openAddTestModal() {
   $('add-test-form').reset();
   $('test-form-held-on').value = getTodayStr();
+  
+  // Clear dynamically populated fields
+  $('test-form-chapter').value = '';
+  const chBtn = $('chapter-dropdown-btn');
+  const chLabel = $('chapter-dropdown-label');
+  if (chBtn) chBtn.style.color = 'var(--text-muted)';
+  if (chLabel) chLabel.textContent = '-- Select Chapter --';
+  const chMenu = $('chapter-dropdown-menu');
+  if (chMenu) chMenu.innerHTML = '<div class="chapter-option" data-value="" onclick="selectChapterOption(this)" style="padding:9px 12px;font-size:0.82rem;color:var(--text-dim);cursor:pointer;">-- Select Chapter --</div>';
+  $('custom-chapter-group').style.display = 'none';
+  $('test-form-custom-chapter').value = '';
+  $('test-form-custom-chapter').removeAttribute('required');
+
+  // Clear links
+  $('test-form-sheet-link').value = '';
+  $('test-form-folder-link').value = '';
+
+  // Clear min & avg marks
+  $('test-form-min').value = '';
+  $('test-form-avg').value = '';
+
+  // Pre-populate individual stages with global blueprints
+  currentFormStages = state.testSettings.map(s => ({
+    id: s.id,
+    label: s.label,
+    offset: s.offset,
+    doer: s.doer,
+    status: 'pending',
+    actualDate: '',
+    doneBy: '',
+    doneAt: ''
+  }));
+  renderIndividualFormStages();
+
   $('add-test-modal').style.display = 'flex';
 }
 
 function closeAddTestModal() {
   $('add-test-modal').style.display = 'none';
 }
+
+window.setTestFmsFilter = function(filter) {
+  document.querySelectorAll('.test-fms-tabs .tab-btn').forEach(btn => {
+    if (btn.getAttribute('data-filter') === filter) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+  state.testFmsFilter = filter;
+  renderTests(state.tests);
+};
+
+window.handleTestFmsSearch = function(query) {
+  state.testFmsSearch = (query || '').toLowerCase().trim();
+  renderTests(state.tests);
+};
+
+window.handleTestFmsSort = function(sortType) {
+  state.testFmsSort = sortType;
+  renderTests(state.tests);
+};
+
+// ── Custom Sort Dropdown ──────────────────────────
+const SORT_LABELS = {
+  'held-desc':    'Date Held ↓',
+  'held-asc':     'Date Held ↑',
+  'subject-asc':  'Subject A–Z',
+  'subject-desc': 'Subject Z–A',
+  'class-asc':    'Class ↑',
+  'class-desc':   'Class ↓',
+  'max-desc':     'Max Marks ↓',
+  'max-asc':      'Max Marks ↑'
+};
+
+window.toggleSortDropdown = function() {
+  const menu     = $('sort-dropdown-menu');
+  const chevron  = $('sort-dropdown-chevron');
+  const isOpen   = menu.style.display !== 'none';
+  menu.style.display = isOpen ? 'none' : 'block';
+  chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+};
+
+window.selectSortOption = function(el) {
+  const value = el.getAttribute('data-value');
+  // Update active state
+  document.querySelectorAll('.sort-option').forEach(o => o.classList.remove('active-sort'));
+  el.classList.add('active-sort');
+  // Update button label
+  const label = $('sort-dropdown-label');
+  if (label) label.textContent = SORT_LABELS[value] || value;
+  // Close menu
+  $('sort-dropdown-menu').style.display = 'none';
+  $('sort-dropdown-chevron').style.transform = '';
+  // Apply sort
+  handleTestFmsSort(value);
+};
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  const wrapper = $('sort-dropdown-wrapper');
+  if (wrapper && !wrapper.contains(e.target)) {
+    const menu = $('sort-dropdown-menu');
+    if (menu) menu.style.display = 'none';
+    const chevron = $('sort-dropdown-chevron');
+    if (chevron) chevron.style.transform = '';
+  }
+});
 
 $('add-test-close-btn')?.addEventListener('click', closeAddTestModal);
 $('add-test-form')?.addEventListener('submit', handleAddTestSubmit);
@@ -3646,6 +4244,18 @@ async function handleAddTestSubmit(e) {
   const maxScore = $('test-form-max').value;
   const heldOn = $('test-form-held-on').value;
   const type = $('test-form-type').value;
+  
+  const subject = $('test-form-subject').value;
+  const chapterSelect = $('test-form-chapter').value;
+  const chapter = chapterSelect === 'custom' ? $('test-form-custom-chapter').value.trim() : chapterSelect;
+
+  const sheetLink = $('test-form-sheet-link').value.trim();
+  const folderLink = $('test-form-folder-link').value.trim();
+  
+  const minScore = $('test-form-min').value.trim();
+  const avgScore = $('test-form-avg').value.trim();
+
+  saveCurrentFormStagesFromDOM();
 
   const submitBtn = e.target.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
@@ -3658,7 +4268,13 @@ async function handleAddTestSubmit(e) {
       maxScore,
       heldOn,
       type,
-      stages: state.testSettings.map(s => ({ id: s.id, status: 'pending', actualDate: '' }))
+      subject,
+      chapter,
+      sheetLink,
+      folderLink,
+      minScore,
+      avgScore,
+      stages: currentFormStages
     }, 'POST');
 
     if (res.success) {
@@ -3681,11 +4297,81 @@ function handleEditTestDetailsModal(testId) {
   if (!test) return;
 
   editingTestTrackerId = testId;
+  
+  // Set dropdowns and fields
+  $('test-form-class').value = test.className || '10';
+  $('test-form-subject').value = test.subject || '';
+  
+  const classVal = $('test-form-class').value;
+  const subVal = $('test-form-subject').value;
+  // Rebuild chapter custom dropdown for the edit modal
+  const chapterHiddenInput = $('test-form-chapter');
+  const customChapterGroup = $('custom-chapter-group');
+  const customChapterInput = $('test-form-custom-chapter');
+  const chMenu = $('chapter-dropdown-menu');
+  const chBtn  = $('chapter-dropdown-btn');
+  const chLabel = $('chapter-dropdown-label');
+
+  chapterHiddenInput.value = '';
+  customChapterGroup.style.display = 'none';
+  customChapterInput.value = '';
+  customChapterInput.removeAttribute('required');
+  if (chBtn)   chBtn.style.color   = 'var(--text-muted)';
+  if (chLabel) chLabel.textContent = '-- Select Chapter --';
+
+  if (chMenu) {
+    chMenu.innerHTML = `<div class="chapter-option" data-value="" onclick="selectChapterOption(this)" style="padding:9px 12px;font-size:0.82rem;color:var(--text-dim);cursor:pointer;border-left:2px solid transparent;">-- Select Chapter --</div>`;
+
+    if (classVal && subVal) {
+      const chapters = (MASTER_SYLLABUS[classVal] && MASTER_SYLLABUS[classVal][subVal]) || [];
+      chapters.forEach(ch => {
+        const div = document.createElement('div');
+        div.className = 'chapter-option';
+        div.dataset.value = ch;
+        div.textContent = ch;
+        div.onclick = () => selectChapterOption(div);
+        div.style.cssText = 'padding:9px 12px;font-size:0.82rem;color:var(--text-normal);cursor:pointer;border-left:2px solid transparent;transition:background 0.12s,color 0.12s;';
+        chMenu.appendChild(div);
+      });
+
+      const customDiv = document.createElement('div');
+      customDiv.className = 'chapter-option';
+      customDiv.dataset.value = 'custom';
+      customDiv.textContent = '✏️ Custom Chapter...';
+      customDiv.onclick = () => selectChapterOption(customDiv);
+      customDiv.style.cssText = 'padding:9px 12px;font-size:0.82rem;color:var(--accent-purple);cursor:pointer;border-left:2px solid transparent;border-top:1px solid var(--border-glass);';
+      chMenu.appendChild(customDiv);
+
+      if (test.chapter) {
+        const chapters2 = Array.from(chMenu.querySelectorAll('.chapter-option'));
+        if ((MASTER_SYLLABUS[classVal][subVal] || []).includes(test.chapter)) {
+          const matchEl = chapters2.find(o => o.dataset.value === test.chapter);
+          if (matchEl) selectChapterOption(matchEl);
+        } else {
+          const customEl = chapters2.find(o => o.dataset.value === 'custom');
+          if (customEl) selectChapterOption(customEl);
+          customChapterInput.value = test.chapter;
+        }
+      }
+    }
+  }
+
   $('test-form-name').value = test.testName;
-  $('test-form-class').value = test.className;
   $('test-form-max').value = test.maxScore;
   $('test-form-held-on').value = test.heldOn.substring(0, 10);
   $('test-form-type').value = test.type;
+  
+  // Set sheet & folder links
+  $('test-form-sheet-link').value = test.sheetLink || '';
+  $('test-form-folder-link').value = test.folderLink || '';
+
+  // Set min & avg marks
+  $('test-form-min').value = test.minScore || '';
+  $('test-form-avg').value = test.avgScore || '';
+
+  // Load individual stages configuration
+  currentFormStages = getTestStages(test);
+  renderIndividualFormStages();
 
   $('add-test-modal').querySelector('h3').textContent = 'Edit Test Details';
   $('add-test-modal').querySelector('button[type="submit"]').textContent = 'Save Changes';
@@ -3695,13 +4381,28 @@ function handleEditTestDetailsModal(testId) {
   const originalHandler = handleAddTestSubmit;
   form.onsubmit = async (e) => {
     e.preventDefault();
+    
+    const className = $('test-form-class').value;
+    const subject = $('test-form-subject').value;
+    const chapterSel = $('test-form-chapter').value;
+    const chapter = chapterSel === 'custom' ? $('test-form-custom-chapter').value.trim() : chapterSel;
+
+    saveCurrentFormStagesFromDOM();
+
     const payload = {
       testId: editingTestTrackerId,
       testName: $('test-form-name').value.trim(),
-      className: $('test-form-class').value.trim(),
+      className,
       maxScore: $('test-form-max').value,
       heldOn: $('test-form-held-on').value,
-      type: $('test-form-type').value
+      type: $('test-form-type').value,
+      subject,
+      chapter,
+      sheetLink: $('test-form-sheet-link').value.trim(),
+      folderLink: $('test-form-folder-link').value.trim(),
+      minScore: $('test-form-min').value.trim(),
+      avgScore: $('test-form-avg').value.trim(),
+      stages: currentFormStages
     };
 
     try {
