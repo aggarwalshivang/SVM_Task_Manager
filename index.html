@@ -261,7 +261,7 @@
           <input type="text" id="test-fms-search" class="test-fms-search-input" placeholder="Search by name, subject, chapter..." oninput="handleTestFmsSearch(this.value)">
         </div>
         <div class="test-fms-sort-wrap" id="sort-dropdown-wrapper">
-          <button id="sort-dropdown-btn" onclick="toggleSortDropdown()" style="width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 12px; background:rgba(255,255,255,0.04); border:1px solid var(--border-glass); border-radius:var(--radius-md); color:var(--text-secondary); font-size:0.82rem; cursor:pointer; outline:none; transition:all var(--transition-base); font-family:inherit;">
+          <button id="sort-dropdown-btn" onclick="toggleSortDropdown()" class="custom-dropdown-btn">
             <span style="display:flex; align-items:center; gap:6px;">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
               <span id="sort-dropdown-label">Date Held ↓</span>
@@ -645,7 +645,7 @@
                 <svg id="chapter-dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; transition:transform 0.2s;"><polyline points="6 9 12 15 18 9"></polyline></svg>
               </button>
               <div id="chapter-dropdown-menu" class="custom-dropdown-menu" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:200px; overflow-y:auto; z-index:500; scrollbar-width:thin; scrollbar-color:rgba(124,58,237,0.3) transparent;">
-                <div class="chapter-option" data-value="" onclick="selectChapterOption(this)">-- Select Chapter --</div>
+                <div class="chapter-option chapter-placeholder" data-value="" onclick="selectChapterOption(this)">-- Select Chapter --</div>
               </div>
             </div>
           </div>

@@ -604,13 +604,19 @@ function renderTests(tests) {
     const completedStages = testStages.filter(s => s.status === 'done').length;
 
     return `
-      <div class="test-card ${hasOverdueStage ? 'overdue' : ''}" data-test-id="${test.testId}">
+      <div class="test-card ${hasOverdueStage ? 'overdue' : ''} ${completedStages === totalStages && totalStages > 0 ? 'complete' : ''}" data-test-id="${test.testId}">
 
-        <!-- Top row: subject badge + actions -->
+        <!-- Top row: subject badge + type + status + actions -->
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <div style="display:flex; align-items:center; gap:8px;">
-            ${test.subject ? `<span class="subject-badge subject-${test.subject.toLowerCase()}">${test.subject === 'Math' ? 'Maths' : test.subject}</span>` : '<span style="display:inline-block; width:4px;"></span>'}
+          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            ${test.subject ? `<span class="subject-badge subject-${test.subject.toLowerCase()}">${test.subject === 'Math' ? 'Maths' : test.subject}</span>` : ''}
             <span class="test-type-pill">${test.type || ''}</span>
+            ${totalStages > 0 ? (() => {
+      const pct = Math.round((completedStages / totalStages) * 100);
+      if (completedStages === totalStages) return `<span class="test-status-badge status-complete">✓ Complete</span>`;
+      if (hasOverdueStage) return `<span class="test-status-badge status-overdue">⚠ Overdue</span>`;
+      return `<span class="test-status-badge status-progress">${pct}% done</span>`;
+    })() : ''}
           </div>
           <div style="display:flex; align-items:center; gap:6px;">
             <button class="btn-ghost btn-sm" onclick="handleEditTestDetailsModal('${test.testId}')">
@@ -657,12 +663,15 @@ function renderTests(tests) {
               <span class="meta-k">Held On</span>
               <span class="meta-v meta-bold">${formatDate(test.heldOn)}</span>
             </div>
-            ${totalStages > 0 ? `
+            ${totalStages > 0 ? (() => {
+      const pct = Math.round((completedStages / totalStages) * 100);
+      const pctColor = completedStages === totalStages ? 'var(--accent-emerald)' : (hasOverdueStage ? 'var(--accent-red)' : 'var(--accent-purple)');
+      return `
             <div class="meta-kv">
               <span class="meta-k">Progress</span>
-              <span class="meta-v" style="color:${completedStages === totalStages ? 'var(--accent-emerald)' : 'var(--accent-purple)'}; font-weight:800;">${completedStages}/${totalStages}</span>
+              <span class="meta-v" style="color:${pctColor}; font-weight:800;">${completedStages}/${totalStages} <span style="font-weight:600; font-size:0.7rem; opacity:0.8;">(${pct}%)</span></span>
             </div>
-            <div style="margin-top:6px;">
+            <div style="margin-top:5px;">
               <div style="background:rgba(255,255,255,0.06); height:5px; border-radius:3px; overflow:hidden; display:flex; gap:2px; border:1px solid var(--border-glass);">
                 ${testStages.map(stage => {
       const plannedDate = new Date(heldOnDate);
@@ -672,10 +681,11 @@ function renderTests(tests) {
       let bg = 'rgba(255,255,255,0.12)';
       if (stage.status === 'done') bg = 'var(--accent-emerald)';
       else if (isDelayed) bg = 'var(--accent-red)';
-      return `<div style="flex:1; background:${bg}; height:100%;" title="${stage.label || 'Stage'}: ${stage.status === 'done' ? 'Done' : (isDelayed ? 'Overdue' : 'Pending')}"></div>`;
+      return `<div style="flex:1; background:${bg}; height:100%; transition:background 0.3s;" title="${stage.label || 'Stage'}: ${stage.status === 'done' ? 'Done' : (isDelayed ? 'Overdue' : 'Pending')}"></div>`;
     }).join('')}
               </div>
-            </div>` : ''}
+            </div>`;
+    })() : ''}
           </div>
         </div>
 
@@ -2428,7 +2438,7 @@ function initTestFormSyllabus() {
 
     const menu = $('chapter-dropdown-menu');
     if (!menu) return;
-    menu.innerHTML = `<div class="chapter-option" data-value="" onclick="selectChapterOption(this)">-- Select Chapter --</div>`;
+    menu.innerHTML = `<div class="chapter-option chapter-placeholder" data-value="" onclick="selectChapterOption(this)">-- Select Chapter --</div>`;
 
     if (!cls || !sub) { updateTestName(); return; }
 

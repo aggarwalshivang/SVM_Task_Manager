@@ -2328,6 +2328,62 @@ body::before {
   color: var(--text-muted);
 }
 
+/* Status badges on test cards */
+.test-status-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.test-status-badge.status-complete {
+  background: rgba(16,185,129,0.12);
+  color: var(--accent-emerald);
+  border: 1px solid rgba(16,185,129,0.25);
+}
+
+.test-status-badge.status-overdue {
+  background: rgba(239,68,68,0.12);
+  color: var(--accent-red);
+  border: 1px solid rgba(239,68,68,0.25);
+  animation: pulse-opacity 2s ease-in-out infinite;
+}
+
+.test-status-badge.status-progress {
+  background: rgba(124,58,237,0.12);
+  color: #c4b5fd;
+  border: 1px solid rgba(124,58,237,0.25);
+}
+
+/* Completed card — subtle green tint */
+.test-card.complete {
+  border-color: rgba(16,185,129,0.15);
+}
+.test-card.complete::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--accent-emerald);
+  border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
+  opacity: 0.6;
+}
+
+/* Staggered entrance for test cards */
+.test-card { animation: slideUp 0.35s ease backwards; }
+.test-card:nth-child(1) { animation-delay: 0ms; }
+.test-card:nth-child(2) { animation-delay: 40ms; }
+.test-card:nth-child(3) { animation-delay: 80ms; }
+.test-card:nth-child(4) { animation-delay: 120ms; }
+.test-card:nth-child(5) { animation-delay: 160ms; }
+.test-card:nth-child(6) { animation-delay: 200ms; }
+.test-card:nth-child(7) { animation-delay: 240ms; }
+.test-card:nth-child(8) { animation-delay: 280ms; }
+
 /* 2-column meta grid inside test cards */
 .test-meta-grid {
   display: grid;
@@ -2455,6 +2511,11 @@ select option:hover {
 .chapter-option.custom-option {
   color: var(--accent-purple);
   border-top: 1px solid var(--border-glass);
+}
+
+.chapter-option.chapter-placeholder {
+  color: var(--text-dim);
+  font-style: italic;
 }
 
 /* Trigger button shared style for custom dropdowns */
