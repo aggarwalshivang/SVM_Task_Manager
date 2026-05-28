@@ -627,7 +627,16 @@ function handleUserSignedIn(userData) {
   };
   $('tab-tests').onclick = () => {
     setActiveTab('tab-tests');
-    openTestTracker();
+    state.testFmsFilter = 'all';
+    openTestTracker('tests');
+    $('task-view-container').style.display = 'none';
+    $('admin-dashboard-container').style.display = 'none';
+    $('test-tracker-container').style.display = 'block';
+  };
+  $('tab-videos').onclick = () => {
+    setActiveTab('tab-videos');
+    state.testFmsFilter = 'all';
+    openTestTracker('videos');
     $('task-view-container').style.display = 'none';
     $('admin-dashboard-container').style.display = 'none';
     $('test-tracker-container').style.display = 'block';
@@ -642,8 +651,8 @@ function setActiveTab(id) {
   $(id).classList.add('active');
 }
 
-async function openTestTracker() {
-  state.currentView = 'tests';
+async function openTestTracker(viewType = 'tests') {
+  state.currentView = viewType;
   const container = $('test-list-content');
   container.innerHTML = '<div class="loading-spinner" style="margin: 3rem auto;"></div>';
 
@@ -709,22 +718,50 @@ function getTestStages(test) {
 function renderTests(tests) {
   const container = $('test-list-content');
 
+  // Programmatically manage the sub-tab filter pills visibility depending on the active main tab
+  const isVideoView = state.currentView === 'videos';
+  const sheetPill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="sheet"]');
+  const appPill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="app"]');
+  const videoPill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="video"]');
+  
+  if (sheetPill) sheetPill.style.display = isVideoView ? 'none' : 'inline-block';
+  if (appPill) appPill.style.display = isVideoView ? 'none' : 'inline-block';
+  if (videoPill) videoPill.style.display = 'none'; // Separate main nav tab takes care of video now, hide this pill
+
+  // Dynamic header titles based on view type
+  const fmsHeaderTitle = document.querySelector('.test-fms-title h2');
+  if (fmsHeaderTitle) {
+    fmsHeaderTitle.textContent = isVideoView ? 'Video FMS' : 'Test FMS';
+  }
+
+  const fmsHeaderIcon = document.querySelector('.test-fms-title-icon');
+  if (fmsHeaderIcon) {
+    fmsHeaderIcon.innerHTML = isVideoView 
+      ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>'
+      : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>';
+  }
+
   // Apply complete/in-progress/sheet/app/search filters
   const filter = state.testFmsFilter || 'all';
   const searchQuery = state.testFmsSearch || '';
 
   let filteredTests = tests.filter(test => {
+    const isVideo = (test.type || '').toLowerCase() === 'video';
+
+    // 1. Partition by Main Navigation Tab
+    if (isVideoView && !isVideo) return false;
+    if (!isVideoView && isVideo) return false;
+
+    // 2. Sub-tab Toolbar Filters
     const testStages = getTestStages(test);
     const totalStages = testStages.length;
     const completedStages = testStages.filter(s => s.status === 'done').length;
     const isCompleted = totalStages > 0 && completedStages === totalStages;
 
-    // 1. Tab Filters
     if (filter === 'complete' && !isCompleted) return false;
     if (filter === 'progress' && isCompleted) return false;
     if (filter === 'sheet' && (test.type || '').toLowerCase() !== 'sheet') return false;
     if (filter === 'app' && (test.type || '').toLowerCase() !== 'app') return false;
-    if (filter === 'video' && (test.type || '').toLowerCase() !== 'video') return false;
 
     // 2. Search Query Filter
     if (searchQuery) {
@@ -4463,11 +4500,12 @@ function openAddTestModal() {
   $('test-form-min').value = '';
   $('test-form-avg').value = '';
 
-  // Set default type to Sheet
-  selectTypeSegment('Sheet');
+  // Set default type dynamically based on current view
+  const defaultType = state.currentView === 'videos' ? 'Video' : 'Sheet';
+  selectTypeSegment(defaultType);
 
-  // Pre-populate individual stages with global blueprints for 'Sheet'
-  const blueprint = (state.testSettings || []).filter(s => s.type === 'Sheet');
+  // Pre-populate individual stages with global blueprints
+  const blueprint = (state.testSettings || []).filter(s => s.type === defaultType);
   currentFormStages = blueprint.map(s => ({
     id: s.id,
     label: s.label,
