@@ -1146,10 +1146,11 @@ function renderTests(tests) {
               <span class="meta-k">Class</span>
               <span class="meta-v meta-bold">${test.className}</span>
             </div>
+            ${test.type !== 'Video' && test.type !== 'BeforeFee' && test.type !== 'AfterFee' ? `
             <div class="meta-kv">
               <span class="meta-k">Max Marks</span>
               <span class="meta-v meta-bold">${test.maxScore}</span>
-            </div>
+            </div>` : ''}
             ${test.minScore !== undefined && test.minScore !== '' && test.type !== 'Video' ? `
             <div class="meta-kv">
               <span class="meta-k">Min Marks</span>
