@@ -3087,3 +3087,18 @@ select option:hover {
     max-width: 1000px;
   }
 }
+
+/* Parents Checklist Interactive Row Styles */
+.parents-checklist-row {
+  transition: all var(--transition-base) !important;
+}
+.parents-checklist-row:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+.parents-checklist-row:active {
+  transform: translateY(0);
+}
+

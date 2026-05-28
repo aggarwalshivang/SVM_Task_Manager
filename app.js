@@ -762,6 +762,35 @@ function getTestStages(test) {
   });
 }
 
+window.toggleParentsChecklistRow = function (idx) {
+  const email = state.currentUser ? state.currentUser.email : 'default';
+  const checkedKey = `parents_fms_checked_${email}`;
+  let checkedIndices = [];
+  try {
+    checkedIndices = JSON.parse(localStorage.getItem(checkedKey)) || [];
+  } catch(e) {
+    checkedIndices = [];
+  }
+
+  const foundIdx = checkedIndices.indexOf(idx);
+  if (foundIdx > -1) {
+    checkedIndices.splice(foundIdx, 1);
+  } else {
+    checkedIndices.push(idx);
+  }
+
+  localStorage.setItem(checkedKey, JSON.stringify(checkedIndices));
+  renderTests(state.tests);
+};
+
+window.resetParentsChecklist = function () {
+  const email = state.currentUser ? state.currentUser.email : 'default';
+  const checkedKey = `parents_fms_checked_${email}`;
+  localStorage.setItem(checkedKey, JSON.stringify([]));
+  renderTests(state.tests);
+  showToast('Checklist refreshed! Start your routine.');
+};
+
 function renderTests(tests) {
   const container = $('test-list-content');
 
@@ -783,6 +812,25 @@ function renderTests(tests) {
   if (beforeFeePill) beforeFeePill.style.display = isAdmissionView ? 'inline-block' : 'none';
   if (afterFeePill) afterFeePill.style.display = isAdmissionView ? 'inline-block' : 'none';
 
+  // Show/Hide FMS Toolbar (search/sort) and FMS subtabs for Parents FMS
+  const toolbar = document.querySelector('.test-fms-toolbar');
+  const filterTabs = document.querySelector('.test-fms-tabs');
+  const settingsBtn = $('btn-test-settings');
+
+  if (isParentsView) {
+    if (toolbar) toolbar.style.display = 'none';
+    if (filterTabs) filterTabs.style.display = 'none';
+    // Admin only can see settings for Parents FMS
+    if (settingsBtn) settingsBtn.style.display = state.userRole === 'admin' ? 'flex' : 'none';
+  } else {
+    if (toolbar) toolbar.style.display = 'flex';
+    if (filterTabs) filterTabs.style.display = 'flex';
+    if (settingsBtn) {
+      const canEditSettings = state.userRole === 'admin' || state.userRole === 'coordinator' || state.userRole === 'process_coordinator';
+      settingsBtn.style.display = canEditSettings ? 'flex' : 'none';
+    }
+  }
+
   // Dynamic header titles & add button label based on view type
   const fmsHeaderTitle = document.querySelector('.test-fms-title h2');
   if (fmsHeaderTitle) {
@@ -796,7 +844,7 @@ function renderTests(tests) {
   if (addBtn) {
     if (isAdmissionView) addBtn.textContent = '+ Add Admission';
     else if (isVideoView) addBtn.textContent = '+ Add Video';
-    else if (isParentsView) addBtn.textContent = '+ Add Parents Checklist';
+    else if (isParentsView) addBtn.textContent = '+ Reset Checklist';
     else addBtn.textContent = '+ Add Test';
   }
 
@@ -811,6 +859,66 @@ function renderTests(tests) {
     } else {
       fmsHeaderIcon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>';
     }
+  }
+
+  // Bypassing filter/sort for Parents view and rendering the custom interactive checklist
+  if (isParentsView) {
+    const email = state.currentUser ? state.currentUser.email : 'default';
+    const checkedKey = `parents_fms_checked_${email}`;
+    let checkedIndices = [];
+    try {
+      checkedIndices = JSON.parse(localStorage.getItem(checkedKey)) || [];
+    } catch(e) {
+      checkedIndices = [];
+    }
+
+    const stages = (state.testSettings || []).filter(s => s.type === 'Parents');
+    const displayStages = stages.length > 0 ? stages : PIPELINE_DEFAULTS.Parents;
+
+    const completedCount = displayStages.filter((_, idx) => checkedIndices.includes(idx)).length;
+    const pct = displayStages.length > 0 ? Math.round((completedCount / displayStages.length) * 100) : 0;
+
+    container.innerHTML = `
+      <div style="width: 100%; max-width: 600px; margin: 20px auto 0 auto; padding: var(--space-xl); background: var(--gradient-card); background-color: var(--bg-secondary); border: 1px solid var(--border-glass); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); animation: slideUp 0.4s ease;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: var(--space-md);">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size: 1.5rem;">👪</span>
+            <div style="text-align: left;">
+              <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">Daily Parents Guidelines Checklist</h3>
+              <p style="font-size: 0.75rem; color: var(--text-secondary); margin: 3px 0 0 0;">Check off completed monitoring activities. Personal to your account.</p>
+            </div>
+          </div>
+          <span class="test-status-badge ${pct === 100 ? 'status-complete' : 'status-progress'}" style="font-size: 0.75rem; font-weight: 700; padding: 4px 8px;">
+            ${pct === 100 ? '✓ All Done' : `${completedCount}/${displayStages.length} Done (${pct}%)`}
+          </span>
+        </div>
+
+        <!-- Custom Progress Bar -->
+        <div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; margin-bottom: var(--space-lg); border: 1px solid var(--border-glass);">
+          <div style="height: 100%; width: ${pct}%; background: var(--gradient-purple); transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: var(--shadow-glow-purple);"></div>
+        </div>
+
+        <!-- Guidelines Checklist list -->
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          ${displayStages.map((stage, idx) => {
+            const isChecked = checkedIndices.includes(idx);
+            return `
+              <div onclick="toggleParentsChecklistRow(${idx})" class="parents-checklist-row" style="display: flex; align-items: center; gap: var(--space-md); padding: var(--space-md); background: ${isChecked ? 'rgba(16, 185, 129, 0.04)' : 'rgba(255, 255, 255, 0.015)'}; border: 1px solid ${isChecked ? 'rgba(16, 185, 129, 0.2)' : 'var(--border-glass)'}; border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s ease; user-select: none;">
+                <!-- Checkbox -->
+                <div style="flex-shrink: 0; width: 20px; height: 20px; border-radius: 6px; border: 2px solid ${isChecked ? 'var(--accent-emerald)' : 'var(--text-muted)'}; background: ${isChecked ? 'var(--accent-emerald)' : 'transparent'}; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; box-shadow: ${isChecked ? '0 0 10px rgba(16, 185, 129, 0.25)' : 'none'};">
+                  ${isChecked ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}
+                </div>
+                <!-- Label text -->
+                <span style="font-size: 0.85rem; font-weight: 600; color: ${isChecked ? 'var(--accent-emerald)' : 'var(--text-primary)'}; text-decoration: ${isChecked ? 'line-through' : 'none'}; opacity: ${isChecked ? 0.75 : 1}; transition: all 0.2s ease; text-align: left; line-height: 1.4;">
+                  ${stage.label}
+                </span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+    return;
   }
 
   // Apply complete/in-progress/sheet/app/search filters
@@ -4425,7 +4533,13 @@ document.addEventListener('click', e => {
   }
   if (e.target.id === 'btn-view-member-tasks') openMemberTasksModal(selectedMember);
   if (e.target.id === 'member-tasks-close-btn') $('member-tasks-modal').style.display = 'none';
-  if (e.target.id === 'btn-add-test') openAddTestModal();
+  if (e.target.id === 'btn-add-test') {
+    if (state.currentView === 'parents') {
+      window.resetParentsChecklist();
+    } else {
+      openAddTestModal();
+    }
+  }
 });
 
 // =============================================
