@@ -149,6 +149,27 @@ const PIPELINE_DEFAULTS = {
     { id: 17, label: 'Receive Final Edited Video', offset: 7, doer: 'Komal', type: 'Video' },
     { id: 18, label: 'Instagram & Facebook Posting', offset: 8, doer: 'Sidhi', type: 'Video' },
     { id: 19, label: 'YouTube Posting', offset: 9, doer: 'Komal', type: 'Video' },
+  ],
+  BeforeFee: [
+    { id: 20, label: 'Say Hi on Bot Number & Collect Details', offset: 1, doer: 'Sidhi/Komal', type: 'BeforeFee' },
+    { id: 21, label: 'Show Orientation Video', offset: 2, doer: 'Sidhi/Komal', type: 'BeforeFee' },
+    { id: 22, label: 'Show Classroom', offset: 3, doer: 'Sidhi/Komal', type: 'BeforeFee' },
+    { id: 23, label: 'Show Student Dashboard', offset: 4, doer: 'Sidhi/Komal', type: 'BeforeFee' },
+    { id: 24, label: 'Show Past Results', offset: 5, doer: 'Sidhi/Komal', type: 'BeforeFee' },
+    { id: 25, label: 'Share Fee Structure from Telegram', offset: 6, doer: 'Sidhi/Komal', type: 'BeforeFee' },
+  ],
+  AfterFee: [
+    { id: 26, label: 'Send Admission Confirmation Message', offset: 1, doer: 'Sidhi/Komal', type: 'AfterFee' },
+    { id: 27, label: 'Change Name in Telegram', offset: 2, doer: 'Sidhi/Komal', type: 'AfterFee' },
+    { id: 28, label: 'Create Leads for Parent and Student', offset: 3, doer: 'Sidhi/Komal', type: 'AfterFee' },
+    { id: 29, label: 'Create Lead in Classroom Main', offset: 4, doer: 'Sidhi/Komal', type: 'AfterFee' },
+    { id: 30, label: 'Save Contact Number', offset: 5, doer: 'Sidhi/Komal', type: 'AfterFee' },
+    { id: 31, label: 'Change Level to Admission Done', offset: 6, doer: 'Sidhi/Komal', type: 'AfterFee' },
+    { id: 32, label: 'Send Student Number to Shivang Sir', offset: 7, doer: 'Sidhi/Komal', type: 'AfterFee' },
+    { id: 33, label: 'Add Student to Group', offset: 8, doer: 'Sidhi/Komal', type: 'AfterFee' },
+    { id: 34, label: 'Send Biometric ID to SVM Group', offset: 9, doer: 'Sidhi/Komal', type: 'AfterFee' },
+    { id: 35, label: 'Create Dashboard', offset: 10, doer: 'Sidhi/Komal', type: 'AfterFee' },
+    { id: 36, label: 'Activate Class App', offset: 11, doer: 'Sidhi/Komal', type: 'AfterFee' }
   ]
 };
 
@@ -159,7 +180,7 @@ const PIPELINE_DEFAULTS = {
  * - Missing stages are added; extra stages are left as-is (admin additions).
  */
 function sanitizeTestSettings() {
-  ['Sheet', 'App', 'Video'].forEach(type => {
+  ['Sheet', 'App', 'Video', 'BeforeFee', 'AfterFee'].forEach(type => {
     const canonical = PIPELINE_DEFAULTS[type];
     const canonicalLabels = canonical.map(s => s.label);
     const current = (state.testSettings || []).filter(s => s.type === type);
@@ -641,6 +662,14 @@ function handleUserSignedIn(userData) {
     $('admin-dashboard-container').style.display = 'none';
     $('test-tracker-container').style.display = 'block';
   };
+  $('tab-admissions').onclick = () => {
+    setActiveTab('tab-admissions');
+    state.testFmsFilter = 'all';
+    openTestTracker('admissions');
+    $('task-view-container').style.display = 'none';
+    $('admin-dashboard-container').style.display = 'none';
+    $('test-tracker-container').style.display = 'block';
+  };
 
   checkBroadcast();
   $('loading-screen').classList.add('hidden');
@@ -720,30 +749,45 @@ function renderTests(tests) {
 
   // Update toolbar filter tabs visibility depending on active main tab
   const isVideoView = state.currentView === 'videos';
+  const isAdmissionView = state.currentView === 'admissions';
+  const isTestView = state.currentView === 'tests';
+
   const sheetPill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="sheet"]');
   const appPill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="app"]');
   const videoPill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="video"]');
+  const beforeFeePill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="beforefee"]');
+  const afterFeePill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="afterfee"]');
   
-  if (sheetPill) sheetPill.style.display = isVideoView ? 'none' : 'inline-block';
-  if (appPill) appPill.style.display = isVideoView ? 'none' : 'inline-block';
-  if (videoPill) videoPill.style.display = 'none'; // Separate main nav tab takes care of video now, hide this pill
+  if (sheetPill) sheetPill.style.display = isTestView ? 'inline-block' : 'none';
+  if (appPill) appPill.style.display = isTestView ? 'inline-block' : 'none';
+  if (videoPill) videoPill.style.display = 'none'; 
+  if (beforeFeePill) beforeFeePill.style.display = isAdmissionView ? 'inline-block' : 'none';
+  if (afterFeePill) afterFeePill.style.display = isAdmissionView ? 'inline-block' : 'none';
 
   // Dynamic header titles & add button label based on view type
   const fmsHeaderTitle = document.querySelector('.test-fms-title h2');
   if (fmsHeaderTitle) {
-    fmsHeaderTitle.textContent = isVideoView ? 'Video FMS' : 'Test FMS';
+    if (isAdmissionView) fmsHeaderTitle.textContent = 'Admission FMS';
+    else if (isVideoView) fmsHeaderTitle.textContent = 'Video FMS';
+    else fmsHeaderTitle.textContent = 'Test FMS';
   }
 
   const addBtn = $('btn-add-test');
   if (addBtn) {
-    addBtn.textContent = isVideoView ? '+ Add Video' : '+ Add Test';
+    if (isAdmissionView) addBtn.textContent = '+ Add Admission';
+    else if (isVideoView) addBtn.textContent = '+ Add Video';
+    else addBtn.textContent = '+ Add Test';
   }
 
   const fmsHeaderIcon = document.querySelector('.test-fms-title-icon');
   if (fmsHeaderIcon) {
-    fmsHeaderIcon.innerHTML = isVideoView 
-      ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>'
-      : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>';
+    if (isAdmissionView) {
+      fmsHeaderIcon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="17" y1="11" x2="23" y2="11"/></svg>';
+    } else if (isVideoView) {
+      fmsHeaderIcon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>';
+    } else {
+      fmsHeaderIcon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>';
+    }
   }
 
   // Apply complete/in-progress/sheet/app/search filters
@@ -752,10 +796,13 @@ function renderTests(tests) {
 
   let filteredTests = tests.filter(test => {
     const isVideo = (test.type || '').toLowerCase() === 'video';
+    const isBeforeFee = (test.type || '').toLowerCase() === 'beforefee';
+    const isAfterFee = (test.type || '').toLowerCase() === 'afterfee';
 
     // 1. Partition by Main Navigation Tab
+    if (isAdmissionView && !isBeforeFee && !isAfterFee) return false;
     if (isVideoView && !isVideo) return false;
-    if (!isVideoView && isVideo) return false;
+    if (isTestView && (isVideo || isBeforeFee || isAfterFee)) return false;
 
     // 2. Sub-tab Toolbar Filters
     const testStages = getTestStages(test);
@@ -767,6 +814,8 @@ function renderTests(tests) {
     if (filter === 'progress' && isCompleted) return false;
     if (filter === 'sheet' && (test.type || '').toLowerCase() !== 'sheet') return false;
     if (filter === 'app' && (test.type || '').toLowerCase() !== 'app') return false;
+    if (filter === 'beforefee' && !isBeforeFee) return false;
+    if (filter === 'afterfee' && !isAfterFee) return false;
 
     // 2. Search Query Filter
     if (searchQuery) {
@@ -1061,9 +1110,13 @@ window.setSettingsActiveTab = function (type) {
   const sheetTab = $('settings-tab-sheet');
   const appTab = $('settings-tab-app');
   const videoTab = $('settings-tab-video');
+  const beforeFeeTab = $('settings-tab-beforefee');
+  const afterFeeTab = $('settings-tab-afterfee');
   if (sheetTab) sheetTab.classList.toggle('active', type === 'Sheet');
   if (appTab) appTab.classList.toggle('active', type === 'App');
   if (videoTab) videoTab.classList.toggle('active', type === 'Video');
+  if (beforeFeeTab) beforeFeeTab.classList.toggle('active', type === 'BeforeFee');
+  if (afterFeeTab) afterFeeTab.classList.toggle('active', type === 'AfterFee');
 
   renderTestSettingsRows();
 };
@@ -1078,6 +1131,8 @@ window.selectTypeSegment = function (type) {
     { id: 'type-segment-sheet', match: 'Sheet' },
     { id: 'type-segment-app',   match: 'App' },
     { id: 'type-segment-video', match: 'Video' },
+    { id: 'type-segment-beforefee', match: 'BeforeFee' },
+    { id: 'type-segment-afterfee', match: 'AfterFee' },
   ];
 
   allSegments.forEach(({ id, match }) => {
@@ -4507,30 +4562,54 @@ function openAddTestModal() {
 
   // Set default type dynamically based on current view
   const isVideoView = state.currentView === 'videos';
-  const defaultType = isVideoView ? 'Video' : 'Sheet';
+  const isAdmissionView = state.currentView === 'admissions';
+  const defaultType = isAdmissionView ? 'BeforeFee' : (isVideoView ? 'Video' : 'Sheet');
   selectTypeSegment(defaultType);
 
   // Dynamic Modal Header and Form Groups based on view type
   const modalTitle = $('add-test-modal-title');
   const typeFormGroup = $('test-type-form-group');
   const submitBtn = $('add-test-modal')?.querySelector('button[type="submit"]');
+  const nameLabel = document.querySelector('label[for="test-form-name"]');
+  const nameInput = $('test-form-name');
 
-  if (isVideoView) {
+  // Configure segments display
+  const sheetSeg = $('type-segment-sheet');
+  const appSeg = $('type-segment-app');
+  const videoSeg = $('type-segment-video');
+  const beforeFeeSeg = $('type-segment-beforefee');
+  const afterFeeSeg = $('type-segment-afterfee');
+
+  if (isAdmissionView) {
+    if (modalTitle) modalTitle.textContent = 'Track New Admission';
+    if (typeFormGroup) typeFormGroup.style.display = 'block'; // Show type segmented control for Admissions
+    if (submitBtn) submitBtn.textContent = 'Start Tracking Admission';
+    if (nameLabel) nameLabel.textContent = 'Student Name';
+    if (nameInput) nameInput.placeholder = 'e.g., Rahul Kumar';
+
+    if (sheetSeg) sheetSeg.style.display = 'none';
+    if (appSeg) appSeg.style.display = 'none';
+    if (videoSeg) videoSeg.style.display = 'none';
+    if (beforeFeeSeg) beforeFeeSeg.style.display = 'block';
+    if (afterFeeSeg) afterFeeSeg.style.display = 'block';
+  } else if (isVideoView) {
     if (modalTitle) modalTitle.textContent = 'Track New Video';
     if (typeFormGroup) typeFormGroup.style.display = 'none'; // Hide type segmented control completely
     if (submitBtn) submitBtn.textContent = 'Start Tracking Video';
+    if (nameLabel) nameLabel.textContent = 'Video Title';
+    if (nameInput) nameInput.placeholder = 'e.g., Coordinate Geometry Animation Video';
   } else {
     if (modalTitle) modalTitle.textContent = 'Track New Test';
     if (typeFormGroup) typeFormGroup.style.display = 'block'; // Show type segmented control
     if (submitBtn) submitBtn.textContent = 'Start Tracking';
+    if (nameLabel) nameLabel.textContent = 'Test Name';
+    if (nameInput) nameInput.placeholder = 'e.g., UT-1 Maths';
 
-    // Under Test FMS, hide the Video option from the segmented control selector
-    const videoSegmentBtn = $('type-segment-video');
-    if (videoSegmentBtn) videoSegmentBtn.style.display = 'none';
-    const sheetSegmentBtn = $('type-segment-sheet');
-    if (sheetSegmentBtn) sheetSegmentBtn.style.display = 'block';
-    const appSegmentBtn = $('type-segment-app');
-    if (appSegmentBtn) appSegmentBtn.style.display = 'block';
+    if (sheetSeg) sheetSeg.style.display = 'block';
+    if (appSeg) appSeg.style.display = 'block';
+    if (videoSeg) videoSeg.style.display = 'none';
+    if (beforeFeeSeg) beforeFeeSeg.style.display = 'none';
+    if (afterFeeSeg) afterFeeSeg.style.display = 'none';
   }
 
   // Pre-populate individual stages with global blueprints
@@ -4777,20 +4856,41 @@ function handleEditTestDetailsModal(testId) {
   renderIndividualFormStages();
 
   const isVideo = (test.type || '').toLowerCase() === 'video';
+  const isBeforeFee = (test.type || '').toLowerCase() === 'beforefee';
+  const isAfterFee = (test.type || '').toLowerCase() === 'afterfee';
+  const isAdmission = isBeforeFee || isAfterFee;
+
   const typeFormGroup = $('test-type-form-group');
   if (typeFormGroup) typeFormGroup.style.display = isVideo ? 'none' : 'block';
 
-  if (!isVideo) {
-    // Hide Video segment option from segment buttons when editing a test
-    const videoSegmentBtn = $('type-segment-video');
-    if (videoSegmentBtn) videoSegmentBtn.style.display = 'none';
-    const sheetSegmentBtn = $('type-segment-sheet');
-    if (sheetSegmentBtn) sheetSegmentBtn.style.display = 'block';
-    const appSegmentBtn = $('type-segment-app');
-    if (appSegmentBtn) appSegmentBtn.style.display = 'block';
+  const sheetSeg = $('type-segment-sheet');
+  const appSeg = $('type-segment-app');
+  const videoSeg = $('type-segment-video');
+  const beforeFeeSeg = $('type-segment-beforefee');
+  const afterFeeSeg = $('type-segment-afterfee');
+
+  if (isAdmission) {
+    if (sheetSeg) sheetSeg.style.display = 'none';
+    if (appSeg) appSeg.style.display = 'none';
+    if (videoSeg) videoSeg.style.display = 'none';
+    if (beforeFeeSeg) beforeFeeSeg.style.display = 'block';
+    if (afterFeeSeg) afterFeeSeg.style.display = 'block';
+  } else if (!isVideo) {
+    if (sheetSeg) sheetSeg.style.display = 'block';
+    if (appSeg) appSeg.style.display = 'block';
+    if (videoSeg) videoSeg.style.display = 'none';
+    if (beforeFeeSeg) beforeFeeSeg.style.display = 'none';
+    if (afterFeeSeg) afterFeeSeg.style.display = 'none';
   }
 
-  $('add-test-modal').querySelector('h3').textContent = isVideo ? 'Edit Video Details' : 'Edit Test Details';
+  const nameLabel = document.querySelector('label[for="test-form-name"]');
+  if (nameLabel) {
+    if (isAdmission) nameLabel.textContent = 'Student Name';
+    else if (isVideo) nameLabel.textContent = 'Video Title';
+    else nameLabel.textContent = 'Test Name';
+  }
+
+  $('add-test-modal').querySelector('h3').textContent = isAdmission ? 'Edit Admission Details' : (isVideo ? 'Edit Video Details' : 'Edit Test Details');
   $('add-test-modal').querySelector('button[type="submit"]').textContent = 'Save Changes';
 
   // Override form submit for edit mode
@@ -4840,8 +4940,8 @@ function handleEditTestDetailsModal(testId) {
 // Reset modal when closing
 function closeAddTestModal() {
   $('add-test-modal').style.display = 'none';
-  const defaultHeader = state.currentView === 'videos' ? 'Track New Video' : 'Track New Test';
-  const defaultBtn = state.currentView === 'videos' ? 'Start Tracking Video' : 'Start Tracking';
+  const defaultHeader = state.currentView === 'videos' ? 'Track New Video' : (state.currentView === 'admissions' ? 'Track New Admission' : 'Track New Test');
+  const defaultBtn = state.currentView === 'videos' ? 'Start Tracking Video' : (state.currentView === 'admissions' ? 'Start Tracking Admission' : 'Start Tracking');
   $('add-test-modal').querySelector('h3').textContent = defaultHeader;
   $('add-test-modal').querySelector('button[type="submit"]').textContent = defaultBtn;
   $('add-test-form').onsubmit = handleAddTestSubmit;
