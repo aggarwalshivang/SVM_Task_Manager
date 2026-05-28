@@ -1247,12 +1247,60 @@ function openTestSettingsModal() {
   const afterFeeTab = $('settings-tab-afterfee');
   const parentsTab = $('settings-tab-parents');
 
+  // Dynamically filter visibility of settings tabs to prevent clutter and truncating
+  const tabsContainer = document.querySelector('.test-settings-tabs');
+  if (tabsContainer) {
+    if (state.currentView === 'parents') {
+      tabsContainer.style.display = 'none'; // Only Parents setting is available
+    } else if (state.currentView === 'videos') {
+      tabsContainer.style.display = 'none'; // Only Video setting is available
+    } else {
+      tabsContainer.style.display = 'flex';
+      
+      if (state.currentView === 'admissions') {
+        if (sheetTab) sheetTab.style.display = 'none';
+        if (appTab) appTab.style.display = 'none';
+        if (videoTab) videoTab.style.display = 'none';
+        if (beforeFeeTab) beforeFeeTab.style.display = 'block';
+        if (afterFeeTab) afterFeeTab.style.display = 'block';
+        if (parentsTab) parentsTab.style.display = 'none';
+      } else { // default to 'tests' view
+        if (sheetTab) sheetTab.style.display = 'block';
+        if (appTab) appTab.style.display = 'block';
+        if (videoTab) videoTab.style.display = 'none';
+        if (beforeFeeTab) beforeFeeTab.style.display = 'none';
+        if (afterFeeTab) afterFeeTab.style.display = 'none';
+        if (parentsTab) parentsTab.style.display = 'none';
+      }
+    }
+  }
+
   if (sheetTab) sheetTab.classList.toggle('active', state.activeSettingsTab === 'Sheet');
   if (appTab) appTab.classList.toggle('active', state.activeSettingsTab === 'App');
   if (videoTab) videoTab.classList.toggle('active', state.activeSettingsTab === 'Video');
   if (beforeFeeTab) beforeFeeTab.classList.toggle('active', state.activeSettingsTab === 'BeforeFee');
   if (afterFeeTab) afterFeeTab.classList.toggle('active', state.activeSettingsTab === 'AfterFee');
   if (parentsTab) parentsTab.classList.toggle('active', state.activeSettingsTab === 'Parents');
+
+  // Update FMS settings modal title dynamically
+  const titleEl = document.querySelector('#test-settings-modal .modal-header h3');
+  if (titleEl) {
+    if (state.activeSettingsTab === 'Parents') {
+      titleEl.textContent = '👪 Parents FMS Settings';
+    } else if (state.activeSettingsTab === 'Video') {
+      titleEl.textContent = '🎬 Video FMS Settings';
+    } else if (state.activeSettingsTab === 'BeforeFee') {
+      titleEl.textContent = '⏳ Admission (Before Fee) Settings';
+    } else if (state.activeSettingsTab === 'AfterFee') {
+      titleEl.textContent = '💳 Admission (After Fee) Settings';
+    } else if (state.activeSettingsTab === 'Sheet') {
+      titleEl.textContent = '📄 Sheet Test FMS Settings';
+    } else if (state.activeSettingsTab === 'App') {
+      titleEl.textContent = '📱 App Test FMS Settings';
+    } else {
+      titleEl.textContent = 'FMS Pipeline Settings';
+    }
+  }
 
   renderTestSettingsRows();
   $('test-settings-modal').style.display = 'flex';
