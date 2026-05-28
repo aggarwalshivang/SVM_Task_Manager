@@ -1294,12 +1294,12 @@ function openTestSettingsModal() {
         if (sheetTab) sheetTab.style.display = 'none';
         if (appTab) appTab.style.display = 'none';
         if (videoTab) videoTab.style.display = 'none';
-        if (beforeFeeTab) beforeFeeTab.style.display = 'block';
-        if (afterFeeTab) afterFeeTab.style.display = 'block';
+        if (beforeFeeTab) beforeFeeTab.style.display = 'inline-flex';
+        if (afterFeeTab) afterFeeTab.style.display = 'inline-flex';
         if (parentsTab) parentsTab.style.display = 'none';
       } else { // default to 'tests' view
-        if (sheetTab) sheetTab.style.display = 'block';
-        if (appTab) appTab.style.display = 'block';
+        if (sheetTab) sheetTab.style.display = 'inline-flex';
+        if (appTab) appTab.style.display = 'inline-flex';
         if (videoTab) videoTab.style.display = 'none';
         if (beforeFeeTab) beforeFeeTab.style.display = 'none';
         if (afterFeeTab) afterFeeTab.style.display = 'none';

@@ -2619,7 +2619,7 @@ select option:hover {
   border-radius: var(--radius-md) !important;
   cursor: pointer !important;
   transition: all var(--transition-base) !important;
-  display: inline-flex !important;
+  display: inline-flex;
   align-items: center !important;
   justify-content: center !important;
   gap: 6px !important;
