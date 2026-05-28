@@ -23,6 +23,103 @@ const CONFIG = {
 // (Supabase removed - Using GSheet Auth)
 
 // =============================================
+// PIPELINE ADMIN APPROVAL UNLOCK SYSTEM
+// =============================================
+
+/** Returns true if an admin has approved pipeline editing and the 10-min window is still open */
+function isPipelineEditUnlocked() {
+  return !!state.pipelineUnlockExpiry && Date.now() < state.pipelineUnlockExpiry;
+}
+
+/** Open the Admin Approval modal */
+window.requestPipelineApproval = function () {
+  const modal = document.getElementById('pipeline-approval-modal');
+  if (!modal) return;
+  document.getElementById('pipeline-approval-email').value = '';
+  document.getElementById('pipeline-approval-password').value = '';
+  document.getElementById('pipeline-approval-error').textContent = '';
+  modal.style.display = 'flex';
+  setTimeout(() => document.getElementById('pipeline-approval-email').focus(), 120);
+};
+
+/** Toggle password visibility in approval modal */
+window.toggleApprovalPasswordVisibility = function () {
+  const inp = document.getElementById('pipeline-approval-password');
+  const isHidden = inp.type === 'password';
+  inp.type = isHidden ? 'text' : 'password';
+  document.getElementById('approval-eye-icon').innerHTML = isHidden
+    ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
+    : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+};
+
+/** Verify admin credentials and start the 10-minute unlock window */
+window.submitPipelineApproval = async function () {
+  const email = document.getElementById('pipeline-approval-email').value.trim();
+  const password = document.getElementById('pipeline-approval-password').value.trim();
+  const errorEl = document.getElementById('pipeline-approval-error');
+  const btn = document.getElementById('pipeline-approval-submit');
+
+  errorEl.textContent = '';
+  if (!email || !password) {
+    errorEl.textContent = 'Please enter admin email and password.';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="loading-spinner" style="width:16px;height:16px;border-width:2px;margin:0 auto;"></div>';
+
+  try {
+    const res = await apiFetch('login', { email, password }, 'POST');
+    if (res.success && res.data && String(res.data.role).toLowerCase() === 'admin') {
+      // ✅ Valid admin — grant 10-minute unlock
+      const TEN_MINUTES = 10 * 60 * 1000;
+      state.pipelineUnlockExpiry = Date.now() + TEN_MINUTES;
+
+      // Clear any existing countdown
+      if (state.pipelineUnlockTimer) clearInterval(state.pipelineUnlockTimer);
+
+      state.pipelineUnlockTimer = setInterval(() => {
+        if (!isPipelineEditUnlocked()) {
+          // Time expired — lock up
+          clearInterval(state.pipelineUnlockTimer);
+          state.pipelineUnlockTimer = null;
+          state.pipelineUnlockExpiry = null;
+          renderIndividualFormStages();
+          showToast('Admin approval expired. Pipeline is locked again.', 'error');
+        } else {
+          // Refresh countdown display
+          const remaining = state.pipelineUnlockExpiry - Date.now();
+          const mins = Math.floor(remaining / 60000);
+          const secs = Math.floor((remaining % 60000) / 1000);
+          const el = document.getElementById('pipeline-unlock-countdown');
+          if (el) el.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+      }, 1000);
+
+      document.getElementById('pipeline-approval-modal').style.display = 'none';
+      renderIndividualFormStages();
+      showToast(`Pipeline unlocked for 10 minutes. Approved by ${res.data.name}.`);
+    } else {
+      errorEl.textContent = res.error || 'Not an admin account. Access denied.';
+    }
+  } catch (err) {
+    errorEl.textContent = 'Verification failed. Check your connection.';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Approve Access';
+  }
+};
+
+/** Immediately re-lock pipeline (manual lock button in unlock mode) */
+window.lockPipelineNow = function () {
+  if (state.pipelineUnlockTimer) clearInterval(state.pipelineUnlockTimer);
+  state.pipelineUnlockTimer = null;
+  state.pipelineUnlockExpiry = null;
+  renderIndividualFormStages();
+  showToast('Pipeline locked.');
+};
+
+// =============================================
 // CANONICAL PIPELINE DEFAULTS
 // These are the source-of-truth stage definitions.
 // They override any stale/wrong data returned by the API.
@@ -101,7 +198,10 @@ const state = {
   testSettings: [],
   testFmsFilter: 'all',
   testFmsSearch: '',
-  testFmsSort: 'held-desc'
+  testFmsSort: 'held-desc',
+  // Pipeline editing unlock (admin approval system)
+  pipelineUnlockExpiry: null,  // timestamp when unlock expires
+  pipelineUnlockTimer: null    // setInterval ID for countdown
 };
 
 // =============================================
@@ -4170,32 +4270,76 @@ function renderIndividualFormStages() {
   if (!container) return;
 
   const isAdmin = state.userRole === 'admin';
-  const addBtn = document.querySelector('button[onclick="addIndividualTestStageRow()"]');
-  if (addBtn) {
-    addBtn.style.display = isAdmin ? 'block' : 'none';
-  }
+  const isUnlocked = isPipelineEditUnlocked(); // admin-approved temporary unlock
+  const canEdit = isAdmin || isUnlocked;       // either permanent (admin) or temporary (approved)
 
-  // Remove any old helper notice first
+  // Show/hide the + Add Stage button
+  const addBtn = document.querySelector('button[onclick="addIndividualTestStageRow()"]');
+  if (addBtn) addBtn.style.display = isAdmin ? 'block' : 'none'; // only real admin can add stages
+
+  // Remove any old notice
   const oldNotice = document.getElementById('pipeline-stages-notice');
   if (oldNotice) oldNotice.remove();
 
-  if (!isAdmin) {
-    const parent = container.parentElement;
-    const notice = document.createElement('p');
+  const parent = container.parentElement;
+
+  if (isUnlocked && !isAdmin) {
+    // ── UNLOCKED BANNER ──────────────────────────────────────────
+    const remaining = state.pipelineUnlockExpiry - Date.now();
+    const mins = Math.floor(remaining / 60000);
+    const secs = Math.floor((remaining % 60000) / 1000);
+    const notice = document.createElement('div');
     notice.id = 'pipeline-stages-notice';
-    notice.className = 'modal-body-text';
-    notice.style.cssText = 'color: var(--accent-amber); font-size: 0.75rem; margin-top: 6px; display: flex; align-items: center; gap: 4px; font-weight: 500;';
-    notice.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Customizing stage names/doers requires Admin approval. You may adjust offset days.`;
+    notice.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:8px; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:var(--radius-sm); padding:8px 12px; margin-top:6px;';
+    notice.innerHTML = `
+      <div style="display:flex; align-items:center; gap:6px; font-size:0.75rem; font-weight:600; color:var(--accent-emerald);">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Pipeline unlocked — <span id="pipeline-unlock-countdown">${mins}:${secs.toString().padStart(2,'0')}</span> remaining
+      </div>
+      <button type="button" onclick="lockPipelineNow()" style="font-size:0.7rem; padding:3px 8px; border:1px solid rgba(16,185,129,0.4); border-radius:4px; background:none; color:var(--accent-emerald); cursor:pointer; font-weight:600;">🔒 Lock Now</button>
+    `;
+    parent.appendChild(notice);
+  } else if (!isAdmin) {
+    // ── LOCKED BANNER ────────────────────────────────────────────
+    const notice = document.createElement('div');
+    notice.id = 'pipeline-stages-notice';
+    notice.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:8px; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:var(--radius-sm); padding:8px 12px; margin-top:6px;';
+    notice.innerHTML = `
+      <div style="display:flex; align-items:center; gap:6px; font-size:0.75rem; font-weight:500; color:var(--accent-amber);">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Stage names &amp; doers require Admin approval. Offset days are always editable.
+      </div>
+      <button type="button" onclick="requestPipelineApproval()" style="white-space:nowrap; font-size:0.7rem; padding:3px 8px; border:1px solid rgba(245,158,11,0.4); border-radius:4px; background:none; color:var(--accent-amber); cursor:pointer; font-weight:600;">🔐 Request Approval</button>
+    `;
     parent.appendChild(notice);
   }
 
   container.innerHTML = currentFormStages.map((s, idx) => `
-    <div class="form-stage-row" data-index="${idx}" draggable="false" ondragstart="${isAdmin ? 'handleFormStageDragStart(event)' : 'event.preventDefault()'}" ondragover="${isAdmin ? 'handleFormStageDragOver(event)' : ''}" ondrop="${isAdmin ? 'handleFormStageDrop(event)' : ''}" ondragend="${isAdmin ? 'handleFormStageDragEnd(event)' : ''}" style="display: flex; flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 6px; margin-bottom: 8px; padding: 8px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: 6px;">
-      ${isAdmin ? `<div class="drag-handle" onmousedown="enableFormRowDrag(this)" style="flex-shrink: 0; color: rgba(255,255,255,0.4); font-size: 1.1rem; cursor: grab; line-height: 1; padding: 0 4px; user-select: none;">☰</div>` : ''}
-      <input type="text" class="form-stage-label" value="${s.label || ''}" ${isAdmin ? '' : 'readonly disabled'} style="flex: 2; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: ${isAdmin ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)'}; border: 1px solid var(--border-glass); border-radius: 4px; color: ${isAdmin ? 'var(--text-normal)' : 'var(--text-muted)'}; cursor: ${isAdmin ? 'text' : 'not-allowed'};" placeholder="Stage name">
-      <input type="number" class="form-stage-offset" value="${s.offset || 0}" style="flex: 0 0 55px; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: rgba(255,255,255,0.04); border: 1px solid ${isAdmin ? 'var(--border-glass)' : 'var(--accent-purple)'}; border-radius: 4px; color: var(--text-primary); font-weight: 600;" title="Offset days — editable by all roles">
-      <input type="text" class="form-stage-doer" value="${s.doer || ''}" ${isAdmin ? '' : 'readonly disabled'} style="flex: 1.5; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: ${isAdmin ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)'}; border: 1px solid var(--border-glass); border-radius: 4px; color: ${isAdmin ? 'var(--text-normal)' : 'var(--text-muted)'}; cursor: ${isAdmin ? 'text' : 'not-allowed'};" placeholder="Assigned to">
-      ${isAdmin ? `<button type="button" onclick="removeIndividualTestStageRow(${idx})" style="flex-shrink: 0; background: none; border: none; color: var(--accent-red); cursor: pointer; font-size: 1rem; line-height: 1; padding: 2px 4px;">✕</button>` : ''}
+    <div class="form-stage-row" data-index="${idx}" draggable="false"
+      ondragstart="${isAdmin ? 'handleFormStageDragStart(event)' : 'event.preventDefault()'}"
+      ondragover="${isAdmin ? 'handleFormStageDragOver(event)' : ''}"
+      ondrop="${isAdmin ? 'handleFormStageDrop(event)' : ''}"
+      ondragend="${isAdmin ? 'handleFormStageDragEnd(event)' : ''}"
+      style="display:flex; flex-direction:row; align-items:center; flex-wrap:nowrap; gap:6px; margin-bottom:8px; padding:8px; background:rgba(255,255,255,0.015); border:1px solid ${isUnlocked && !isAdmin ? 'rgba(16,185,129,0.25)' : 'var(--border-glass)'}; border-radius:6px; transition:border-color 0.3s;">
+      ${isAdmin ? `<div class="drag-handle" onmousedown="enableFormRowDrag(this)" style="flex-shrink:0; color:rgba(255,255,255,0.4); font-size:1.1rem; cursor:grab; line-height:1; padding:0 4px; user-select:none;">☰</div>` : ''}
+      <input type="text" class="form-stage-label" value="${s.label || ''}" ${canEdit ? '' : 'readonly disabled'}
+        style="flex:2; min-width:0; padding:6px 8px; font-size:0.8rem;
+               background:${canEdit ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)'};
+               border:1px solid var(--border-glass); border-radius:4px;
+               color:${canEdit ? 'var(--text-primary)' : 'var(--text-muted)'};
+               cursor:${canEdit ? 'text' : 'not-allowed'};" placeholder="Stage name">
+      <input type="number" class="form-stage-offset" value="${s.offset || 0}"
+        style="flex:0 0 55px; min-width:0; padding:6px 8px; font-size:0.8rem; font-weight:600;
+               background:rgba(255,255,255,0.04);
+               border:1px solid var(--accent-purple); border-radius:4px;
+               color:var(--text-primary);" title="Offset days — always editable">
+      <input type="text" class="form-stage-doer" value="${s.doer || ''}" ${canEdit ? '' : 'readonly disabled'}
+        style="flex:1.5; min-width:0; padding:6px 8px; font-size:0.8rem;
+               background:${canEdit ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)'};
+               border:1px solid var(--border-glass); border-radius:4px;
+               color:${canEdit ? 'var(--text-primary)' : 'var(--text-muted)'};
+               cursor:${canEdit ? 'text' : 'not-allowed'};" placeholder="Assigned to">
+      ${isAdmin ? `<button type="button" onclick="removeIndividualTestStageRow(${idx})" style="flex-shrink:0; background:none; border:none; color:var(--accent-red); cursor:pointer; font-size:1rem; line-height:1; padding:2px 4px;">✕</button>` : ''}
     </div>
   `).join('');
 }

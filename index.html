@@ -844,5 +844,46 @@
     .member-task-meta { font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 8px; }
     .recurrence-info { font-size: 0.7rem; color: var(--accent-indigo); background: rgba(99, 102, 241, 0.1); padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; }
   </style>
+
+  <!-- Pipeline Admin Approval Modal -->
+  <div class="modal-overlay" id="pipeline-approval-modal" style="display:none; z-index: 2000;">
+    <div class="modal-card" style="max-width: 380px;">
+      <div class="modal-header">
+        <div>
+          <h3 style="margin:0;">🔐 Admin Approval</h3>
+          <p style="font-size:0.75rem; color:var(--text-muted); margin:4px 0 0 0;">Request pipeline editing access</p>
+        </div>
+        <button class="modal-close" onclick="document.getElementById('pipeline-approval-modal').style.display='none'">✕</button>
+      </div>
+
+      <!-- Info strip -->
+      <div style="background: rgba(124,58,237,0.1); border: 1px solid rgba(124,58,237,0.25); border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: var(--space-md); display:flex; align-items:flex-start; gap:10px;">
+        <svg width="16" height="16" style="flex-shrink:0; margin-top:1px; color:var(--accent-purple);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <p style="margin:0; font-size:0.78rem; color:var(--text-secondary); line-height:1.5;">An admin must enter their credentials to grant <strong style="color:var(--text-primary);">10 minutes</strong> of pipeline editing access. This window closes automatically.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="pipeline-approval-email">Admin Email</label>
+        <input type="email" id="pipeline-approval-email" placeholder="admin@example.com" autocomplete="off">
+      </div>
+      <div class="form-group" style="margin-top: var(--space-sm);">
+        <label for="pipeline-approval-password">Admin Password</label>
+        <div style="position:relative;">
+          <input type="password" id="pipeline-approval-password" placeholder="••••••••" autocomplete="off" style="padding-right: 40px;">
+          <button type="button" onclick="toggleApprovalPasswordVisibility()" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text-muted); cursor:pointer; padding:0; display:flex; align-items:center;">
+            <svg id="approval-eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <p id="pipeline-approval-error" style="color: var(--accent-red); font-size: 0.78rem; min-height: 18px; margin: 6px 0 0 0; font-weight: 500;"></p>
+
+      <button id="pipeline-approval-submit" class="btn-primary" style="margin-top: var(--space-md); width:100%; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="submitPipelineApproval()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Approve Access
+      </button>
+    </div>
+  </div>
+
 </body>
 </html>
