@@ -342,12 +342,21 @@ body::before {
 
 .header-center {
   order: 3;
-  width: fit-content;
-  margin-inline: auto;
+  width: 100%;
+  max-width: 100%;
   display: flex;
-  justify-content: center;
+  justify-content: safe center; /* Centered when it fits, safe left-aligned when it overflows to prevent clipping */
+  gap: var(--space-xs);
+  background: var(--bg-card);
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-glass);
+  overflow-x: auto;
   margin-top: var(--space-xs);
+  margin-inline: auto;
   z-index: 5;
+  scrollbar-width: none; /* Hide scrollbar for Firefox */
+  -ms-overflow-style: none;  /* Hide scrollbar for IE/Edge */
 }
 
 /* Ensure greeting doesn't overlap or wrap weirdly */
@@ -485,18 +494,6 @@ body::before {
 }
 
 /* Navigation Tabs */
-.header-center {
-  display: flex;
-  gap: var(--space-xs);
-  background: var(--bg-card);
-  padding: 4px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border-glass);
-  overflow-x: auto;
-  max-width: 100%;
-  scrollbar-width: none; /* Hide scrollbar for Firefox */
-  -ms-overflow-style: none;  /* Hide scrollbar for IE/Edge */
-}
 
 .header-center::-webkit-scrollbar {
   display: none; /* Hide scrollbar for Chrome/Safari/Opera */
