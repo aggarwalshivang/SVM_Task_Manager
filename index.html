@@ -639,19 +639,33 @@
 
         <div class="form-row" id="form-row-class-subject">
           <div class="form-group">
-            <label for="test-form-class">Class</label>
-            <select id="test-form-class" required>
-              <option value="9">Class 9</option>
-              <option value="10" selected>Class 10</option>
-            </select>
+            <label>Class</label>
+            <div id="class-dropdown-wrapper" style="position: relative;">
+              <input type="hidden" id="test-form-class" value="10" required>
+              <button type="button" id="class-dropdown-btn" onclick="toggleClassDropdown()" class="custom-dropdown-btn">
+                <span id="class-dropdown-label" style="flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Class 10</span>
+                <svg id="class-dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; transition:transform 0.2s;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
+              <div id="class-dropdown-menu" class="custom-dropdown-menu" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:200px; overflow-y:auto; z-index:500;">
+                <div class="class-option" data-value="9" onclick="selectClassOption(this)">Class 9</div>
+                <div class="class-option selected" data-value="10" onclick="selectClassOption(this)">Class 10</div>
+              </div>
+            </div>
           </div>
           <div class="form-group">
-            <label for="test-form-subject">Subject</label>
-            <select id="test-form-subject" required>
-              <option value="">-- Select Subject --</option>
-              <option value="Science">Science</option>
-              <option value="Math">Maths</option>
-            </select>
+            <label>Subject</label>
+            <div id="subject-dropdown-wrapper" style="position: relative;">
+              <input type="hidden" id="test-form-subject" required>
+              <button type="button" id="subject-dropdown-btn" onclick="toggleSubjectDropdown()" class="custom-dropdown-btn" style="color:var(--text-muted);">
+                <span id="subject-dropdown-label" style="flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">-- Select Subject --</span>
+                <svg id="subject-dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; transition:transform 0.2s;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
+              <div id="subject-dropdown-menu" class="custom-dropdown-menu" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:200px; overflow-y:auto; z-index:500;">
+                <div class="subject-option selected" data-value="" onclick="selectSubjectOption(this)">-- Select Subject --</div>
+                <div class="subject-option" data-value="Science" onclick="selectSubjectOption(this)">Science</div>
+                <div class="subject-option" data-value="Math" onclick="selectSubjectOption(this)">Maths</div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="form-row" id="form-row-chapter">

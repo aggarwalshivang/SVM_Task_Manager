@@ -2486,7 +2486,9 @@ select option:hover {
 
 /* Shared option style for ALL custom dropdowns */
 .sort-option,
-.chapter-option {
+.chapter-option,
+.class-option,
+.subject-option {
   padding: 9px 14px;
   font-size: 0.82rem;
   color: var(--text-secondary);
@@ -2499,14 +2501,18 @@ select option:hover {
 }
 
 .sort-option:hover,
-.chapter-option:hover {
+.chapter-option:hover,
+.class-option:hover,
+.subject-option:hover {
   background: rgba(124, 58, 237, 0.1);
   color: var(--text-primary);
   border-left-color: rgba(124, 58, 237, 0.5);
 }
 
 .sort-option.active-sort,
-.chapter-option.selected {
+.chapter-option.selected,
+.class-option.selected,
+.subject-option.selected {
   background: rgba(124, 58, 237, 0.12);
   color: var(--accent-purple);
   font-weight: 600;

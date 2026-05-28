@@ -3236,12 +3236,11 @@ function initTestFormSyllabus() {
     testNameInput.value = `${subName} - ${chName}`;
   }
 
-  classSelect.addEventListener('change', updateChapters);
-  subjectSelect.addEventListener('change', updateChapters);
   customChapterInput.addEventListener('input', updateTestName);
 
-  // Expose updateTestName for selectChapterOption
+  // Expose updateTestName and updateChapters for custom dropdown selections
   window._updateTestFormName = updateTestName;
+  window._updateTestFormChapters = updateChapters;
 
   // Close chapter dropdown on outside click
   document.addEventListener('click', function (e) {
@@ -3253,7 +3252,93 @@ function initTestFormSyllabus() {
       if (chev) chev.style.transform = '';
     }
   });
+
+  // Close class dropdown on outside click
+  document.addEventListener('click', function (e) {
+    const wrapper = $('class-dropdown-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+      const menu = $('class-dropdown-menu');
+      if (menu) menu.style.display = 'none';
+      const chev = $('class-dropdown-chevron');
+      if (chev) chev.style.transform = '';
+    }
+  });
+
+  // Close subject dropdown on outside click
+  document.addEventListener('click', function (e) {
+    const wrapper = $('subject-dropdown-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+      const menu = $('subject-dropdown-menu');
+      if (menu) menu.style.display = 'none';
+      const chev = $('subject-dropdown-chevron');
+      if (chev) chev.style.transform = '';
+    }
+  });
 }
+
+// ── Custom Class & Subject Dropdowns ────────────────
+window.toggleClassDropdown = function () {
+  const menu = $('class-dropdown-menu');
+  const chev = $('class-dropdown-chevron');
+  if (!menu) return;
+  const isOpen = menu.style.display !== 'none';
+  menu.style.display = isOpen ? 'none' : 'block';
+  if (chev) chev.style.transform = isOpen ? '' : 'rotate(180deg)';
+};
+
+window.selectClassOption = function (el) {
+  const value = el.dataset.value;
+  const label = $('class-dropdown-label');
+  const btn = $('class-dropdown-btn');
+  const input = $('test-form-class');
+
+  document.querySelectorAll('.class-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+
+  if (label) label.textContent = el.textContent;
+  if (input) {
+    input.value = value;
+    // Trigger chapter update
+    if (window._updateTestFormChapters) window._updateTestFormChapters();
+  }
+
+  const menu = $('class-dropdown-menu');
+  if (menu) menu.style.display = 'none';
+  const chev = $('class-dropdown-chevron');
+  if (chev) chev.style.transform = '';
+};
+
+window.toggleSubjectDropdown = function () {
+  const menu = $('subject-dropdown-menu');
+  const chev = $('subject-dropdown-chevron');
+  if (!menu) return;
+  const isOpen = menu.style.display !== 'none';
+  menu.style.display = isOpen ? 'none' : 'block';
+  if (chev) chev.style.transform = isOpen ? '' : 'rotate(180deg)';
+};
+
+window.selectSubjectOption = function (el) {
+  const value = el.dataset.value;
+  const label = $('subject-dropdown-label');
+  const btn = $('subject-dropdown-btn');
+  const input = $('test-form-subject');
+
+  document.querySelectorAll('.subject-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+
+  if (label) label.textContent = value ? el.textContent : '-- Select Subject --';
+  if (btn) btn.style.color = value ? 'var(--text-primary)' : 'var(--text-muted)';
+  if (input) {
+    input.value = value;
+    // Trigger chapter update
+    if (window._updateTestFormChapters) window._updateTestFormChapters();
+  }
+
+  const menu = $('subject-dropdown-menu');
+  if (menu) menu.style.display = 'none';
+  const chev = $('subject-dropdown-chevron');
+  if (chev) chev.style.transform = '';
+};
 
 window.toggleChapterDropdown = function () {
   const menu = $('chapter-dropdown-menu');
@@ -5019,6 +5104,14 @@ function openAddTestModal() {
   $('add-test-form').reset();
   $('test-form-held-on').value = getTodayStr();
 
+  // Reset custom Class dropdown to default (Class 10)
+  const defaultClassOption = Array.from(document.querySelectorAll('.class-option')).find(o => o.dataset.value === '10');
+  if (defaultClassOption) selectClassOption(defaultClassOption);
+
+  // Reset custom Subject dropdown to default (empty)
+  const defaultSubjectOption = Array.from(document.querySelectorAll('.subject-option')).find(o => o.dataset.value === '');
+  if (defaultSubjectOption) selectSubjectOption(defaultSubjectOption);
+
   // Clear dynamically populated fields
   $('test-form-chapter').value = '';
   const chBtn = $('chapter-dropdown-btn');
@@ -5296,8 +5389,18 @@ function handleEditTestDetailsModal(testId) {
   editingTestTrackerId = testId;
 
   // Set dropdowns and fields
-  $('test-form-class').value = test.className || '10';
-  $('test-form-subject').value = test.subject || '';
+  const clsVal = test.className || '10';
+  const subVal = test.subject || '';
+
+  const classOption = Array.from(document.querySelectorAll('.class-option')).find(o => o.dataset.value === clsVal);
+  if (classOption) selectClassOption(classOption);
+
+  const subjectOption = Array.from(document.querySelectorAll('.subject-option')).find(o => o.dataset.value === subVal);
+  if (subjectOption) selectSubjectOption(subjectOption);
+  else {
+    const defaultSubOption = Array.from(document.querySelectorAll('.subject-option')).find(o => o.dataset.value === '');
+    if (defaultSubOption) selectSubjectOption(defaultSubOption);
+  }
 
   const classVal = $('test-form-class').value;
   const subVal = $('test-form-subject').value;
