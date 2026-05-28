@@ -1236,11 +1236,11 @@ function renderTestSettingsRows() {
         <label>Label</label>
         <input type="text" class="setting-label" value="${s.label}">
       </div>
-      <div class="form-group" style="flex: 1;">
+      <div class="form-group" style="flex: 1; ${activeType === 'Parents' ? 'display: none;' : ''}">
         <label>Offset (Days)</label>
         <input type="number" class="setting-offset" value="${s.offset}">
       </div>
-      <div class="form-group" style="flex: 1.5;">
+      <div class="form-group" style="flex: 1.5; ${activeType === 'Parents' ? 'display: none;' : ''}">
         <label>Doer</label>
         <input type="text" class="setting-doer" value="${s.doer}">
       </div>
@@ -4483,6 +4483,9 @@ function renderIndividualFormStages() {
     parent.appendChild(notice);
   }
 
+  const type = $('test-form-type').value;
+  const isParents = type === 'Parents';
+
   container.innerHTML = currentFormStages.map((s, idx) => `
     <div class="form-stage-row" data-index="${idx}" draggable="false"
       ondragstart="${isAdmin ? 'handleFormStageDragStart(event)' : 'event.preventDefault()'}"
@@ -4501,13 +4504,13 @@ function renderIndividualFormStages() {
         style="flex:0 0 55px; min-width:0; padding:6px 8px; font-size:0.8rem; font-weight:600;
                background:rgba(255,255,255,0.04);
                border:1px solid var(--accent-purple); border-radius:4px;
-               color:var(--text-primary);" title="Offset days — always editable">
+               color:var(--text-primary); ${isParents ? 'display: none;' : ''}" title="Offset days — always editable">
       <input type="text" class="form-stage-doer" value="${s.doer || ''}" ${canEdit ? '' : 'readonly disabled'}
         style="flex:1.5; min-width:0; padding:6px 8px; font-size:0.8rem;
                background:${canEdit ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)'};
                border:1px solid var(--border-glass); border-radius:4px;
                color:${canEdit ? 'var(--text-primary)' : 'var(--text-muted)'};
-               cursor:${canEdit ? 'text' : 'not-allowed'};" placeholder="Assigned to">
+               cursor:${canEdit ? 'text' : 'not-allowed'}; ${isParents ? 'display: none;' : ''}" placeholder="Assigned to">
       ${isAdmin ? `<button type="button" onclick="removeIndividualTestStageRow(${idx})" style="flex-shrink:0; background:none; border:none; color:var(--accent-red); cursor:pointer; font-size:1rem; line-height:1; padding:2px 4px;">✕</button>` : ''}
     </div>
   `).join('');
