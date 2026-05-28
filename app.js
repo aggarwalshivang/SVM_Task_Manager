@@ -883,15 +883,15 @@ function renderTests(tests) {
 
     container.innerHTML = `
       <div style="width: 100%; max-width: 600px; margin: 20px auto 0 auto; padding: var(--space-xl); background: var(--gradient-card); background-color: var(--bg-secondary); border: 1px solid var(--border-glass); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); animation: slideUp 0.4s ease;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: var(--space-md);">
-          <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-size: 1.5rem;">👪</span>
-            <div style="text-align: left;">
-              <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">Daily Parents Guidelines Checklist</h3>
-              <p style="font-size: 0.75rem; color: var(--text-secondary); margin: 3px 0 0 0;">Check off completed monitoring activities. Personal to your account.</p>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px; margin-bottom: var(--space-md); width: 100%;">
+          <div style="display:flex; align-items:center; gap:10px; flex: 1; min-width: 0;">
+            <span style="font-size: 1.5rem; flex-shrink: 0;">👪</span>
+            <div style="text-align: left; min-width: 0;">
+              <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--text-primary); margin: 0; line-height: 1.3;">Daily Parents Guidelines Checklist</h3>
+              <p style="font-size: 0.72rem; color: var(--text-secondary); margin: 3px 0 0 0; line-height: 1.3;">Check off completed monitoring activities. Personal to your account.</p>
             </div>
           </div>
-          <span class="test-status-badge ${pct === 100 ? 'status-complete' : 'status-progress'}" style="font-size: 0.75rem; font-weight: 700; padding: 4px 8px;">
+          <span class="test-status-badge ${pct === 100 ? 'status-complete' : 'status-progress'}" style="font-size: 0.72rem; font-weight: 700; padding: 4px 10px; flex-shrink: 0; white-space: nowrap;">
             ${pct === 100 ? '✓ All Done' : `${completedCount}/${displayStages.length} Done (${pct}%)`}
           </span>
         </div>
