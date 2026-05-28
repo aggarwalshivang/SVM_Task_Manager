@@ -1113,7 +1113,7 @@ function renderTests(tests) {
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
           <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
             ${test.subject ? `<span class="subject-badge subject-${test.subject.toLowerCase()}">${test.subject === 'Math' ? 'Maths' : test.subject}</span>` : ''}
-            <span class="test-type-pill">${test.type || ''}</span>
+            <span class="test-type-pill type-${(test.type || '').toLowerCase()}">${test.type || ''}</span>
             ${totalStages > 0 ? (() => {
         const pct = Math.round((completedStages / totalStages) * 100);
         if (completedStages === totalStages) return `<span class="test-status-badge status-complete">✓ Complete</span>`;

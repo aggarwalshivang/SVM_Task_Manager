@@ -3151,3 +3151,59 @@ select option:hover {
   transform: translateY(0);
 }
 
+/* Custom coloring for Before Fee and After Fee pills & tabs */
+.test-type-pill.type-beforefee,
+.test-fms-tabs .tab-btn[data-filter="beforefee"].active {
+  color: var(--accent-amber) !important;
+  border-bottom-color: var(--accent-amber) !important;
+  text-shadow: 0 0 10px rgba(245, 158, 11, 0.2) !important;
+}
+
+.test-fms-tabs .tab-btn[data-filter="beforefee"] {
+  transition: all var(--transition-base);
+}
+.test-fms-tabs .tab-btn[data-filter="beforefee"]:hover {
+  color: var(--accent-amber) !important;
+  opacity: 0.85;
+}
+
+.test-type-pill.type-afterfee,
+.test-fms-tabs .tab-btn[data-filter="afterfee"].active {
+  color: var(--accent-emerald) !important;
+  border-bottom-color: var(--accent-emerald) !important;
+  text-shadow: 0 0 10px rgba(16, 185, 129, 0.2) !important;
+}
+
+.test-fms-tabs .tab-btn[data-filter="afterfee"] {
+  transition: all var(--transition-base);
+}
+.test-fms-tabs .tab-btn[data-filter="afterfee"]:hover {
+  color: var(--accent-emerald) !important;
+  opacity: 0.85;
+}
+
+/* Card type pill distinct styles */
+.test-type-pill.type-beforefee {
+  background: rgba(245, 158, 11, 0.1) !important;
+  border: 1px solid rgba(245, 158, 11, 0.25) !important;
+  color: var(--accent-amber) !important;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.test-type-pill.type-afterfee {
+  background: rgba(16, 185, 129, 0.1) !important;
+  border: 1px solid rgba(16, 185, 129, 0.25) !important;
+  color: var(--accent-emerald) !important;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
