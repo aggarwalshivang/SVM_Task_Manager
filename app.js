@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   //  REPLACE THIS with your deployed Apps Script Web App URL
-  API_URL: 'https://script.google.com/macros/s/AKfycbzKWuUHc_xBAKQs6ze0EpYGwVGNz4jH8xMkhi1bTmapQ7MsT1L1jeoVdfDeZ2CVB5J6/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbzZfLuP3osM7Ef7iOY-lzSt9nHBiQ5tcZ9NcS7fuW9Zbu1Ilbpse1cBXNHJNv6rP6n8/exec',
 
   // Retry settings
   MAX_RETRIES: 2,
@@ -801,7 +801,7 @@ window.toggleParentsChecklistRow = function (idx) {
   let checkedIndices = [];
   try {
     checkedIndices = JSON.parse(localStorage.getItem(checkedKey)) || [];
-  } catch(e) {
+  } catch (e) {
     checkedIndices = [];
   }
 
@@ -838,10 +838,10 @@ function renderTests(tests) {
   const videoPill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="video"]');
   const beforeFeePill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="beforefee"]');
   const afterFeePill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="afterfee"]');
-  
+
   if (sheetPill) sheetPill.style.display = isTestView ? 'inline-block' : 'none';
   if (appPill) appPill.style.display = isTestView ? 'inline-block' : 'none';
-  if (videoPill) videoPill.style.display = 'none'; 
+  if (videoPill) videoPill.style.display = 'none';
   if (beforeFeePill) beforeFeePill.style.display = isAdmissionView ? 'inline-block' : 'none';
   if (afterFeePill) afterFeePill.style.display = isAdmissionView ? 'inline-block' : 'none';
 
@@ -904,7 +904,7 @@ function renderTests(tests) {
     let checkedIndices = [];
     try {
       checkedIndices = JSON.parse(localStorage.getItem(checkedKey)) || [];
-    } catch(e) {
+    } catch (e) {
       checkedIndices = [];
     }
 
@@ -937,8 +937,8 @@ function renderTests(tests) {
         <!-- Guidelines Checklist list -->
         <div style="display: flex; flex-direction: column; gap: 12px;">
           ${displayStages.map((stage, idx) => {
-            const isChecked = checkedIndices.includes(idx);
-            return `
+      const isChecked = checkedIndices.includes(idx);
+      return `
               <div onclick="toggleParentsChecklistRow(${idx})" class="parents-checklist-row" style="display: flex; align-items: center; gap: var(--space-md); padding: var(--space-md); background: ${isChecked ? 'rgba(16, 185, 129, 0.04)' : 'rgba(255, 255, 255, 0.015)'}; border: 1px solid ${isChecked ? 'rgba(16, 185, 129, 0.2)' : 'var(--border-glass)'}; border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s ease; user-select: none;">
                 <!-- Checkbox -->
                 <div style="flex-shrink: 0; width: 20px; height: 20px; border-radius: 6px; border: 2px solid ${isChecked ? 'var(--accent-emerald)' : 'var(--text-muted)'}; background: ${isChecked ? 'var(--accent-emerald)' : 'transparent'}; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; box-shadow: ${isChecked ? '0 0 10px rgba(16, 185, 129, 0.25)' : 'none'};">
@@ -950,7 +950,7 @@ function renderTests(tests) {
                 </span>
               </div>
             `;
-          }).join('')}
+    }).join('')}
         </div>
       </div>
     `;
@@ -1289,7 +1289,7 @@ function openTestSettingsModal() {
       tabsContainer.style.display = 'none'; // Only Video setting is available
     } else {
       tabsContainer.style.display = 'flex';
-      
+
       if (state.currentView === 'admissions') {
         if (sheetTab) sheetTab.style.display = 'none';
         if (appTab) appTab.style.display = 'none';
@@ -1368,7 +1368,7 @@ window.selectTypeSegment = function (type) {
   // All segment buttons
   const allSegments = [
     { id: 'type-segment-sheet', match: 'Sheet' },
-    { id: 'type-segment-app',   match: 'App' },
+    { id: 'type-segment-app', match: 'App' },
     { id: 'type-segment-video', match: 'Video' },
     { id: 'type-segment-beforefee', match: 'BeforeFee' },
     { id: 'type-segment-afterfee', match: 'AfterFee' },
@@ -1400,7 +1400,7 @@ window.selectTypeSegment = function (type) {
 
 function toggleAcademicFields(type) {
   const isAcademic = type === 'Sheet' || type === 'App';
-  
+
   const classSubRow = $('form-row-class-subject');
   const chapterRow = $('form-row-chapter');
   const marksRow = $('form-row-marks');
