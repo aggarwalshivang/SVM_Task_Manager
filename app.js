@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   //  REPLACE THIS with your deployed Apps Script Web App URL
-  API_URL: 'https://script.google.com/macros/s/AKfycbxE_lvh0Dh5RbIZpSQgqRPU3JprnavHxnNHPFWbAn8iXlSk5mjX6f5e5P45wRIBtuaf/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbzPCoIl9kBNfApFYjvpFFejrwUlgLgF9H78zlMu_dJawdjzSxadt7u-dpJ_4xyLv9xq/exec',
 
   // Retry settings
   MAX_RETRIES: 2,
@@ -486,6 +486,13 @@ async function openTestTracker() {
   const container = $('test-list-content');
   container.innerHTML = '<div class="loading-spinner" style="margin: 3rem auto;"></div>';
 
+  // Lock configuration to admin role only
+  const isAdmin = state.userRole === 'admin';
+  const btnSettings = $('btn-test-settings');
+  if (btnSettings) {
+    btnSettings.style.display = isAdmin ? 'flex' : 'none';
+  }
+
   try {
     const [settingsRes, testsRes] = await Promise.all([
       apiFetch('getTestSettings'),
@@ -503,7 +510,8 @@ async function openTestTracker() {
 }
 
 function getTestStages(test) {
-  const globalSettings = state.testSettings || [];
+  const testType = test.type || 'Sheet';
+  const globalSettings = (state.testSettings || []).filter(s => s.type === testType);
   const testStages = test.stages || [];
 
   if (testStages.length === 0) {
@@ -587,7 +595,9 @@ function renderTests(tests) {
     const heldOnDate = new Date(test.heldOn);
 
     // Check if any stage is overdue to apply card styling
-    const hasOverdueStage = (state.testSettings || []).some(stage => {
+    const testType = test.type || 'Sheet';
+    const relevantSettings = (state.testSettings || []).filter(s => s.type === testType);
+    const hasOverdueStage = relevantSettings.some(stage => {
       const stages = test.stages || [];
       const testStage = stages.find(s => s.id === stage.id) || { status: 'pending' };
       if (testStage.status === 'done') return false;
@@ -612,11 +622,11 @@ function renderTests(tests) {
             ${test.subject ? `<span class="subject-badge subject-${test.subject.toLowerCase()}">${test.subject === 'Math' ? 'Maths' : test.subject}</span>` : ''}
             <span class="test-type-pill">${test.type || ''}</span>
             ${totalStages > 0 ? (() => {
-      const pct = Math.round((completedStages / totalStages) * 100);
-      if (completedStages === totalStages) return `<span class="test-status-badge status-complete">✓ Complete</span>`;
-      if (hasOverdueStage) return `<span class="test-status-badge status-overdue">⚠ Overdue</span>`;
-      return `<span class="test-status-badge status-progress">${pct}% done</span>`;
-    })() : ''}
+        const pct = Math.round((completedStages / totalStages) * 100);
+        if (completedStages === totalStages) return `<span class="test-status-badge status-complete">✓ Complete</span>`;
+        if (hasOverdueStage) return `<span class="test-status-badge status-overdue">⚠ Overdue</span>`;
+        return `<span class="test-status-badge status-progress">${pct}% done</span>`;
+      })() : ''}
           </div>
           <div style="display:flex; align-items:center; gap:6px;">
             <button class="btn-ghost btn-sm" onclick="handleEditTestDetailsModal('${test.testId}')">
@@ -664,9 +674,9 @@ function renderTests(tests) {
               <span class="meta-v meta-bold">${formatDate(test.heldOn)}</span>
             </div>
             ${totalStages > 0 ? (() => {
-      const pct = Math.round((completedStages / totalStages) * 100);
-      const pctColor = completedStages === totalStages ? 'var(--accent-emerald)' : (hasOverdueStage ? 'var(--accent-red)' : 'var(--accent-purple)');
-      return `
+        const pct = Math.round((completedStages / totalStages) * 100);
+        const pctColor = completedStages === totalStages ? 'var(--accent-emerald)' : (hasOverdueStage ? 'var(--accent-red)' : 'var(--accent-purple)');
+        return `
             <div class="meta-kv">
               <span class="meta-k">Progress</span>
               <span class="meta-v" style="color:${pctColor}; font-weight:800;">${completedStages}/${totalStages} <span style="font-weight:600; font-size:0.7rem; opacity:0.8;">(${pct}%)</span></span>
@@ -674,18 +684,18 @@ function renderTests(tests) {
             <div style="margin-top:5px;">
               <div style="background:rgba(255,255,255,0.06); height:5px; border-radius:3px; overflow:hidden; display:flex; gap:2px; border:1px solid var(--border-glass);">
                 ${testStages.map(stage => {
-      const plannedDate = new Date(heldOnDate);
-      plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
-      plannedDate.setHours(23, 59, 59, 999);
-      const isDelayed = stage.status !== 'done' && new Date() > plannedDate;
-      let bg = 'rgba(255,255,255,0.12)';
-      if (stage.status === 'done') bg = 'var(--accent-emerald)';
-      else if (isDelayed) bg = 'var(--accent-red)';
-      return `<div style="flex:1; background:${bg}; height:100%; transition:background 0.3s;" title="${stage.label || 'Stage'}: ${stage.status === 'done' ? 'Done' : (isDelayed ? 'Overdue' : 'Pending')}"></div>`;
-    }).join('')}
+          const plannedDate = new Date(heldOnDate);
+          plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
+          plannedDate.setHours(23, 59, 59, 999);
+          const isDelayed = stage.status !== 'done' && new Date() > plannedDate;
+          let bg = 'rgba(255,255,255,0.12)';
+          if (stage.status === 'done') bg = 'var(--accent-emerald)';
+          else if (isDelayed) bg = 'var(--accent-red)';
+          return `<div style="flex:1; background:${bg}; height:100%; transition:background 0.3s;" title="${stage.label || 'Stage'}: ${stage.status === 'done' ? 'Done' : (isDelayed ? 'Overdue' : 'Pending')}"></div>`;
+        }).join('')}
               </div>
             </div>`;
-    })() : ''}
+      })() : ''}
           </div>
         </div>
 
@@ -705,15 +715,15 @@ function renderTests(tests) {
         
         <div class="test-pipeline">
           ${testStages.map((stage, sIdx) => {
-      const plannedDate = new Date(heldOnDate);
-      plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
-      const pDateCheck = new Date(plannedDate);
-      pDateCheck.setHours(23, 59, 59, 999);
-      const isDelayed = stage.status !== 'done' && new Date() > pDateCheck;
-      const statusClass = stage.status === 'done' ? 'done' : (isDelayed ? 'delayed' : 'pending');
-      const doneIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+        const plannedDate = new Date(heldOnDate);
+        plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
+        const pDateCheck = new Date(plannedDate);
+        pDateCheck.setHours(23, 59, 59, 999);
+        const isDelayed = stage.status !== 'done' && new Date() > pDateCheck;
+        const statusClass = stage.status === 'done' ? 'done' : (isDelayed ? 'delayed' : 'pending');
+        const doneIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
 
-      return `
+        return `
               <div class="pipeline-step ${statusClass}" onclick="handleToggleTestStage('${test.testId}', ${stage.id})" title="Click to toggle status.">
                 <div class="pipeline-step-left">
                   <div class="step-indicator">${stage.status === 'done' ? doneIcon : (sIdx + 1)}</div>
@@ -732,7 +742,7 @@ function renderTests(tests) {
                   </div>
                 </div>
               </div>`;
-    }).join('')}
+      }).join('')}
         </div>
       </div>
     `;
@@ -820,14 +830,78 @@ $('btn-add-setting-row')?.addEventListener('click', addSettingRow);
 $('btn-save-test-settings')?.addEventListener('click', saveTestSettings);
 
 function openTestSettingsModal() {
+  if (state.userRole !== 'admin') {
+    showToast('Only admins can change test settings.', 'error');
+    return;
+  }
+  state.activeSettingsTab = 'Sheet';
+
+  // Update active tab styles
+  const sheetTab = $('settings-tab-sheet');
+  const appTab = $('settings-tab-app');
+  if (sheetTab) sheetTab.classList.add('active');
+  if (appTab) appTab.classList.remove('active');
+
   renderTestSettingsRows();
   $('test-settings-modal').style.display = 'flex';
 }
 
+window.setSettingsActiveTab = function (type) {
+  saveActiveSettingsFromDOM();
+  state.activeSettingsTab = type;
+
+  // Update tab classes
+  const sheetTab = $('settings-tab-sheet');
+  const appTab = $('settings-tab-app');
+  if (sheetTab) sheetTab.classList.toggle('active', type === 'Sheet');
+  if (appTab) appTab.classList.toggle('active', type === 'App');
+
+  renderTestSettingsRows();
+};
+
+window.selectTypeSegment = function (type) {
+  const input = document.getElementById('test-form-type');
+  if (!input) return;
+  input.value = type;
+
+  // Toggle visual states
+  const sheetBtn = document.getElementById('type-segment-sheet');
+  const appBtn = document.getElementById('type-segment-app');
+  if (sheetBtn && appBtn) {
+    if (type === 'Sheet') {
+      sheetBtn.classList.add('active');
+      sheetBtn.style.background = 'var(--accent-purple)';
+      sheetBtn.style.color = '#ffffff';
+      sheetBtn.style.boxShadow = 'var(--shadow-glow-purple)';
+
+      appBtn.classList.remove('active');
+      appBtn.style.background = 'none';
+      appBtn.style.color = 'var(--text-muted)';
+      appBtn.style.boxShadow = 'none';
+    } else {
+      appBtn.classList.add('active');
+      appBtn.style.background = 'var(--accent-purple)';
+      appBtn.style.color = '#ffffff';
+      appBtn.style.boxShadow = 'var(--shadow-glow-purple)';
+
+      sheetBtn.classList.remove('active');
+      sheetBtn.style.background = 'none';
+      sheetBtn.style.color = 'var(--text-muted)';
+      sheetBtn.style.boxShadow = 'none';
+    }
+  }
+
+  // Trigger change event manually so current listeners for #test-form-type react!
+  input.dispatchEvent(new Event('change'));
+};
+
 function renderTestSettingsRows() {
   const container = $('test-settings-list');
-  container.innerHTML = state.testSettings.map((s, idx) => `
-    <div class="form-row setting-row" data-index="${idx}" draggable="true" ondragstart="handleSettingDragStart(event)" ondragover="handleSettingDragOver(event)" ondrop="handleSettingDrop(event)" style="align-items: flex-end; margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; cursor: move; position: relative;">
+  const activeType = state.activeSettingsTab || 'Sheet';
+  const activeSettings = (state.testSettings || []).filter(s => s.type === activeType);
+
+  container.innerHTML = activeSettings.map((s, idx) => `
+    <div class="form-row setting-row" data-index="${idx}" data-id="${s.id}" draggable="true" ondragstart="handleSettingDragStart(event)" ondragover="handleSettingDragOver(event)" ondrop="handleSettingDrop(event)" style="align-items: flex-end; margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; cursor: move; position: relative;">
       <!-- Drag handle -->
       <div class="drag-handle" style="padding: 10px 5px; color: rgba(255,255,255,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; height: 100%;">☰</div>
       <div class="form-group" style="flex: 2; margin-left: 5px;">
@@ -848,34 +922,49 @@ function renderTestSettingsRows() {
 }
 
 function addSettingRow() {
+  const activeType = state.activeSettingsTab || 'Sheet';
   const newId = state.testSettings.length > 0 ? Math.max(...state.testSettings.map(s => s.id)) + 1 : 1;
-  state.testSettings.push({ id: newId, label: 'New Stage', offset: 0, doer: '' });
+  state.testSettings.push({ id: newId, label: 'New Stage', offset: 0, doer: '', type: activeType });
   renderTestSettingsRows();
 }
 
 function removeSettingRow(idx) {
-  state.testSettings.splice(idx, 1);
+  const activeType = state.activeSettingsTab || 'Sheet';
+  const activeSettings = state.testSettings.filter(s => s.type === activeType);
+  const otherSettings = state.testSettings.filter(s => s.type !== activeType);
+
+  activeSettings.splice(idx, 1);
+  state.testSettings = [...otherSettings, ...activeSettings];
   renderTestSettingsRows();
 }
 
 // Drag & Drop reordering support for Test Settings stages
 let draggedIdx = null;
 
-function saveCurrentSettingsFromDOM() {
+function saveActiveSettingsFromDOM() {
   const rows = document.querySelectorAll('.setting-row');
-  state.testSettings = Array.from(rows).map((row, idx) => {
-    const existingId = state.testSettings[idx]?.id;
+  const activeType = state.activeSettingsTab || 'Sheet';
+
+  // First, filter out the old stages of the activeType
+  const otherSettings = state.testSettings.filter(s => s.type !== activeType);
+
+  // Create updated objects for the active type from inputs
+  const updatedActiveSettings = Array.from(rows).map((row, idx) => {
+    const existingId = parseInt(row.getAttribute('data-id'));
     return {
-      id: existingId !== undefined ? existingId : idx + 1,
+      id: !isNaN(existingId) ? existingId : idx + 100,
       label: row.querySelector('.setting-label').value.trim(),
       offset: parseInt(row.querySelector('.setting-offset').value) || 0,
-      doer: row.querySelector('.setting-doer').value.trim()
+      doer: row.querySelector('.setting-doer').value.trim(),
+      type: activeType
     };
   });
+
+  state.testSettings = [...otherSettings, ...updatedActiveSettings];
 }
 
 window.handleSettingDragStart = function (e) {
-  saveCurrentSettingsFromDOM();
+  saveActiveSettingsFromDOM();
   draggedIdx = parseInt(e.currentTarget.getAttribute('data-index'));
   e.dataTransfer.effectAllowed = 'move';
   e.currentTarget.style.opacity = '0.5';
@@ -891,31 +980,30 @@ window.handleSettingDrop = function (e) {
   const targetIdx = parseInt(e.currentTarget.getAttribute('data-index'));
   e.currentTarget.style.opacity = '1';
 
+  const activeType = state.activeSettingsTab || 'Sheet';
+  const activeSettings = state.testSettings.filter(s => s.type === activeType);
+  const otherSettings = state.testSettings.filter(s => s.type !== activeType);
+
   if (draggedIdx !== null && targetIdx !== null && draggedIdx !== targetIdx) {
-    const [draggedItem] = state.testSettings.splice(draggedIdx, 1);
-    state.testSettings.splice(targetIdx, 0, draggedItem);
+    const [draggedItem] = activeSettings.splice(draggedIdx, 1);
+    activeSettings.splice(targetIdx, 0, draggedItem);
+    state.testSettings = [...otherSettings, ...activeSettings];
     renderTestSettingsRows();
   }
   draggedIdx = null;
 };
 
 async function saveTestSettings() {
-  const rows = document.querySelectorAll('.setting-row');
-  const newSettings = Array.from(rows).map((row, idx) => ({
-    id: state.testSettings[idx]?.id || idx + 1,
-    label: row.querySelector('.setting-label').value.trim(),
-    offset: parseInt(row.querySelector('.setting-offset').value) || 0,
-    doer: row.querySelector('.setting-doer').value.trim()
-  }));
+  // Save active tab edits first
+  saveActiveSettingsFromDOM();
 
   try {
     const btn = $('btn-save-test-settings');
     btn.textContent = 'Saving...';
     btn.disabled = true;
 
-    const res = await apiFetch('updateTestSettings', { settings: newSettings }, 'POST');
+    const res = await apiFetch('updateTestSettings', { settings: state.testSettings }, 'POST');
     if (res.success) {
-      state.testSettings = newSettings;
       showToast('Configuration saved successfully.');
       $('test-settings-modal').style.display = 'none';
       renderTests(state.tests);
@@ -4022,18 +4110,42 @@ function renderIndividualFormStages() {
   const container = $('individual-test-stages-list');
   if (!container) return;
 
+  const isAdmin = state.userRole === 'admin';
+  const addBtn = document.querySelector('button[onclick="addIndividualTestStageRow()"]');
+  if (addBtn) {
+    addBtn.style.display = isAdmin ? 'block' : 'none';
+  }
+
+  // Remove any old helper notice first
+  const oldNotice = document.getElementById('pipeline-stages-notice');
+  if (oldNotice) oldNotice.remove();
+
+  if (!isAdmin) {
+    const parent = container.parentElement;
+    const notice = document.createElement('p');
+    notice.id = 'pipeline-stages-notice';
+    notice.className = 'modal-body-text';
+    notice.style.cssText = 'color: var(--accent-amber); font-size: 0.75rem; margin-top: 6px; display: flex; align-items: center; gap: 4px; font-weight: 500;';
+    notice.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Customizing stage names/doers requires Admin approval. You may adjust offset days.`;
+    parent.appendChild(notice);
+  }
+
   container.innerHTML = currentFormStages.map((s, idx) => `
-    <div class="form-stage-row" data-index="${idx}" draggable="false" ondragstart="handleFormStageDragStart(event)" ondragover="handleFormStageDragOver(event)" ondrop="handleFormStageDrop(event)" ondragend="handleFormStageDragEnd(event)" style="display: flex; flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 6px; margin-bottom: 8px; padding: 8px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: 6px;">
-      <div class="drag-handle" onmousedown="enableFormRowDrag(this)" style="flex-shrink: 0; color: rgba(255,255,255,0.4); font-size: 1.1rem; cursor: grab; line-height: 1; padding: 0 4px; user-select: none;">☰</div>
-      <input type="text" class="form-stage-label" value="${s.label || ''}" style="flex: 2; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-normal);" placeholder="Stage name">
+    <div class="form-stage-row" data-index="${idx}" draggable="false" ondragstart="${isAdmin ? 'handleFormStageDragStart(event)' : 'event.preventDefault()'}" ondragover="${isAdmin ? 'handleFormStageDragOver(event)' : ''}" ondrop="${isAdmin ? 'handleFormStageDrop(event)' : ''}" ondragend="${isAdmin ? 'handleFormStageDragEnd(event)' : ''}" style="display: flex; flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 6px; margin-bottom: 8px; padding: 8px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: 6px;">
+      ${isAdmin ? `<div class="drag-handle" onmousedown="enableFormRowDrag(this)" style="flex-shrink: 0; color: rgba(255,255,255,0.4); font-size: 1.1rem; cursor: grab; line-height: 1; padding: 0 4px; user-select: none;">☰</div>` : ''}
+      <input type="text" class="form-stage-label" value="${s.label || ''}" ${isAdmin ? '' : 'readonly disabled'} style="flex: 2; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-normal);" placeholder="Stage name">
       <input type="number" class="form-stage-offset" value="${s.offset || 0}" style="flex: 0 0 50px; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-normal);" title="Offset days">
-      <input type="text" class="form-stage-doer" value="${s.doer || ''}" style="flex: 1.5; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-normal);" placeholder="Assigned to">
-      <button type="button" onclick="removeIndividualTestStageRow(${idx})" style="flex-shrink: 0; background: none; border: none; color: var(--accent-red); cursor: pointer; font-size: 1rem; line-height: 1; padding: 2px 4px;">✕</button>
+      <input type="text" class="form-stage-doer" value="${s.doer || ''}" ${isAdmin ? '' : 'readonly disabled'} style="flex: 1.5; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-normal);" placeholder="Assigned to">
+      ${isAdmin ? `<button type="button" onclick="removeIndividualTestStageRow(${idx})" style="flex-shrink: 0; background: none; border: none; color: var(--accent-red); cursor: pointer; font-size: 1rem; line-height: 1; padding: 2px 4px;">✕</button>` : ''}
     </div>
   `).join('');
 }
 
 window.addIndividualTestStageRow = function () {
+  if (state.userRole !== 'admin') {
+    showToast('Adding stages requires admin approval.', 'error');
+    return;
+  }
   saveCurrentFormStagesFromDOM();
   const nextId = currentFormStages.length > 0 ? Math.max(...currentFormStages.map(s => s.id)) + 1 : 1;
   currentFormStages.push({
@@ -4050,6 +4162,10 @@ window.addIndividualTestStageRow = function () {
 };
 
 window.removeIndividualTestStageRow = function (idx) {
+  if (state.userRole !== 'admin') {
+    showToast('Removing stages requires admin approval.', 'error');
+    return;
+  }
   saveCurrentFormStagesFromDOM();
   currentFormStages.splice(idx, 1);
   renderIndividualFormStages();
@@ -4140,8 +4256,12 @@ function openAddTestModal() {
   $('test-form-min').value = '';
   $('test-form-avg').value = '';
 
-  // Pre-populate individual stages with global blueprints
-  currentFormStages = state.testSettings.map(s => ({
+  // Set default type to Sheet
+  selectTypeSegment('Sheet');
+
+  // Pre-populate individual stages with global blueprints for 'Sheet'
+  const blueprint = (state.testSettings || []).filter(s => s.type === 'Sheet');
+  currentFormStages = blueprint.map(s => ({
     id: s.id,
     label: s.label,
     offset: s.offset,
@@ -4230,6 +4350,21 @@ document.addEventListener('click', function (e) {
 
 $('add-test-close-btn')?.addEventListener('click', closeAddTestModal);
 $('add-test-form')?.addEventListener('submit', handleAddTestSubmit);
+$('test-form-type')?.addEventListener('change', (e) => {
+  const selectedType = e.target.value; // 'Sheet' or 'App'
+  const blueprint = (state.testSettings || []).filter(s => s.type === selectedType);
+  currentFormStages = blueprint.map(s => ({
+    id: s.id,
+    label: s.label,
+    offset: s.offset,
+    doer: s.doer,
+    status: 'pending',
+    actualDate: '',
+    doneBy: '',
+    doneAt: ''
+  }));
+  renderIndividualFormStages();
+});
 
 async function handleAddTestSubmit(e) {
   e.preventDefault();
@@ -4353,7 +4488,7 @@ function handleEditTestDetailsModal(testId) {
   $('test-form-name').value = test.testName;
   $('test-form-max').value = test.maxScore;
   $('test-form-held-on').value = test.heldOn.substring(0, 10);
-  $('test-form-type').value = test.type;
+  selectTypeSegment(test.type || 'Sheet');
 
   // Set sheet & folder links
   $('test-form-sheet-link').value = test.sheetLink || '';

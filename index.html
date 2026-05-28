@@ -617,6 +617,16 @@
         <button class="modal-close" id="add-test-close-btn" aria-label="Close">✕</button>
       </div>
       <form id="add-test-form">
+        <!-- Test Type Segmented Control -->
+        <div class="form-group" style="margin-bottom: var(--space-md);">
+          <label style="font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Test Type</label>
+          <div class="segmented-control" style="display: flex; background: rgba(255,255,255,0.04); padding: 4px; border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
+            <button type="button" class="segment-btn active" id="type-segment-sheet" onclick="selectTypeSegment('Sheet')" style="flex: 1; padding: 10px; border: none; background: var(--accent-purple); color: #ffffff; box-shadow: var(--shadow-glow-purple); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">📄 Sheet Test</button>
+            <button type="button" class="segment-btn" id="type-segment-app" onclick="selectTypeSegment('App')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">📱 App Test</button>
+          </div>
+          <input type="hidden" id="test-form-type" value="Sheet">
+        </div>
+
         <div class="form-row">
           <div class="form-group">
             <label for="test-form-class">Class</label>
@@ -659,10 +669,7 @@
             <label for="test-form-min">Min Marks</label>
             <input type="number" id="test-form-min" placeholder="e.g. 15" step="any">
           </div>
-          <div class="form-group" style="flex: 1;">
-            <label for="test-form-avg">Avg Marks</label>
-            <input type="number" id="test-form-avg" placeholder="e.g. 35.5" step="any">
-          </div>
+          <input type="hidden" id="test-form-avg" value="">
         </div>
         
         <!-- Custom Chapter Input (shown when "custom" is selected above) -->
@@ -671,17 +678,8 @@
           <input type="text" id="test-form-custom-chapter" placeholder="Type custom chapter name...">
         </div>
 
-        <!-- Sheet and Folder Links -->
-        <div class="form-row">
-          <div class="form-group">
-            <label for="test-form-sheet-link">Google Sheet Link (Optional)</label>
-            <input type="url" id="test-form-sheet-link" placeholder="https://docs.google.com/spreadsheets/...">
-          </div>
-          <div class="form-group">
-            <label for="test-form-folder-link">Google Drive Folder Link (Optional)</label>
-            <input type="url" id="test-form-folder-link" placeholder="https://drive.google.com/drive/...">
-          </div>
-        </div>
+        <input type="hidden" id="test-form-sheet-link" value="">
+        <input type="hidden" id="test-form-folder-link" value="">
 
         <div class="form-group">
           <label for="test-form-name">Test Name (Auto-generated)</label>
@@ -689,16 +687,9 @@
         </div>
 
         <div class="form-row">
-          <div class="form-group">
+          <div class="form-group" style="flex: 1;">
             <label for="test-form-held-on">Held On</label>
             <input type="date" id="test-form-held-on" required>
-          </div>
-          <div class="form-group">
-            <label for="test-form-type">Type</label>
-            <select id="test-form-type">
-              <option value="Sheet">Sheet</option>
-              <option value="App">App</option>
-            </select>
           </div>
         </div>
         
@@ -728,7 +719,11 @@
         <h3>Test FMS Settings</h3>
         <button class="modal-close" id="test-settings-close-btn">✕</button>
       </div>
-      <p class="modal-body-text">Configure the stages for the Test FMS pipeline. These stages will apply to all tests.</p>
+      <p class="modal-body-text">Configure the stages for the Sheet and App Test FMS pipelines. These templates will initialize stages for newly tracked tests.</p>
+      <div class="test-settings-tabs" style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <button class="tab-btn active" id="settings-tab-sheet" onclick="setSettingsActiveTab('Sheet')" style="flex: 1; padding: 8px; font-weight: 600;">📄 Sheet Pipeline</button>
+        <button class="tab-btn" id="settings-tab-app" onclick="setSettingsActiveTab('App')" style="flex: 1; padding: 8px; font-weight: 600;">📱 App Pipeline</button>
+      </div>
       <div id="test-settings-list" style="max-height: 400px; overflow-y: auto; margin-bottom: var(--space-md); padding-right: 5px;">
         <!-- Settings rows will be rendered here -->
       </div>
