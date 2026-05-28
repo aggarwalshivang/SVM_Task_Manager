@@ -23,6 +23,62 @@ const CONFIG = {
 // (Supabase removed - Using GSheet Auth)
 
 // =============================================
+// CANONICAL PIPELINE DEFAULTS
+// These are the source-of-truth stage definitions.
+// They override any stale/wrong data returned by the API.
+// =============================================
+const PIPELINE_DEFAULTS = {
+  Sheet: [
+    { id: 1,  label: 'Create Test',        offset: 2,  doer: 'All',    type: 'Sheet' },
+    { id: 2,  label: 'Sheet Checking',     offset: 4,  doer: 'All',    type: 'Sheet' },
+    { id: 3,  label: 'Enter Score',        offset: 6,  doer: 'Sidhi',  type: 'Sheet' },
+    { id: 4,  label: 'Sheet Distribution', offset: 8,  doer: 'All',    type: 'Sheet' },
+    { id: 5,  label: 'Discussion',         offset: 10, doer: 'Shivang',type: 'Sheet' },
+    { id: 6,  label: 'Save Score',         offset: 12, doer: 'Sidhi',  type: 'Sheet' },
+    { id: 7,  label: 'Send to Parents',    offset: 14, doer: 'Komal',  type: 'Sheet' },
+  ],
+  App: [
+    { id: 8,  label: 'Create Test',     offset: 2,  doer: 'All',    type: 'App' },
+    { id: 9,  label: 'Enter Score',     offset: 4,  doer: 'Sidhi',  type: 'App' },
+    { id: 10, label: 'Save Score',      offset: 6,  doer: 'Sidhi',  type: 'App' },
+    { id: 11, label: 'Discussion',      offset: 8,  doer: 'Shivang',type: 'App' },
+    { id: 12, label: 'Send to Parents', offset: 10, doer: 'Komal',  type: 'App' },
+  ]
+};
+
+/**
+ * Validates and repairs state.testSettings against PIPELINE_DEFAULTS.
+ * - Correct stage labels / doers are enforced (non-negotiable).
+ * - Offset values are preserved from the API (user-editable).
+ * - Missing stages are added; extra stages are left as-is (admin additions).
+ */
+function sanitizeTestSettings() {
+  ['Sheet', 'App'].forEach(type => {
+    const canonical = PIPELINE_DEFAULTS[type];
+    const canonicalLabels = canonical.map(s => s.label);
+    // Get current settings for this type
+    const current = (state.testSettings || []).filter(s => s.type === type);
+    // Check if current is valid: same count and all canonical labels present
+    const currentLabels = current.map(s => s.label);
+    const isValid = canonical.length === current.length &&
+      canonicalLabels.every(l => currentLabels.includes(l));
+
+    if (!isValid) {
+      // Replace with canonical, preserving any matching offset values from the API
+      const repaired = canonical.map(def => {
+        const existing = current.find(s => s.label === def.label);
+        return { ...def, offset: existing ? existing.offset : def.offset };
+      });
+      // Swap out old stages for this type
+      state.testSettings = [
+        ...(state.testSettings || []).filter(s => s.type !== type),
+        ...repaired
+      ];
+    }
+  });
+}
+
+// =============================================
 // STATE
 // =============================================
 const state = {
@@ -501,6 +557,9 @@ async function openTestTracker() {
 
     if (settingsRes.success) state.testSettings = settingsRes.data;
     if (testsRes.success) state.tests = testsRes.data;
+
+    // Always validate & repair pipeline stages against canonical definitions
+    sanitizeTestSettings();
 
     renderTests(state.tests);
   } catch (err) {
@@ -4133,9 +4192,9 @@ function renderIndividualFormStages() {
   container.innerHTML = currentFormStages.map((s, idx) => `
     <div class="form-stage-row" data-index="${idx}" draggable="false" ondragstart="${isAdmin ? 'handleFormStageDragStart(event)' : 'event.preventDefault()'}" ondragover="${isAdmin ? 'handleFormStageDragOver(event)' : ''}" ondrop="${isAdmin ? 'handleFormStageDrop(event)' : ''}" ondragend="${isAdmin ? 'handleFormStageDragEnd(event)' : ''}" style="display: flex; flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 6px; margin-bottom: 8px; padding: 8px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: 6px;">
       ${isAdmin ? `<div class="drag-handle" onmousedown="enableFormRowDrag(this)" style="flex-shrink: 0; color: rgba(255,255,255,0.4); font-size: 1.1rem; cursor: grab; line-height: 1; padding: 0 4px; user-select: none;">☰</div>` : ''}
-      <input type="text" class="form-stage-label" value="${s.label || ''}" ${isAdmin ? '' : 'readonly disabled'} style="flex: 2; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-normal);" placeholder="Stage name">
-      <input type="number" class="form-stage-offset" value="${s.offset || 0}" style="flex: 0 0 50px; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-normal);" title="Offset days">
-      <input type="text" class="form-stage-doer" value="${s.doer || ''}" ${isAdmin ? '' : 'readonly disabled'} style="flex: 1.5; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-normal);" placeholder="Assigned to">
+      <input type="text" class="form-stage-label" value="${s.label || ''}" ${isAdmin ? '' : 'readonly disabled'} style="flex: 2; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: ${isAdmin ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)'}; border: 1px solid var(--border-glass); border-radius: 4px; color: ${isAdmin ? 'var(--text-normal)' : 'var(--text-muted)'}; cursor: ${isAdmin ? 'text' : 'not-allowed'};" placeholder="Stage name">
+      <input type="number" class="form-stage-offset" value="${s.offset || 0}" style="flex: 0 0 55px; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: rgba(255,255,255,0.04); border: 1px solid ${isAdmin ? 'var(--border-glass)' : 'var(--accent-purple)'}; border-radius: 4px; color: var(--text-primary); font-weight: 600;" title="Offset days — editable by all roles">
+      <input type="text" class="form-stage-doer" value="${s.doer || ''}" ${isAdmin ? '' : 'readonly disabled'} style="flex: 1.5; min-width: 0; padding: 6px 8px; font-size: 0.8rem; background: ${isAdmin ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)'}; border: 1px solid var(--border-glass); border-radius: 4px; color: ${isAdmin ? 'var(--text-normal)' : 'var(--text-muted)'}; cursor: ${isAdmin ? 'text' : 'not-allowed'};" placeholder="Assigned to">
       ${isAdmin ? `<button type="button" onclick="removeIndividualTestStageRow(${idx})" style="flex-shrink: 0; background: none; border: none; color: var(--accent-red); cursor: pointer; font-size: 1rem; line-height: 1; padding: 2px 4px;">✕</button>` : ''}
     </div>
   `).join('');
