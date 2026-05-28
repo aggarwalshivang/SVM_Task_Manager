@@ -5277,7 +5277,7 @@ async function handleAddTestSubmit(e) {
     if (res.success) {
       showToast('Test Tracking Started!');
       closeAddTestModal();
-      openTestTracker(); // Refresh
+      openTestTracker(state.currentView); // Refresh current view
     }
   } catch (err) {
     showToast('Failed to start tracking', 'error');
@@ -5447,7 +5447,7 @@ function handleEditTestDetailsModal(testId) {
       if (res.success) {
         showToast('Test details updated.');
         closeAddTestModal();
-        openTestTracker();
+        openTestTracker(state.currentView); // Refresh current view
       }
     } catch (err) {
       showToast('Update failed', 'error');
