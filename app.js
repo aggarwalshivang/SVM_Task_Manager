@@ -5390,7 +5390,7 @@ function handleEditTestDetailsModal(testId) {
 
   // Set dropdowns and fields
   const clsVal = test.className || '10';
-  const subVal = test.subject || '';
+  let subVal = test.subject || '';
 
   const classOption = Array.from(document.querySelectorAll('.class-option')).find(o => o.dataset.value === clsVal);
   if (classOption) selectClassOption(classOption);
@@ -5403,7 +5403,7 @@ function handleEditTestDetailsModal(testId) {
   }
 
   const classVal = $('test-form-class').value;
-  const subVal = $('test-form-subject').value;
+  subVal = $('test-form-subject').value;
   // Rebuild chapter custom dropdown for the edit modal
   const chapterHiddenInput = $('test-form-chapter');
   const customChapterGroup = $('custom-chapter-group');
