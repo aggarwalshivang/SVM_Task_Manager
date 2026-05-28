@@ -1220,16 +1220,35 @@ $('btn-save-test-settings')?.addEventListener('click', saveTestSettings);
 
 function openTestSettingsModal() {
   if (state.userRole !== 'admin') {
-    showToast('Only admins can change test settings.', 'error');
+    showToast('Only admins can change settings.', 'error');
     return;
   }
-  state.activeSettingsTab = 'Sheet';
 
-  // Update active tab styles
+  // Pre-select tab based on the active view
+  if (state.currentView === 'parents') {
+    state.activeSettingsTab = 'Parents';
+  } else if (state.currentView === 'admissions') {
+    state.activeSettingsTab = 'BeforeFee';
+  } else if (state.currentView === 'videos') {
+    state.activeSettingsTab = 'Video';
+  } else {
+    state.activeSettingsTab = 'Sheet';
+  }
+
+  // Update tab classes dynamically
   const sheetTab = $('settings-tab-sheet');
   const appTab = $('settings-tab-app');
-  if (sheetTab) sheetTab.classList.add('active');
-  if (appTab) appTab.classList.remove('active');
+  const videoTab = $('settings-tab-video');
+  const beforeFeeTab = $('settings-tab-beforefee');
+  const afterFeeTab = $('settings-tab-afterfee');
+  const parentsTab = $('settings-tab-parents');
+
+  if (sheetTab) sheetTab.classList.toggle('active', state.activeSettingsTab === 'Sheet');
+  if (appTab) appTab.classList.toggle('active', state.activeSettingsTab === 'App');
+  if (videoTab) videoTab.classList.toggle('active', state.activeSettingsTab === 'Video');
+  if (beforeFeeTab) beforeFeeTab.classList.toggle('active', state.activeSettingsTab === 'BeforeFee');
+  if (afterFeeTab) afterFeeTab.classList.toggle('active', state.activeSettingsTab === 'AfterFee');
+  if (parentsTab) parentsTab.classList.toggle('active', state.activeSettingsTab === 'Parents');
 
   renderTestSettingsRows();
   $('test-settings-modal').style.display = 'flex';
