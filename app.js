@@ -824,8 +824,74 @@ window.resetParentsChecklist = function () {
   showToast('Checklist refreshed! Start your routine.');
 };
 
+function renderFmsSortDropdownOptions() {
+  const isVideoView = state.currentView === 'videos';
+  const isAdmissionView = state.currentView === 'admissions';
+
+  const menu = $('sort-dropdown-menu');
+  if (!menu) return;
+
+  // Let's get current active sortType or set default
+  let sortType = state.testFmsSort;
+  
+  let options = [];
+  if (isAdmissionView) {
+    if (!sortType || !['held-desc', 'held-asc', 'name-asc', 'name-desc'].includes(sortType)) {
+      sortType = 'held-desc';
+      state.testFmsSort = 'held-desc';
+    }
+    options = [
+      { value: 'held-desc', label: '📅 Date Registered (Newest First)', display: 'Date Registered ↓' },
+      { value: 'held-asc', label: '📅 Date Registered (Oldest First)', display: 'Date Registered ↑' },
+      { value: 'name-asc', label: '🔤 Student Name (A–Z)', display: 'Student Name A–Z' },
+      { value: 'name-desc', label: '🔤 Student Name (Z–A)', display: 'Student Name Z–A' }
+    ];
+  } else if (isVideoView) {
+    if (!sortType || !['held-desc', 'held-asc', 'name-asc', 'name-desc'].includes(sortType)) {
+      sortType = 'held-desc';
+      state.testFmsSort = 'held-desc';
+    }
+    options = [
+      { value: 'held-desc', label: '📅 Date Created (Newest First)', display: 'Date Created ↓' },
+      { value: 'held-asc', label: '📅 Date Created (Oldest First)', display: 'Date Created ↑' },
+      { value: 'name-asc', label: '🎥 Video Title (A–Z)', display: 'Video Title A–Z' },
+      { value: 'name-desc', label: '🎥 Video Title (Z–A)', display: 'Video Title Z–A' }
+    ];
+  } else { // default tests view
+    if (!sortType || ['name-asc', 'name-desc'].includes(sortType)) {
+      sortType = 'held-desc';
+      state.testFmsSort = 'held-desc';
+    }
+    options = [
+      { value: 'held-desc', label: '📅 Date Held (Newest First)', display: 'Date Held ↓' },
+      { value: 'held-asc', label: '📅 Date Held (Oldest First)', display: 'Date Held ↑' },
+      { value: 'subject-asc', label: '📚 Subject (A–Z)', display: 'Subject A–Z' },
+      { value: 'subject-desc', label: '📚 Subject (Z–A)', display: 'Subject Z–A' },
+      { value: 'class-asc', label: '🎓 Class (Ascending)', display: 'Class ↑' },
+      { value: 'class-desc', label: '🎓 Class (Descending)', display: 'Class ↓' },
+      { value: 'max-desc', label: '💯 Max Marks (High → Low)', display: 'Max Marks ↓' },
+      { value: 'max-asc', label: '💯 Max Marks (Low → High)', display: 'Max Marks ↑' }
+    ];
+  }
+
+  // Generate html
+  menu.innerHTML = options.map(opt => `
+    <div class="sort-option ${opt.value === sortType ? 'active-sort' : ''}" data-value="${opt.value}" onclick="selectSortOption(this)">${opt.label}</div>
+  `).join('');
+
+  // Update button label
+  const labelEl = $('sort-dropdown-label');
+  if (labelEl) {
+    const currentOpt = options.find(o => o.value === sortType);
+    labelEl.textContent = currentOpt ? currentOpt.display : 'Sort';
+  }
+}
+
 function renderTests(tests) {
   const container = $('test-list-content');
+
+  // Populate dynamic sorting options according to the current FMS view
+  renderFmsSortDropdownOptions();
 
   // Update toolbar filter tabs visibility depending on active main tab
   const isVideoView = state.currentView === 'videos';
@@ -1008,6 +1074,8 @@ function renderTests(tests) {
     if (sortType === 'class-desc') return parseInt(b.className || 0) - parseInt(a.className || 0);
     if (sortType === 'max-desc') return parseFloat(b.maxScore || 0) - parseFloat(a.maxScore || 0);
     if (sortType === 'max-asc') return parseFloat(a.maxScore || 0) - parseFloat(b.maxScore || 0);
+    if (sortType === 'name-asc') return (a.testName || '').localeCompare(b.testName || '');
+    if (sortType === 'name-desc') return (b.testName || '').localeCompare(a.testName || '');
     return 0;
   });
 
@@ -5084,7 +5152,9 @@ const SORT_LABELS = {
   'class-asc': 'Class ↑',
   'class-desc': 'Class ↓',
   'max-desc': 'Max Marks ↓',
-  'max-asc': 'Max Marks ↑'
+  'max-asc': 'Max Marks ↑',
+  'name-asc': 'Name A–Z',
+  'name-desc': 'Name Z–A'
 };
 
 window.toggleSortDropdown = function () {
@@ -5100,9 +5170,33 @@ window.selectSortOption = function (el) {
   // Update active state
   document.querySelectorAll('.sort-option').forEach(o => o.classList.remove('active-sort'));
   el.classList.add('active-sort');
-  // Update button label
+  
+  // Update button label dynamically based on active FMS view context
   const label = $('sort-dropdown-label');
-  if (label) label.textContent = SORT_LABELS[value] || value;
+  if (label) {
+    let displayLabel = el.textContent;
+    // Strip emoji prefixes
+    displayLabel = displayLabel.replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+    if (value === 'held-desc') {
+      if (state.currentView === 'admissions') displayLabel = 'Date Registered ↓';
+      else if (state.currentView === 'videos') displayLabel = 'Date Created ↓';
+      else displayLabel = 'Date Held ↓';
+    } else if (value === 'held-asc') {
+      if (state.currentView === 'admissions') displayLabel = 'Date Registered ↑';
+      else if (state.currentView === 'videos') displayLabel = 'Date Created ↑';
+      else displayLabel = 'Date Held ↑';
+    } else if (value === 'name-asc') {
+      if (state.currentView === 'admissions') displayLabel = 'Student Name A–Z';
+      else if (state.currentView === 'videos') displayLabel = 'Video Title A–Z';
+      else displayLabel = 'Name A–Z';
+    } else if (value === 'name-desc') {
+      if (state.currentView === 'admissions') displayLabel = 'Student Name Z–A';
+      else if (state.currentView === 'videos') displayLabel = 'Video Title Z–A';
+      else displayLabel = 'Name Z–A';
+    }
+    label.textContent = displayLabel;
+  }
+
   // Close menu
   $('sort-dropdown-menu').style.display = 'none';
   $('sort-dropdown-chevron').style.transform = '';
