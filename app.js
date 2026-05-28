@@ -1151,9 +1151,49 @@ window.selectTypeSegment = function (type) {
     }
   });
 
+  // Toggle visibility of Class, Subject, Chapter, and Marks rows based on type
+  toggleAcademicFields(type);
+
   // Trigger change event so pipeline stages reload
   input.dispatchEvent(new Event('change'));
 };
+
+function toggleAcademicFields(type) {
+  const isAcademic = type === 'Sheet' || type === 'App';
+  
+  const classSubRow = $('form-row-class-subject');
+  const chapterRow = $('form-row-chapter');
+  const marksRow = $('form-row-marks');
+  const customChapterGrp = $('custom-chapter-group');
+
+  const classSel = $('test-form-class');
+  const subjectSel = $('test-form-subject');
+  const chapterInput = $('test-form-chapter');
+  const customChapterInput = $('test-form-custom-chapter');
+  const maxInput = $('test-form-max');
+
+  if (isAcademic) {
+    if (classSubRow) classSubRow.style.display = 'flex';
+    if (chapterRow) chapterRow.style.display = 'flex';
+    if (marksRow) marksRow.style.display = 'flex';
+
+    if (classSel) classSel.setAttribute('required', 'required');
+    if (subjectSel) subjectSel.setAttribute('required', 'required');
+    if (chapterInput) chapterInput.setAttribute('required', 'required');
+    if (maxInput) maxInput.setAttribute('required', 'required');
+  } else {
+    if (classSubRow) classSubRow.style.display = 'none';
+    if (chapterRow) chapterRow.style.display = 'none';
+    if (marksRow) marksRow.style.display = 'none';
+    if (customChapterGrp) customChapterGrp.style.display = 'none';
+
+    if (classSel) classSel.removeAttribute('required');
+    if (subjectSel) subjectSel.removeAttribute('required');
+    if (chapterInput) chapterInput.removeAttribute('required');
+    if (maxInput) maxInput.removeAttribute('required');
+    if (customChapterInput) customChapterInput.removeAttribute('required');
+  }
+}
 
 function renderTestSettingsRows() {
   const container = $('test-settings-list');
