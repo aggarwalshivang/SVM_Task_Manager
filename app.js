@@ -3318,6 +3318,9 @@ async function initForUser(user) {
         }));
       });
 
+    // Pre-load FMS pipelines and Team Dashboard in the background immediately!
+    preloadAllTabsData();
+
   } catch (err) {
     console.error('Fetch error:', err);
     // If we have cached tasks, don't show a hard error — just warn
@@ -3327,6 +3330,57 @@ async function initForUser(user) {
       showError('Could not load tasks. Please check your connection.');
     }
   }
+}
+
+/**
+ * Pre-warms and pre-loads all tabs (Test FMS, Parents FMS, Team Dashboard) 
+ * silently in the background immediately upon startup/login.
+ * This completely eliminates loading spinners and delay on the first tab switches!
+ */
+function preloadAllTabsData() {
+  console.log('Starting background pre-load of all tabs...');
+
+  // 1. Pre-load FMS settings and pipelines
+  Promise.all([
+    apiFetch('getTestSettings'),
+    apiFetch('getTests')
+  ]).then(([settingsRes, testsRes]) => {
+    if (settingsRes.success) state.testSettings = settingsRes.data;
+    if (testsRes.success) state.tests = testsRes.data;
+    sanitizeTestSettings();
+    console.log('FMS Pipelines successfully preloaded in background.');
+  }).catch(err => console.error('Failed to preload FMS data:', err));
+
+  // 2. Pre-load Dashboard metrics & pending approvals
+  Promise.all([
+    apiFetch('getScores').catch(() => ({ success: true, data: [] })),
+    apiFetch('getTeam').catch(() => ({ success: true, data: [] })),
+    apiFetch('getLeaves').catch(() => ({ success: true, data: [] })),
+    apiFetch('getTeamPerformance').catch(() => ({ success: true, data: [] })),
+    (state.userRole === 'admin' || state.userRole === 'process_coordinator')
+      ? apiFetch('getWorkflowHealth').catch(() => ({ success: true, data: null }))
+      : Promise.resolve({ success: true, data: null }),
+    apiFetch('getPendingModifications').catch(() => ({ success: true, data: [] }))
+  ]).then(([scoresRes, teamRes, leavesRes, perfRes, healthRes, modRes]) => {
+    state.dashboardCache = { scoresRes, teamRes, leavesRes, perfRes, healthRes, modRes };
+    
+    // Update the notification badge next to the "Team" tab on startup!
+    const pendingMembersCount = teamRes.data ? teamRes.data.filter(m => !(m.active === true || String(m.active).toUpperCase().trim() === 'TRUE')).length : 0;
+    const pendingLeavesCount = leavesRes.data ? leavesRes.data.filter(l => l.status === 'pending').length : 0;
+    const pendingModsCount = modRes.data ? modRes.data.length : 0;
+    const totalPending = pendingMembersCount + pendingLeavesCount + pendingModsCount;
+    
+    const teamBadge = $('team-badge');
+    if (teamBadge) {
+      if (totalPending > 0) {
+        teamBadge.style.display = 'block';
+        teamBadge.textContent = totalPending;
+      } else {
+        teamBadge.style.display = 'none';
+      }
+    }
+    console.log('Dashboard metrics successfully preloaded in background.');
+  }).catch(err => console.error('Failed to preload Dashboard data:', err));
 }
 
 /**
