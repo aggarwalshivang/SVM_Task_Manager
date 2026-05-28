@@ -170,6 +170,16 @@ const PIPELINE_DEFAULTS = {
     { id: 34, label: 'Send Biometric ID to SVM Group', offset: 9, doer: 'Sidhi/Komal', type: 'AfterFee' },
     { id: 35, label: 'Create Dashboard', offset: 10, doer: 'Sidhi/Komal', type: 'AfterFee' },
     { id: 36, label: 'Activate Class App', offset: 11, doer: 'Sidhi/Komal', type: 'AfterFee' }
+  ],
+  Parents: [
+    { id: 37, label: 'Check Performance in Maths & Science', offset: 1, doer: 'Parents', type: 'Parents' },
+    { id: 38, label: 'Ensure Child Understands Concepts', offset: 2, doer: 'Parents', type: 'Parents' },
+    { id: 39, label: 'Encourage NCERT Science & Maths Practice', offset: 3, doer: 'Parents', type: 'Parents' },
+    { id: 40, label: 'Practice Upadhyay Regularly', offset: 4, doer: 'Parents', type: 'Parents' },
+    { id: 41, label: 'Watch Video Lectures for Doubt Solving', offset: 5, doer: 'Parents', type: 'Parents' },
+    { id: 42, label: 'Monitor Mobile/Tablet Usage during Study', offset: 6, doer: 'Parents', type: 'Parents' },
+    { id: 43, label: 'Discuss Daily Test Scores with Child', offset: 7, doer: 'Parents', type: 'Parents' },
+    { id: 44, label: 'Avoid Copying, Focus on Practice & Matching', offset: 8, doer: 'Parents', type: 'Parents' }
   ]
 };
 
@@ -180,7 +190,7 @@ const PIPELINE_DEFAULTS = {
  * - Missing stages are added; extra stages are left as-is (admin additions).
  */
 function sanitizeTestSettings() {
-  ['Sheet', 'App', 'Video', 'BeforeFee', 'AfterFee'].forEach(type => {
+  ['Sheet', 'App', 'Video', 'BeforeFee', 'AfterFee', 'Parents'].forEach(type => {
     const canonical = PIPELINE_DEFAULTS[type];
     const canonicalLabels = canonical.map(s => s.label);
     const current = (state.testSettings || []).filter(s => s.type === type);
@@ -670,6 +680,14 @@ function handleUserSignedIn(userData) {
     $('admin-dashboard-container').style.display = 'none';
     $('test-tracker-container').style.display = 'block';
   };
+  $('tab-parents').onclick = () => {
+    setActiveTab('tab-parents');
+    state.testFmsFilter = 'all';
+    openTestTracker('parents');
+    $('task-view-container').style.display = 'none';
+    $('admin-dashboard-container').style.display = 'none';
+    $('test-tracker-container').style.display = 'block';
+  };
 
   checkBroadcast();
   $('loading-screen').classList.add('hidden');
@@ -750,6 +768,7 @@ function renderTests(tests) {
   // Update toolbar filter tabs visibility depending on active main tab
   const isVideoView = state.currentView === 'videos';
   const isAdmissionView = state.currentView === 'admissions';
+  const isParentsView = state.currentView === 'parents';
   const isTestView = state.currentView === 'tests';
 
   const sheetPill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="sheet"]');
@@ -769,6 +788,7 @@ function renderTests(tests) {
   if (fmsHeaderTitle) {
     if (isAdmissionView) fmsHeaderTitle.textContent = 'Admission FMS';
     else if (isVideoView) fmsHeaderTitle.textContent = 'Video FMS';
+    else if (isParentsView) fmsHeaderTitle.textContent = 'Parents FMS';
     else fmsHeaderTitle.textContent = 'Test FMS';
   }
 
@@ -776,6 +796,7 @@ function renderTests(tests) {
   if (addBtn) {
     if (isAdmissionView) addBtn.textContent = '+ Add Admission';
     else if (isVideoView) addBtn.textContent = '+ Add Video';
+    else if (isParentsView) addBtn.textContent = '+ Add Parents Checklist';
     else addBtn.textContent = '+ Add Test';
   }
 
@@ -785,6 +806,8 @@ function renderTests(tests) {
       fmsHeaderIcon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="17" y1="11" x2="23" y2="11"/></svg>';
     } else if (isVideoView) {
       fmsHeaderIcon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>';
+    } else if (isParentsView) {
+      fmsHeaderIcon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
     } else {
       fmsHeaderIcon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>';
     }
@@ -798,11 +821,13 @@ function renderTests(tests) {
     const isVideo = (test.type || '').toLowerCase() === 'video';
     const isBeforeFee = (test.type || '').toLowerCase() === 'beforefee';
     const isAfterFee = (test.type || '').toLowerCase() === 'afterfee';
+    const isParents = (test.type || '').toLowerCase() === 'parents';
 
     // 1. Partition by Main Navigation Tab
+    if (isParentsView && !isParents) return false;
     if (isAdmissionView && !isBeforeFee && !isAfterFee) return false;
     if (isVideoView && !isVideo) return false;
-    if (isTestView && (isVideo || isBeforeFee || isAfterFee)) return false;
+    if (isTestView && (isVideo || isBeforeFee || isAfterFee || isParents)) return false;
 
     // 2. Sub-tab Toolbar Filters
     const testStages = getTestStages(test);
@@ -1112,11 +1137,13 @@ window.setSettingsActiveTab = function (type) {
   const videoTab = $('settings-tab-video');
   const beforeFeeTab = $('settings-tab-beforefee');
   const afterFeeTab = $('settings-tab-afterfee');
+  const parentsTab = $('settings-tab-parents');
   if (sheetTab) sheetTab.classList.toggle('active', type === 'Sheet');
   if (appTab) appTab.classList.toggle('active', type === 'App');
   if (videoTab) videoTab.classList.toggle('active', type === 'Video');
   if (beforeFeeTab) beforeFeeTab.classList.toggle('active', type === 'BeforeFee');
   if (afterFeeTab) afterFeeTab.classList.toggle('active', type === 'AfterFee');
+  if (parentsTab) parentsTab.classList.toggle('active', type === 'Parents');
 
   renderTestSettingsRows();
 };
@@ -1133,6 +1160,7 @@ window.selectTypeSegment = function (type) {
     { id: 'type-segment-video', match: 'Video' },
     { id: 'type-segment-beforefee', match: 'BeforeFee' },
     { id: 'type-segment-afterfee', match: 'AfterFee' },
+    { id: 'type-segment-parents', match: 'Parents' },
   ];
 
   allSegments.forEach(({ id, match }) => {
@@ -4603,7 +4631,8 @@ function openAddTestModal() {
   // Set default type dynamically based on current view
   const isVideoView = state.currentView === 'videos';
   const isAdmissionView = state.currentView === 'admissions';
-  const defaultType = isAdmissionView ? 'BeforeFee' : (isVideoView ? 'Video' : 'Sheet');
+  const isParentsView = state.currentView === 'parents';
+  const defaultType = isParentsView ? 'Parents' : (isAdmissionView ? 'BeforeFee' : (isVideoView ? 'Video' : 'Sheet'));
   selectTypeSegment(defaultType);
 
   // Dynamic Modal Header and Form Groups based on view type
@@ -4619,8 +4648,15 @@ function openAddTestModal() {
   const videoSeg = $('type-segment-video');
   const beforeFeeSeg = $('type-segment-beforefee');
   const afterFeeSeg = $('type-segment-afterfee');
+  const parentsSeg = $('type-segment-parents');
 
-  if (isAdmissionView) {
+  if (isParentsView) {
+    if (modalTitle) modalTitle.textContent = 'Track Parents Checklist';
+    if (typeFormGroup) typeFormGroup.style.display = 'none'; // Hide type segmented control completely
+    if (submitBtn) submitBtn.textContent = 'Start Tracking Checklist';
+    if (nameLabel) nameLabel.textContent = 'Checklist Title';
+    if (nameInput) nameInput.placeholder = 'e.g., Student Rahul Kumar - Parents Checklist';
+  } else if (isAdmissionView) {
     if (modalTitle) modalTitle.textContent = 'Track New Admission';
     if (typeFormGroup) typeFormGroup.style.display = 'block'; // Show type segmented control for Admissions
     if (submitBtn) submitBtn.textContent = 'Start Tracking Admission';
@@ -4632,6 +4668,7 @@ function openAddTestModal() {
     if (videoSeg) videoSeg.style.display = 'none';
     if (beforeFeeSeg) beforeFeeSeg.style.display = 'block';
     if (afterFeeSeg) afterFeeSeg.style.display = 'block';
+    if (parentsSeg) parentsSeg.style.display = 'none';
   } else if (isVideoView) {
     if (modalTitle) modalTitle.textContent = 'Track New Video';
     if (typeFormGroup) typeFormGroup.style.display = 'none'; // Hide type segmented control completely
@@ -4650,6 +4687,7 @@ function openAddTestModal() {
     if (videoSeg) videoSeg.style.display = 'none';
     if (beforeFeeSeg) beforeFeeSeg.style.display = 'none';
     if (afterFeeSeg) afterFeeSeg.style.display = 'none';
+    if (parentsSeg) parentsSeg.style.display = 'none';
   }
 
   // Pre-populate individual stages with global blueprints
@@ -4898,16 +4936,18 @@ function handleEditTestDetailsModal(testId) {
   const isVideo = (test.type || '').toLowerCase() === 'video';
   const isBeforeFee = (test.type || '').toLowerCase() === 'beforefee';
   const isAfterFee = (test.type || '').toLowerCase() === 'afterfee';
+  const isParents = (test.type || '').toLowerCase() === 'parents';
   const isAdmission = isBeforeFee || isAfterFee;
 
   const typeFormGroup = $('test-type-form-group');
-  if (typeFormGroup) typeFormGroup.style.display = isVideo ? 'none' : 'block';
+  if (typeFormGroup) typeFormGroup.style.display = (isVideo || isParents) ? 'none' : 'block';
 
   const sheetSeg = $('type-segment-sheet');
   const appSeg = $('type-segment-app');
   const videoSeg = $('type-segment-video');
   const beforeFeeSeg = $('type-segment-beforefee');
   const afterFeeSeg = $('type-segment-afterfee');
+  const parentsSeg = $('type-segment-parents');
 
   if (isAdmission) {
     if (sheetSeg) sheetSeg.style.display = 'none';
@@ -4915,22 +4955,25 @@ function handleEditTestDetailsModal(testId) {
     if (videoSeg) videoSeg.style.display = 'none';
     if (beforeFeeSeg) beforeFeeSeg.style.display = 'block';
     if (afterFeeSeg) afterFeeSeg.style.display = 'block';
-  } else if (!isVideo) {
+    if (parentsSeg) parentsSeg.style.display = 'none';
+  } else if (!isVideo && !isParents) {
     if (sheetSeg) sheetSeg.style.display = 'block';
     if (appSeg) appSeg.style.display = 'block';
     if (videoSeg) videoSeg.style.display = 'none';
     if (beforeFeeSeg) beforeFeeSeg.style.display = 'none';
     if (afterFeeSeg) afterFeeSeg.style.display = 'none';
+    if (parentsSeg) parentsSeg.style.display = 'none';
   }
 
   const nameLabel = document.querySelector('label[for="test-form-name"]');
   if (nameLabel) {
     if (isAdmission) nameLabel.textContent = 'Student Name';
     else if (isVideo) nameLabel.textContent = 'Video Title';
+    else if (isParents) nameLabel.textContent = 'Checklist Title';
     else nameLabel.textContent = 'Test Name';
   }
 
-  $('add-test-modal').querySelector('h3').textContent = isAdmission ? 'Edit Admission Details' : (isVideo ? 'Edit Video Details' : 'Edit Test Details');
+  $('add-test-modal').querySelector('h3').textContent = isAdmission ? 'Edit Admission Details' : (isVideo ? 'Edit Video Details' : (isParents ? 'Edit Parents Checklist' : 'Edit Test Details'));
   $('add-test-modal').querySelector('button[type="submit"]').textContent = 'Save Changes';
 
   // Override form submit for edit mode
@@ -4980,8 +5023,8 @@ function handleEditTestDetailsModal(testId) {
 // Reset modal when closing
 function closeAddTestModal() {
   $('add-test-modal').style.display = 'none';
-  const defaultHeader = state.currentView === 'videos' ? 'Track New Video' : (state.currentView === 'admissions' ? 'Track New Admission' : 'Track New Test');
-  const defaultBtn = state.currentView === 'videos' ? 'Start Tracking Video' : (state.currentView === 'admissions' ? 'Start Tracking Admission' : 'Start Tracking');
+  const defaultHeader = state.currentView === 'videos' ? 'Track New Video' : (state.currentView === 'admissions' ? 'Track New Admission' : (state.currentView === 'parents' ? 'Track Parents Checklist' : 'Track New Test'));
+  const defaultBtn = state.currentView === 'videos' ? 'Start Tracking Video' : (state.currentView === 'admissions' ? 'Start Tracking Admission' : (state.currentView === 'parents' ? 'Start Tracking Checklist' : 'Start Tracking'));
   $('add-test-modal').querySelector('h3').textContent = defaultHeader;
   $('add-test-modal').querySelector('button[type="submit"]').textContent = defaultBtn;
   $('add-test-form').onsubmit = handleAddTestSubmit;

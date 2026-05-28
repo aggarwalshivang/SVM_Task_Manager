@@ -137,6 +137,7 @@
         <button class="nav-tab" id="tab-tests">Test FMS</button>
         <button class="nav-tab" id="tab-videos">Video FMS</button>
         <button class="nav-tab" id="tab-admissions">Admission FMS</button>
+        <button class="nav-tab" id="tab-parents">Parents FMS</button>
       </div>
 
       <div class="header-right">
@@ -631,6 +632,7 @@
             <button type="button" class="segment-btn" id="type-segment-video" onclick="selectTypeSegment('Video')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">🎬 Video</button>
             <button type="button" class="segment-btn" id="type-segment-beforefee" onclick="selectTypeSegment('BeforeFee')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">⏳ Before Fee</button>
             <button type="button" class="segment-btn" id="type-segment-afterfee" onclick="selectTypeSegment('AfterFee')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">💳 After Fee</button>
+            <button type="button" class="segment-btn" id="type-segment-parents" onclick="selectTypeSegment('Parents')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">👪 Parents</button>
           </div>
           <input type="hidden" id="test-form-type" value="Sheet">
         </div>
@@ -734,6 +736,7 @@
         <button class="tab-btn" id="settings-tab-video" onclick="setSettingsActiveTab('Video')" style="flex: 1; padding: 8px; font-weight: 600;">🎬 Video Pipeline</button>
         <button class="tab-btn" id="settings-tab-beforefee" onclick="setSettingsActiveTab('BeforeFee')" style="flex: 1; padding: 8px; font-weight: 600;">⏳ Before Fee</button>
         <button class="tab-btn" id="settings-tab-afterfee" onclick="setSettingsActiveTab('AfterFee')" style="flex: 1; padding: 8px; font-weight: 600;">💳 After Fee</button>
+        <button class="tab-btn" id="settings-tab-parents" onclick="setSettingsActiveTab('Parents')" style="flex: 1; padding: 8px; font-weight: 600;">👪 Parents FMS</button>
       </div>
       <div id="test-settings-list" style="max-height: 400px; overflow-y: auto; margin-bottom: var(--space-md); padding-right: 5px;">
         <!-- Settings rows will be rendered here -->

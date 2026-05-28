@@ -1795,11 +1795,12 @@ function handleGetTestSettings() {
   );
   const hasVideoStages = data.some(row => row[4] === 'Video');
   const hasAdmissionStages = data.some(row => row[4] === 'BeforeFee');
+  const hasParentsStages = data.some(row => row[4] === 'Parents');
   const hasOldStages = data.some(row =>
     row[1] === 'Receive Excel' || row[1] === 'Test Created' ||
     (row[4] === 'App' && !CANONICAL_APP_LABELS.includes(row[1]))
   );
-  if (data.length <= 1 || hasOldStages || !hasVideoStages || !hasAdmissionStages) {
+  if (data.length <= 1 || hasOldStages || !hasVideoStages || !hasAdmissionStages || !hasParentsStages) {
     // Clear and reseed with all canonical pipelines
     sheet.clearContents();
     sheet.getRange(1, 1, 1, 5).setValues([['StageId', 'Label', 'Offset', 'Doer', 'Type']]);
@@ -1849,7 +1850,17 @@ function handleGetTestSettings() {
       ['33', 'Add Student to Group',                         '8', 'Sidhi/Komal', 'AfterFee'],
       ['34', 'Send Biometric ID to SVM Group',               '9', 'Sidhi/Komal', 'AfterFee'],
       ['35', 'Create Dashboard',                            '10', 'Sidhi/Komal', 'AfterFee'],
-      ['36', 'Activate Class App',                          '11', 'Sidhi/Komal', 'AfterFee']
+      ['36', 'Activate Class App',                          '11', 'Sidhi/Komal', 'AfterFee'],
+
+      // ── Parents Pipeline (Guidelines) ──────────────────────
+      ['37', 'Check Performance in Maths & Science',         '1', 'Parents', 'Parents'],
+      ['38', 'Ensure Child Understands Concepts',            '2', 'Parents', 'Parents'],
+      ['39', 'Encourage NCERT Science & Maths Practice',     '3', 'Parents', 'Parents'],
+      ['40', 'Practice Upadhyay Regularly',                  '4', 'Parents', 'Parents'],
+      ['41', 'Watch Video Lectures for Doubt Solving',       '5', 'Parents', 'Parents'],
+      ['42', 'Monitor Mobile/Tablet Usage during Study',     '6', 'Parents', 'Parents'],
+      ['43', 'Discuss Daily Test Scores with Child',         '7', 'Parents', 'Parents'],
+      ['44', 'Avoid Copying, Focus on Practice & Matching',  '8', 'Parents', 'Parents']
     ];
     sheet.getRange(2, 1, defaults.length, 5).setValues(defaults);
     data = sheet.getDataRange().getValues();
