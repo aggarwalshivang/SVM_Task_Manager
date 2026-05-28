@@ -820,8 +820,11 @@ function renderTests(tests) {
   if (isParentsView) {
     if (toolbar) toolbar.style.display = 'none';
     if (filterTabs) filterTabs.style.display = 'none';
-    // Admin only can see settings for Parents FMS
-    if (settingsBtn) settingsBtn.style.display = state.userRole === 'admin' ? 'flex' : 'none';
+    // Admin and Coordinator can see settings for Parents FMS
+    if (settingsBtn) {
+      const allowed = state.userRole === 'admin' || state.userRole === 'coordinator' || state.userRole === 'process_coordinator';
+      settingsBtn.style.display = allowed ? 'flex' : 'none';
+    }
   } else {
     if (toolbar) toolbar.style.display = 'flex';
     if (filterTabs) filterTabs.style.display = 'flex';
@@ -1219,8 +1222,9 @@ $('btn-add-setting-row')?.addEventListener('click', addSettingRow);
 $('btn-save-test-settings')?.addEventListener('click', saveTestSettings);
 
 function openTestSettingsModal() {
-  if (state.userRole !== 'admin') {
-    showToast('Only admins can change settings.', 'error');
+  const allowed = state.userRole === 'admin' || state.userRole === 'coordinator' || state.userRole === 'process_coordinator';
+  if (!allowed) {
+    showToast('Only admins or coordinators can change settings.', 'error');
     return;
   }
 
