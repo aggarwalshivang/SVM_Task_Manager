@@ -701,7 +701,6 @@ function setActiveTab(id) {
 async function openTestTracker(viewType = 'tests') {
   state.currentView = viewType;
   const container = $('test-list-content');
-  container.innerHTML = '<div class="loading-spinner" style="margin: 3rem auto;"></div>';
 
   // Lock configuration to admin role only
   const isAdmin = state.userRole === 'admin';
@@ -709,6 +708,40 @@ async function openTestTracker(viewType = 'tests') {
   if (btnSettings) {
     btnSettings.style.display = isAdmin ? 'flex' : 'none';
   }
+
+  // SWR Caching: If we already have cached data, render it INSTANTLY without showing a spinner or waiting!
+  if (state.testSettings && state.testSettings.length > 0 && state.tests && state.tests.length > 0) {
+    sanitizeTestSettings();
+    renderTests(state.tests);
+
+    // Fetch in the background silently to keep it up to date, without blocking the UI or showing a spinner!
+    const oldSettingsStr = JSON.stringify(state.testSettings);
+    const oldTestsStr = JSON.stringify(state.tests);
+
+    Promise.all([
+      apiFetch('getTestSettings'),
+      apiFetch('getTests')
+    ]).then(([settingsRes, testsRes]) => {
+      const settingsChanged = settingsRes.success && oldSettingsStr !== JSON.stringify(settingsRes.data);
+      const testsChanged = testsRes.success && oldTestsStr !== JSON.stringify(testsRes.data);
+
+      if (settingsChanged || testsChanged) {
+        if (settingsRes.success) state.testSettings = settingsRes.data;
+        if (testsRes.success) state.tests = testsRes.data;
+        sanitizeTestSettings();
+        // Only re-render if we are still on an FMS view and the data actually changed!
+        const fmsViews = ['tests', 'videos', 'admissions', 'parents'];
+        if (fmsViews.includes(state.currentView)) {
+          renderTests(state.tests);
+        }
+      }
+    }).catch(err => console.error('Background refresh failed:', err));
+
+    return;
+  }
+
+  // If no cache, show spinner and fetch for the first time
+  container.innerHTML = '<div class="loading-spinner" style="margin: 3rem auto;"></div>';
 
   try {
     const [settingsRes, testsRes] = await Promise.all([
@@ -1941,6 +1974,46 @@ async function openDashboard() {
   const content = $('dashboard-content');
 
   if (container) container.style.display = 'block';
+
+  // SWR Caching: If we already have cached data, render it INSTANTLY without showing a spinner!
+  if (state.dashboardCache) {
+    const { scoresRes, teamRes, leavesRes, perfRes, healthRes, modRes } = state.dashboardCache;
+    renderDashboardWithRes(scoresRes, teamRes, leavesRes, perfRes, healthRes, modRes);
+
+    // Silently fetch fresh data in the background to detect updates
+    Promise.all([
+      apiFetch('getScores').catch(() => ({ success: true, data: [] })),
+      apiFetch('getTeam').catch(() => ({ success: true, data: [] })),
+      apiFetch('getLeaves').catch(() => ({ success: true, data: [] })),
+      apiFetch('getTeamPerformance').catch(() => ({ success: true, data: [] })),
+      (state.userRole === 'admin' || state.userRole === 'process_coordinator')
+        ? apiFetch('getWorkflowHealth').catch(() => ({ success: true, data: null }))
+        : Promise.resolve({ success: true, data: null }),
+      apiFetch('getPendingModifications').catch(() => ({ success: true, data: [] }))
+    ]).then(([scoresResNew, teamResNew, leavesResNew, perfResNew, healthResNew, modResNew]) => {
+      const oldCacheStr = JSON.stringify(state.dashboardCache);
+      const newCache = {
+        scoresRes: scoresResNew,
+        teamRes: teamResNew,
+        leavesRes: leavesResNew,
+        perfRes: perfResNew,
+        healthRes: healthResNew,
+        modRes: modResNew
+      };
+
+      // Only re-render if the fetched data actually changed!
+      if (oldCacheStr !== JSON.stringify(newCache)) {
+        state.dashboardCache = newCache;
+        if (state.currentView === 'dashboard') {
+          renderDashboardWithRes(scoresResNew, teamResNew, leavesResNew, perfResNew, healthResNew, modResNew);
+        }
+      }
+    }).catch(err => console.error('Dashboard background sync failed:', err));
+
+    return;
+  }
+
+  // If no cache, show spinner and fetch for the first time
   if (content) content.innerHTML = '<div class="loading-spinner" style="margin: 3rem auto;"></div>';
 
   try {
@@ -1955,54 +2028,53 @@ async function openDashboard() {
       apiFetch('getPendingModifications').catch(() => ({ success: true, data: [] }))
     ]);
 
-    const scoresMap = new Map();
-    if (scoresRes && scoresRes.data) {
-      scoresRes.data.forEach(s => scoresMap.set(s.name, s));
-    }
-
-    const mergedScores = [];
-    const pendingMembers = [];
-    if (teamRes && teamRes.data) {
-      teamRes.data.forEach(member => {
-        const isActive = member.active === true || String(member.active).toUpperCase().trim() === 'TRUE';
-        if (!isActive) {
-          pendingMembers.push(member);
-        } else {
-          const stats = scoresMap.get(member.name) || {
-            score: 0,
-            tasksAssigned: 0,
-            tasksCompleted: 0,
-            tasksLate: 0,
-            tasksMissed: 0
-          };
-          mergedScores.push({ ...member, ...stats });
-        }
-      });
-    }
-
-    console.log('Dashboard Data Fetched:', {
-      scores: mergedScores.length,
-      pendingMembers: pendingMembers.length,
-      leaves: leavesRes.data ? leavesRes.data.length : 0,
-      modifications: modRes.data ? modRes.data.length : 0
-    });
-
-    renderDashboard(mergedScores, pendingMembers, leavesRes.data || [], perfRes.data || [], healthRes.data, modRes.data || []);
-
-    // Update tab badge
-    const totalPending = (modRes.data ? modRes.data.length : 0) + pendingMembers.length + (leavesRes.data ? leavesRes.data.filter(l => l.status === 'pending').length : 0);
-    const teamBadge = $('team-badge');
-    if (teamBadge) {
-      if (totalPending > 0) {
-        teamBadge.style.display = 'block';
-        teamBadge.textContent = totalPending;
-      } else {
-        teamBadge.style.display = 'none';
-      }
-    }
+    state.dashboardCache = { scoresRes, teamRes, leavesRes, perfRes, healthRes, modRes };
+    renderDashboardWithRes(scoresRes, teamRes, leavesRes, perfRes, healthRes, modRes);
   } catch (err) {
     console.error('Dashboard error:', err);
     if (content) content.innerHTML = '<div class="empty-state">Failed to load dashboard data. Please try again.</div>';
+  }
+}
+
+// Helper function to process and render dashboard from raw responses
+function renderDashboardWithRes(scoresRes, teamRes, leavesRes, perfRes, healthRes, modRes) {
+  const scoresMap = new Map();
+  if (scoresRes && scoresRes.data) {
+    scoresRes.data.forEach(s => scoresMap.set(s.name, s));
+  }
+
+  const mergedScores = [];
+  const pendingMembers = [];
+  if (teamRes && teamRes.data) {
+    teamRes.data.forEach(member => {
+      const isActive = member.active === true || String(member.active).toUpperCase().trim() === 'TRUE';
+      if (!isActive) {
+        pendingMembers.push(member);
+      } else {
+        const stats = scoresMap.get(member.name) || {
+          score: 0,
+          tasksAssigned: 0,
+          tasksCompleted: 0,
+          tasksLate: 0,
+          tasksMissed: 0
+        };
+        mergedScores.push({ ...member, ...stats });
+      }
+    });
+  }
+
+  renderDashboard(mergedScores, pendingMembers, leavesRes.data || [], perfRes.data || [], healthRes.data, modRes.data || []);
+
+  // Update tab badge
+  const totalPending = (modRes.data ? modRes.data.length : 0) + pendingMembers.length + (leavesRes.data ? leavesRes.data.filter(l => l.status === 'pending').length : 0);
+  const teamBadge = $('team-badge');
+  if (teamBadge) {
+    if (totalPending > 0) {
+      teamBadge.style.display = 'block';
+      teamBadge.textContent = totalPending;
+    } else {
+      teamBadge.style.display = 'none';
+    }
   }
 }
 
