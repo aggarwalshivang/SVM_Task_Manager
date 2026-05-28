@@ -718,7 +718,7 @@ function getTestStages(test) {
 function renderTests(tests) {
   const container = $('test-list-content');
 
-  // Programmatically manage the sub-tab filter pills visibility depending on the active main tab
+  // Update toolbar filter tabs visibility depending on active main tab
   const isVideoView = state.currentView === 'videos';
   const sheetPill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="sheet"]');
   const appPill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="app"]');
@@ -728,10 +728,15 @@ function renderTests(tests) {
   if (appPill) appPill.style.display = isVideoView ? 'none' : 'inline-block';
   if (videoPill) videoPill.style.display = 'none'; // Separate main nav tab takes care of video now, hide this pill
 
-  // Dynamic header titles based on view type
+  // Dynamic header titles & add button label based on view type
   const fmsHeaderTitle = document.querySelector('.test-fms-title h2');
   if (fmsHeaderTitle) {
     fmsHeaderTitle.textContent = isVideoView ? 'Video FMS' : 'Test FMS';
+  }
+
+  const addBtn = $('btn-add-test');
+  if (addBtn) {
+    addBtn.textContent = isVideoView ? '+ Add Video' : '+ Add Test';
   }
 
   const fmsHeaderIcon = document.querySelector('.test-fms-title-icon');
@@ -4501,8 +4506,32 @@ function openAddTestModal() {
   $('test-form-avg').value = '';
 
   // Set default type dynamically based on current view
-  const defaultType = state.currentView === 'videos' ? 'Video' : 'Sheet';
+  const isVideoView = state.currentView === 'videos';
+  const defaultType = isVideoView ? 'Video' : 'Sheet';
   selectTypeSegment(defaultType);
+
+  // Dynamic Modal Header and Form Groups based on view type
+  const modalTitle = $('add-test-modal-title');
+  const typeFormGroup = $('test-type-form-group');
+  const submitBtn = $('add-test-modal')?.querySelector('button[type="submit"]');
+
+  if (isVideoView) {
+    if (modalTitle) modalTitle.textContent = 'Track New Video';
+    if (typeFormGroup) typeFormGroup.style.display = 'none'; // Hide type segmented control completely
+    if (submitBtn) submitBtn.textContent = 'Start Tracking Video';
+  } else {
+    if (modalTitle) modalTitle.textContent = 'Track New Test';
+    if (typeFormGroup) typeFormGroup.style.display = 'block'; // Show type segmented control
+    if (submitBtn) submitBtn.textContent = 'Start Tracking';
+
+    // Under Test FMS, hide the Video option from the segmented control selector
+    const videoSegmentBtn = $('type-segment-video');
+    if (videoSegmentBtn) videoSegmentBtn.style.display = 'none';
+    const sheetSegmentBtn = $('type-segment-sheet');
+    if (sheetSegmentBtn) sheetSegmentBtn.style.display = 'block';
+    const appSegmentBtn = $('type-segment-app');
+    if (appSegmentBtn) appSegmentBtn.style.display = 'block';
+  }
 
   // Pre-populate individual stages with global blueprints
   const blueprint = (state.testSettings || []).filter(s => s.type === defaultType);
@@ -4747,7 +4776,21 @@ function handleEditTestDetailsModal(testId) {
   currentFormStages = getTestStages(test);
   renderIndividualFormStages();
 
-  $('add-test-modal').querySelector('h3').textContent = 'Edit Test Details';
+  const isVideo = (test.type || '').toLowerCase() === 'video';
+  const typeFormGroup = $('test-type-form-group');
+  if (typeFormGroup) typeFormGroup.style.display = isVideo ? 'none' : 'block';
+
+  if (!isVideo) {
+    // Hide Video segment option from segment buttons when editing a test
+    const videoSegmentBtn = $('type-segment-video');
+    if (videoSegmentBtn) videoSegmentBtn.style.display = 'none';
+    const sheetSegmentBtn = $('type-segment-sheet');
+    if (sheetSegmentBtn) sheetSegmentBtn.style.display = 'block';
+    const appSegmentBtn = $('type-segment-app');
+    if (appSegmentBtn) appSegmentBtn.style.display = 'block';
+  }
+
+  $('add-test-modal').querySelector('h3').textContent = isVideo ? 'Edit Video Details' : 'Edit Test Details';
   $('add-test-modal').querySelector('button[type="submit"]').textContent = 'Save Changes';
 
   // Override form submit for edit mode
@@ -4797,8 +4840,10 @@ function handleEditTestDetailsModal(testId) {
 // Reset modal when closing
 function closeAddTestModal() {
   $('add-test-modal').style.display = 'none';
-  $('add-test-modal').querySelector('h3').textContent = 'Track New Test';
-  $('add-test-modal').querySelector('button[type="submit"]').textContent = 'Start Tracking';
+  const defaultHeader = state.currentView === 'videos' ? 'Track New Video' : 'Track New Test';
+  const defaultBtn = state.currentView === 'videos' ? 'Start Tracking Video' : 'Start Tracking';
+  $('add-test-modal').querySelector('h3').textContent = defaultHeader;
+  $('add-test-modal').querySelector('button[type="submit"]').textContent = defaultBtn;
   $('add-test-form').onsubmit = handleAddTestSubmit;
 }
 

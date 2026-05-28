@@ -615,12 +615,12 @@
   <div class="modal-overlay" id="add-test-modal" style="display:none;">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>Track New Test</h3>
+        <h3 id="add-test-modal-title">Track New Test</h3>
         <button class="modal-close" id="add-test-close-btn" aria-label="Close">✕</button>
       </div>
       <form id="add-test-form">
         <!-- Test Type Segmented Control -->
-        <div class="form-group" style="margin-bottom: var(--space-md);">
+        <div class="form-group" id="test-type-form-group" style="margin-bottom: var(--space-md);">
           <label style="font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Test Type</label>
           <div class="segmented-control" style="display: flex; background: rgba(255,255,255,0.04); padding: 4px; border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
             <button type="button" class="segment-btn active" id="type-segment-sheet" onclick="selectTypeSegment('Sheet')" style="flex: 1; padding: 10px; border: none; background: var(--accent-purple); color: #ffffff; box-shadow: var(--shadow-glow-purple); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">📄 Sheet Test</button>
