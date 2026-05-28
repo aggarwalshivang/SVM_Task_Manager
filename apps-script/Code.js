@@ -1789,11 +1789,6 @@ function handleGetTestSettings() {
   // Migrate if empty OR if old/incorrect stage names are present OR if Video pipeline is missing
   const CANONICAL_APP_LABELS = ['Create Test', 'Enter Score', 'Save Score', 'Discussion', 'Send to Parents'];
   const hasVideoStages = data.some(row => row[4] === 'Video');
-  const hasOldStages = data.some(row =>
-    row[1] === 'Receive Excel' || row[1] === 'Test Created' ||
-    (row[4] === 'App' && !CANONICAL_APP_LABELS.includes(row[1]))
-  );
-  const hasVideoStages = data.some(row => row[4] === 'Video');
   const hasAdmissionStages = data.some(row => row[4] === 'BeforeFee');
   const hasParentsStages = data.some(row => row[4] === 'Parents');
   const hasOldStages = data.some(row =>
