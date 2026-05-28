@@ -1156,10 +1156,10 @@ function renderTests(tests) {
                 <div class="step-details">
                   <div class="step-main-info">
                     <div class="step-label">${stage.label || 'Step'}</div>
-                    <div class="step-date">Planned: ${formatDate(plannedDate)}</div>
+                    ${(test.type !== 'BeforeFee' && test.type !== 'AfterFee') ? `<div class="step-date">Planned: ${formatDate(plannedDate)}</div>` : ''}
                   </div>
                   <div class="step-meta-info">
-                    <div><strong>Assigned:</strong> ${stage.doer || 'Unassigned'}</div>
+                    ${(test.type !== 'BeforeFee' && test.type !== 'AfterFee') ? `<div><strong>Assigned:</strong> ${stage.doer || 'Unassigned'}</div>` : ''}
                     ${stage.status === 'done' ? `
                       <div><strong>Done by:</strong> ${stage.doneBy || 'System'}</div>
                       <div><strong>At:</strong> ${stage.doneAt || 'N/A'}</div>
@@ -1448,11 +1448,11 @@ function renderTestSettingsRows() {
         <label>Label</label>
         <input type="text" class="setting-label" value="${s.label}">
       </div>
-      <div class="form-group" style="flex: 1; ${activeType === 'Parents' ? 'display: none;' : ''}">
+      <div class="form-group" style="flex: 1; ${(activeType === 'Parents' || activeType === 'BeforeFee' || activeType === 'AfterFee') ? 'display: none;' : ''}">
         <label>Offset (Days)</label>
         <input type="number" class="setting-offset" value="${s.offset}">
       </div>
-      <div class="form-group" style="flex: 1.5; ${activeType === 'Parents' ? 'display: none;' : ''}">
+      <div class="form-group" style="flex: 1.5; ${(activeType === 'Parents' || activeType === 'BeforeFee' || activeType === 'AfterFee') ? 'display: none;' : ''}">
         <label>Doer</label>
         <input type="text" class="setting-doer" value="${s.doer}">
       </div>

@@ -2590,6 +2590,58 @@ select option:hover {
   border-bottom-color: var(--accent-purple);
   text-shadow: 0 0 10px rgba(139, 92, 246, 0.15);
 }
+
+/* Settings Modal Premium Segmented Tabs */
+.test-settings-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.02) !important;
+  padding: 4px !important;
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid var(--border-glass) !important;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.test-settings-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.test-settings-tabs .tab-btn {
+  flex: 1;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: var(--text-muted) !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  padding: 10px 14px !important;
+  border-radius: var(--radius-md) !important;
+  cursor: pointer !important;
+  transition: all var(--transition-base) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  font-family: inherit !important;
+  box-shadow: none !important;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.test-settings-tabs .tab-btn:hover {
+  color: var(--text-normal) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.test-settings-tabs .tab-btn.active {
+  background: var(--gradient-purple) !important;
+  color: white !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: var(--shadow-glow-purple) !important;
+  font-weight: 700 !important;
+}
 /* =============================================
    Test Cards
    ============================================= */
