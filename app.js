@@ -1315,28 +1315,53 @@ function openTestSettingsModal() {
   if (afterFeeTab) afterFeeTab.classList.toggle('active', state.activeSettingsTab === 'AfterFee');
   if (parentsTab) parentsTab.classList.toggle('active', state.activeSettingsTab === 'Parents');
 
-  // Update FMS settings modal title dynamically
+  // Update FMS settings modal title and description dynamically
+  updateTestSettingsModalTitleAndDesc();
+
+  renderTestSettingsRows();
+  $('test-settings-modal').style.display = 'flex';
+}
+
+function updateTestSettingsModalTitleAndDesc() {
   const titleEl = document.querySelector('#test-settings-modal .modal-header h3');
+  const descEl = document.querySelector('#test-settings-modal .modal-body-text');
+  const activeTab = state.activeSettingsTab || 'Sheet';
+
   if (titleEl) {
-    if (state.activeSettingsTab === 'Parents') {
+    if (activeTab === 'Parents') {
       titleEl.textContent = '👪 Parents FMS Settings';
-    } else if (state.activeSettingsTab === 'Video') {
+    } else if (activeTab === 'Video') {
       titleEl.textContent = '🎬 Video FMS Settings';
-    } else if (state.activeSettingsTab === 'BeforeFee') {
+    } else if (activeTab === 'BeforeFee') {
       titleEl.textContent = '⏳ Admission (Before Fee) Settings';
-    } else if (state.activeSettingsTab === 'AfterFee') {
+    } else if (activeTab === 'AfterFee') {
       titleEl.textContent = '💳 Admission (After Fee) Settings';
-    } else if (state.activeSettingsTab === 'Sheet') {
+    } else if (activeTab === 'Sheet') {
       titleEl.textContent = '📄 Sheet Test FMS Settings';
-    } else if (state.activeSettingsTab === 'App') {
+    } else if (activeTab === 'App') {
       titleEl.textContent = '📱 App Test FMS Settings';
     } else {
       titleEl.textContent = 'FMS Pipeline Settings';
     }
   }
 
-  renderTestSettingsRows();
-  $('test-settings-modal').style.display = 'flex';
+  if (descEl) {
+    if (activeTab === 'Parents') {
+      descEl.textContent = 'Configure the checklist guidelines for the Parents FMS. These settings will determine the checklist items displayed under the Parents Guidelines tab.';
+    } else if (activeTab === 'Video') {
+      descEl.textContent = 'Configure the stages for the Video FMS pipeline. These templates will initialize stages for newly tracked videos.';
+    } else if (activeTab === 'BeforeFee') {
+      descEl.textContent = 'Configure the pre-payment stages for the Admission FMS pipeline. These templates will initialize stages for newly tracked admissions.';
+    } else if (activeTab === 'AfterFee') {
+      descEl.textContent = 'Configure the post-payment stages for the Admission FMS pipeline. These templates will initialize stages for newly tracked admissions.';
+    } else if (activeTab === 'Sheet') {
+      descEl.textContent = 'Configure the stages for the Sheet Test FMS pipeline. These templates will initialize stages for newly tracked academic tests.';
+    } else if (activeTab === 'App') {
+      descEl.textContent = 'Configure the stages for the App Test FMS pipeline. These templates will initialize stages for newly tracked academic tests.';
+    } else {
+      descEl.textContent = 'Configure the template stages for the FMS pipelines. These templates will initialize stages for newly tracked records.';
+    }
+  }
 }
 
 window.setSettingsActiveTab = function (type) {
@@ -1356,6 +1381,9 @@ window.setSettingsActiveTab = function (type) {
   if (beforeFeeTab) beforeFeeTab.classList.toggle('active', type === 'BeforeFee');
   if (afterFeeTab) afterFeeTab.classList.toggle('active', type === 'AfterFee');
   if (parentsTab) parentsTab.classList.toggle('active', type === 'Parents');
+
+  // Update title and description for the switched tab
+  updateTestSettingsModalTitleAndDesc();
 
   renderTestSettingsRows();
 };
