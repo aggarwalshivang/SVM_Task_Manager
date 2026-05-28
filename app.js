@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   //  REPLACE THIS with your deployed Apps Script Web App URL
-  API_URL: 'https://script.google.com/macros/s/AKfycbzPCoIl9kBNfApFYjvpFFejrwUlgLgF9H78zlMu_dJawdjzSxadt7u-dpJ_4xyLv9xq/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbzKWuUHc_xBAKQs6ze0EpYGwVGNz4jH8xMkhi1bTmapQ7MsT1L1jeoVdfDeZ2CVB5J6/exec',
 
   // Retry settings
   MAX_RETRIES: 2,
@@ -126,20 +126,20 @@ window.lockPipelineNow = function () {
 // =============================================
 const PIPELINE_DEFAULTS = {
   Sheet: [
-    { id: 1,  label: 'Create Test',        offset: 2,  doer: 'All',    type: 'Sheet' },
-    { id: 2,  label: 'Sheet Checking',     offset: 4,  doer: 'All',    type: 'Sheet' },
-    { id: 3,  label: 'Enter Score',        offset: 6,  doer: 'Sidhi',  type: 'Sheet' },
-    { id: 4,  label: 'Sheet Distribution', offset: 8,  doer: 'All',    type: 'Sheet' },
-    { id: 5,  label: 'Discussion',         offset: 10, doer: 'Shivang',type: 'Sheet' },
-    { id: 6,  label: 'Save Score',         offset: 12, doer: 'Sidhi',  type: 'Sheet' },
-    { id: 7,  label: 'Send to Parents',    offset: 14, doer: 'Komal',  type: 'Sheet' },
+    { id: 1, label: 'Create Test', offset: 2, doer: 'All', type: 'Sheet' },
+    { id: 2, label: 'Sheet Checking', offset: 4, doer: 'All', type: 'Sheet' },
+    { id: 3, label: 'Enter Score', offset: 6, doer: 'Sidhi', type: 'Sheet' },
+    { id: 4, label: 'Sheet Distribution', offset: 8, doer: 'All', type: 'Sheet' },
+    { id: 5, label: 'Discussion', offset: 10, doer: 'Shivang', type: 'Sheet' },
+    { id: 6, label: 'Save Score', offset: 12, doer: 'Sidhi', type: 'Sheet' },
+    { id: 7, label: 'Send to Parents', offset: 14, doer: 'Komal', type: 'Sheet' },
   ],
   App: [
-    { id: 8,  label: 'Create Test',     offset: 2,  doer: 'All',    type: 'App' },
-    { id: 9,  label: 'Enter Score',     offset: 4,  doer: 'Sidhi',  type: 'App' },
-    { id: 10, label: 'Save Score',      offset: 6,  doer: 'Sidhi',  type: 'App' },
-    { id: 11, label: 'Discussion',      offset: 8,  doer: 'Shivang',type: 'App' },
-    { id: 12, label: 'Send to Parents', offset: 10, doer: 'Komal',  type: 'App' },
+    { id: 8, label: 'Create Test', offset: 2, doer: 'All', type: 'App' },
+    { id: 9, label: 'Enter Score', offset: 4, doer: 'Sidhi', type: 'App' },
+    { id: 10, label: 'Save Score', offset: 6, doer: 'Sidhi', type: 'App' },
+    { id: 11, label: 'Discussion', offset: 8, doer: 'Shivang', type: 'App' },
+    { id: 12, label: 'Send to Parents', offset: 10, doer: 'Komal', type: 'App' },
   ]
 };
 
@@ -4294,7 +4294,7 @@ function renderIndividualFormStages() {
     notice.innerHTML = `
       <div style="display:flex; align-items:center; gap:6px; font-size:0.75rem; font-weight:600; color:var(--accent-emerald);">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        Pipeline unlocked — <span id="pipeline-unlock-countdown">${mins}:${secs.toString().padStart(2,'0')}</span> remaining
+        Pipeline unlocked — <span id="pipeline-unlock-countdown">${mins}:${secs.toString().padStart(2, '0')}</span> remaining
       </div>
       <button type="button" onclick="lockPipelineNow()" style="font-size:0.7rem; padding:3px 8px; border:1px solid rgba(16,185,129,0.4); border-radius:4px; background:none; color:var(--accent-emerald); cursor:pointer; font-weight:600;">🔒 Lock Now</button>
     `;
