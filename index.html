@@ -288,6 +288,7 @@
         <button class="tab-btn" data-filter="complete" onclick="setTestFmsFilter('complete')">✅ Completed</button>
         <button class="tab-btn" data-filter="sheet" onclick="setTestFmsFilter('sheet')">📄 Sheet</button>
         <button class="tab-btn" data-filter="app" onclick="setTestFmsFilter('app')">📱 App</button>
+        <button class="tab-btn" data-filter="video" onclick="setTestFmsFilter('video')">🎬 Video</button>
       </div>
 
       <div id="test-list-content" class="dashboard-content" style="padding-top:0;">
@@ -623,6 +624,7 @@
           <div class="segmented-control" style="display: flex; background: rgba(255,255,255,0.04); padding: 4px; border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
             <button type="button" class="segment-btn active" id="type-segment-sheet" onclick="selectTypeSegment('Sheet')" style="flex: 1; padding: 10px; border: none; background: var(--accent-purple); color: #ffffff; box-shadow: var(--shadow-glow-purple); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">📄 Sheet Test</button>
             <button type="button" class="segment-btn" id="type-segment-app" onclick="selectTypeSegment('App')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">📱 App Test</button>
+            <button type="button" class="segment-btn" id="type-segment-video" onclick="selectTypeSegment('Video')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">🎬 Video</button>
           </div>
           <input type="hidden" id="test-form-type" value="Sheet">
         </div>
@@ -719,10 +721,11 @@
         <h3>Test FMS Settings</h3>
         <button class="modal-close" id="test-settings-close-btn">✕</button>
       </div>
-      <p class="modal-body-text">Configure the stages for the Sheet and App Test FMS pipelines. These templates will initialize stages for newly tracked tests.</p>
+      <p class="modal-body-text">Configure the stages for the Sheet, App, and Video FMS pipelines. These templates will initialize stages for newly tracked tests.</p>
       <div class="test-settings-tabs" style="display: flex; gap: 10px; margin-bottom: 15px;">
         <button class="tab-btn active" id="settings-tab-sheet" onclick="setSettingsActiveTab('Sheet')" style="flex: 1; padding: 8px; font-weight: 600;">📄 Sheet Pipeline</button>
         <button class="tab-btn" id="settings-tab-app" onclick="setSettingsActiveTab('App')" style="flex: 1; padding: 8px; font-weight: 600;">📱 App Pipeline</button>
+        <button class="tab-btn" id="settings-tab-video" onclick="setSettingsActiveTab('Video')" style="flex: 1; padding: 8px; font-weight: 600;">🎬 Video Pipeline</button>
       </div>
       <div id="test-settings-list" style="max-height: 400px; overflow-y: auto; margin-bottom: var(--space-md); padding-right: 5px;">
         <!-- Settings rows will be rendered here -->

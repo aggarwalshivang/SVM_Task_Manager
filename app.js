@@ -140,6 +140,15 @@ const PIPELINE_DEFAULTS = {
     { id: 10, label: 'Save Score', offset: 6, doer: 'Sidhi', type: 'App' },
     { id: 11, label: 'Discussion', offset: 8, doer: 'Shivang', type: 'App' },
     { id: 12, label: 'Send to Parents', offset: 10, doer: 'Komal', type: 'App' },
+  ],
+  Video: [
+    { id: 13, label: 'Script Creation', offset: 1, doer: 'Komal', type: 'Video' },
+    { id: 14, label: 'Shoot Planning & Recording', offset: 2, doer: 'Komal', type: 'Video' },
+    { id: 15, label: 'Send to Editor', offset: 5, doer: 'Komal', type: 'Video' },
+    { id: 16, label: 'Review Edited Video', offset: 6, doer: 'Komal', type: 'Video' },
+    { id: 17, label: 'Receive Final Edited Video', offset: 7, doer: 'Komal', type: 'Video' },
+    { id: 18, label: 'Instagram & Facebook Posting', offset: 8, doer: 'Sidhi', type: 'Video' },
+    { id: 19, label: 'YouTube Posting', offset: 9, doer: 'Komal', type: 'Video' },
   ]
 };
 
@@ -150,23 +159,19 @@ const PIPELINE_DEFAULTS = {
  * - Missing stages are added; extra stages are left as-is (admin additions).
  */
 function sanitizeTestSettings() {
-  ['Sheet', 'App'].forEach(type => {
+  ['Sheet', 'App', 'Video'].forEach(type => {
     const canonical = PIPELINE_DEFAULTS[type];
     const canonicalLabels = canonical.map(s => s.label);
-    // Get current settings for this type
     const current = (state.testSettings || []).filter(s => s.type === type);
-    // Check if current is valid: same count and all canonical labels present
     const currentLabels = current.map(s => s.label);
     const isValid = canonical.length === current.length &&
       canonicalLabels.every(l => currentLabels.includes(l));
 
     if (!isValid) {
-      // Replace with canonical, preserving any matching offset values from the API
       const repaired = canonical.map(def => {
         const existing = current.find(s => s.label === def.label);
         return { ...def, offset: existing ? existing.offset : def.offset };
       });
-      // Swap out old stages for this type
       state.testSettings = [
         ...(state.testSettings || []).filter(s => s.type !== type),
         ...repaired
@@ -719,6 +724,7 @@ function renderTests(tests) {
     if (filter === 'progress' && isCompleted) return false;
     if (filter === 'sheet' && (test.type || '').toLowerCase() !== 'sheet') return false;
     if (filter === 'app' && (test.type || '').toLowerCase() !== 'app') return false;
+    if (filter === 'video' && (test.type || '').toLowerCase() !== 'video') return false;
 
     // 2. Search Query Filter
     if (searchQuery) {
@@ -1012,8 +1018,10 @@ window.setSettingsActiveTab = function (type) {
   // Update tab classes
   const sheetTab = $('settings-tab-sheet');
   const appTab = $('settings-tab-app');
+  const videoTab = $('settings-tab-video');
   if (sheetTab) sheetTab.classList.toggle('active', type === 'Sheet');
   if (appTab) appTab.classList.toggle('active', type === 'App');
+  if (videoTab) videoTab.classList.toggle('active', type === 'Video');
 
   renderTestSettingsRows();
 };
@@ -1023,34 +1031,30 @@ window.selectTypeSegment = function (type) {
   if (!input) return;
   input.value = type;
 
-  // Toggle visual states
-  const sheetBtn = document.getElementById('type-segment-sheet');
-  const appBtn = document.getElementById('type-segment-app');
-  if (sheetBtn && appBtn) {
-    if (type === 'Sheet') {
-      sheetBtn.classList.add('active');
-      sheetBtn.style.background = 'var(--accent-purple)';
-      sheetBtn.style.color = '#ffffff';
-      sheetBtn.style.boxShadow = 'var(--shadow-glow-purple)';
+  // All segment buttons
+  const allSegments = [
+    { id: 'type-segment-sheet', match: 'Sheet' },
+    { id: 'type-segment-app',   match: 'App' },
+    { id: 'type-segment-video', match: 'Video' },
+  ];
 
-      appBtn.classList.remove('active');
-      appBtn.style.background = 'none';
-      appBtn.style.color = 'var(--text-muted)';
-      appBtn.style.boxShadow = 'none';
+  allSegments.forEach(({ id, match }) => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    if (match === type) {
+      btn.classList.add('active');
+      btn.style.background = 'var(--accent-purple)';
+      btn.style.color = '#ffffff';
+      btn.style.boxShadow = 'var(--shadow-glow-purple)';
     } else {
-      appBtn.classList.add('active');
-      appBtn.style.background = 'var(--accent-purple)';
-      appBtn.style.color = '#ffffff';
-      appBtn.style.boxShadow = 'var(--shadow-glow-purple)';
-
-      sheetBtn.classList.remove('active');
-      sheetBtn.style.background = 'none';
-      sheetBtn.style.color = 'var(--text-muted)';
-      sheetBtn.style.boxShadow = 'none';
+      btn.classList.remove('active');
+      btn.style.background = 'none';
+      btn.style.color = 'var(--text-muted)';
+      btn.style.boxShadow = 'none';
     }
-  }
+  });
 
-  // Trigger change event manually so current listeners for #test-form-type react!
+  // Trigger change event so pipeline stages reload
   input.dispatchEvent(new Event('change'));
 };
 
