@@ -1551,7 +1551,9 @@ function renderTestSettingsRows() {
       </div>
       <div class="form-group" style="flex: 1.5; ${(activeType === 'Parents' || activeType === 'BeforeFee' || activeType === 'AfterFee') ? 'display: none;' : ''}">
         <label>Doer</label>
-        <input type="text" class="setting-doer" value="${s.doer}">
+        <select class="setting-doer" style="width:100%; padding:6px 8px; font-size:0.8rem; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:var(--text-primary); cursor:pointer;">
+          ${getDoerDropdownOptions(s.doer)}
+        </select>
       </div>
       <button class="btn-ghost" onclick="removeSettingRow(${idx})" style="padding: 10px; color: var(--accent-red); margin-left: 5px;">✕</button>
     </div>
@@ -4927,6 +4929,29 @@ document.addEventListener('click', e => {
 // Global states for individual stages configuration inside the modal
 let currentFormStages = [];
 
+/**
+ * Returns HTML options for a "Doer" (Assigned To) select dropdown.
+ * Populates with "Unassigned", "All", and all names from state.teamMembers.
+ * If the current value is not in state.teamMembers, it is preserved as an option.
+ */
+function getDoerDropdownOptions(currentDoer) {
+  const names = (state.teamMembers || []).map(m => m.name);
+  const options = [];
+  
+  options.push(`<option value=""${!currentDoer ? ' selected' : ''}>Unassigned</option>`);
+  options.push(`<option value="All"${currentDoer === 'All' ? ' selected' : ''}>All</option>`);
+  
+  (state.teamMembers || []).forEach(m => {
+    options.push(`<option value="${m.name}"${currentDoer === m.name ? ' selected' : ''}>${m.name}</option>`);
+  });
+  
+  if (currentDoer && currentDoer !== 'All' && !names.includes(currentDoer)) {
+    options.push(`<option value="${currentDoer}" selected>${currentDoer}</option>`);
+  }
+  
+  return options.join('');
+}
+
 function renderIndividualFormStages() {
   const container = $('individual-test-stages-list');
   if (!container) return;
@@ -4998,12 +5023,14 @@ function renderIndividualFormStages() {
                background:rgba(255,255,255,0.04);
                border:1px solid var(--accent-purple); border-radius:4px;
                color:var(--text-primary); ${isParents ? 'display: none;' : ''}" title="Offset days — always editable">
-      <input type="text" class="form-stage-doer" value="${s.doer || ''}" ${canEdit ? '' : 'readonly disabled'}
+      <select class="form-stage-doer"
         style="flex:1.5; min-width:0; padding:6px 8px; font-size:0.8rem;
-               background:${canEdit ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)'};
+               background:rgba(255,255,255,0.05);
                border:1px solid var(--border-glass); border-radius:4px;
-               color:${canEdit ? 'var(--text-primary)' : 'var(--text-muted)'};
-               cursor:${canEdit ? 'text' : 'not-allowed'}; ${isParents ? 'display: none;' : ''}" placeholder="Assigned to">
+               color:var(--text-primary);
+               cursor:pointer; ${isParents ? 'display: none;' : ''}">
+        ${getDoerDropdownOptions(s.doer)}
+      </select>
       ${isAdmin ? `<button type="button" onclick="removeIndividualTestStageRow(${idx})" style="flex-shrink:0; background:none; border:none; color:var(--accent-red); cursor:pointer; font-size:1rem; line-height:1; padding:2px 4px;">✕</button>` : ''}
     </div>
   `).join('');
@@ -5310,7 +5337,7 @@ document.addEventListener('click', function (e) {
 });
 
 $('add-test-close-btn')?.addEventListener('click', closeAddTestModal);
-$('add-test-form')?.addEventListener('submit', handleAddTestSubmit);
+if ($('add-test-form')) $('add-test-form').onsubmit = handleAddTestSubmit;
 $('test-form-type')?.addEventListener('change', (e) => {
   const selectedType = e.target.value; // 'Sheet' or 'App'
   const blueprint = (state.testSettings || []).filter(s => s.type === selectedType);
