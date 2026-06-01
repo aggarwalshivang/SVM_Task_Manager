@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   // Apps Script URL — kept for email/AI/scoring triggers and Sheet sync
-  API_URL: 'https://script.google.com/macros/s/AKfycbz7DXp_lIuFL2wG5_t_GgGPL0giAkIO01vq99XpiYT_eBow9e2lfoEDqFUeCU6Tk7E8/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbygVjr3gtJUkUrxsGcLwqq1en4S-7YiNljeviu4XIe016HQZzY_t8fzdFyecRdZpEZp/exec',
 
   // Supabase — PRIMARY data store
   SUPABASE_URL: 'https://nslhzkthcgjyqlejlrxk.supabase.co',
@@ -892,6 +892,9 @@ function closeCustomFmsBuilderModal() {
   if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
 }
 
+// Tracks the list of custom field definitions for the blueprint being created
+let _fmsBlueprintFields = [];
+
 function openCustomFmsCreatorSection() {
   $('fms-blueprint-form-section').style.display = 'block';
   $('fms-blueprint-form').reset();
@@ -900,11 +903,103 @@ function openCustomFmsCreatorSection() {
   $('fms-bp-offsets').checked = true;
   $('fms-bp-marks').checked = false;
   $('fms-bp-scoring').checked = false;
-  
+
+  // Reset scope to Dependent
+  const depRadio = $('fms-bp-scope-dependent');
+  if (depRadio) depRadio.checked = true;
+  updateScopeLabels();
+
+  // Reset custom fields
+  _fmsBlueprintFields = [];
+  renderBlueprintFieldRows();
+
+  // Bind scope radio visual update
+  document.querySelectorAll('input[name="fms-bp-scope"]').forEach(r => {
+    r.onchange = updateScopeLabels;
+  });
+
+  // Bind add-field button
+  const addFieldBtn = $('btn-add-fms-field');
+  if (addFieldBtn) addFieldBtn.onclick = addBlueprintFieldRow;
+
   document.querySelectorAll('input[name="fms-bp-roles"]').forEach(cb => {
     if (cb.value !== 'admin') cb.checked = cb.value !== 'member';
   });
 }
+
+function updateScopeLabels() {
+  const isDep = $('fms-bp-scope-dependent') && $('fms-bp-scope-dependent').checked;
+  const depLabel = $('fms-scope-dependent-label');
+  const indLabel = $('fms-scope-independent-label');
+  if (depLabel) {
+    depLabel.style.border = isDep ? '2px solid var(--accent-purple)' : '2px solid var(--border-glass)';
+    depLabel.style.background = isDep ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.015)';
+  }
+  if (indLabel) {
+    indLabel.style.border = isDep ? '2px solid var(--border-glass)' : '2px solid var(--accent-amber)';
+    indLabel.style.background = isDep ? 'rgba(255,255,255,0.015)' : 'rgba(245,158,11,0.08)';
+  }
+}
+
+/** Adds a new empty field definition row to the blueprint field list */
+function addBlueprintFieldRow(existingField) {
+  const id = existingField ? existingField.id : ('field_' + Date.now());
+  const label = existingField ? existingField.label : '';
+  const type = existingField ? existingField.type : 'text';
+  const required = existingField ? existingField.required : false;
+  const options = existingField ? (existingField.options || '') : '';
+
+  _fmsBlueprintFields.push({ id, label, type, required, options });
+  renderBlueprintFieldRows();
+}
+
+/** Re-renders all field-builder rows from `_fmsBlueprintFields` */
+function renderBlueprintFieldRows() {
+  const list = $('fms-custom-fields-list');
+  const empty = $('fms-custom-fields-empty');
+  if (!list) return;
+
+  if (_fmsBlueprintFields.length === 0) {
+    list.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  list.innerHTML = _fmsBlueprintFields.map((f, idx) => `
+    <div style="display:grid;grid-template-columns:1fr 110px auto auto;gap:8px;align-items:center;padding:10px 12px;background:rgba(255,255,255,0.02);border:1px solid var(--border-glass);border-radius:var(--radius-md);" data-field-idx="${idx}">
+      <input type="text" class="fms-field-label" placeholder="Field label (e.g. Student Name)" value="${f.label.replace(/"/g, '&quot;')}" oninput="updateBlueprintField(${idx},'label',this.value)" style="background:rgba(255,255,255,0.04);border:1px solid var(--border-glass);border-radius:var(--radius-sm);padding:7px 10px;font-size:0.82rem;color:var(--text-primary);width:100%;">
+      <select class="fms-field-type" onchange="updateBlueprintField(${idx},'type',this.value)" style="background:rgba(255,255,255,0.04);border:1px solid var(--border-glass);border-radius:var(--radius-sm);padding:7px 8px;font-size:0.82rem;color:var(--text-primary);">
+        <option value="text" ${f.type === 'text' ? 'selected' : ''}>Text</option>
+        <option value="number" ${f.type === 'number' ? 'selected' : ''}>Number</option>
+        <option value="date" ${f.type === 'date' ? 'selected' : ''}>Date</option>
+        <option value="url" ${f.type === 'url' ? 'selected' : ''}>URL</option>
+        <option value="select" ${f.type === 'select' ? 'selected' : ''}>Dropdown</option>
+        <option value="textarea" ${f.type === 'textarea' ? 'selected' : ''}>Text Area</option>
+      </select>
+      <label title="Required?" style="display:flex;align-items:center;gap:4px;font-size:0.72rem;color:var(--text-muted);cursor:pointer;white-space:nowrap;">
+        <input type="checkbox" ${f.required ? 'checked' : ''} onchange="updateBlueprintField(${idx},'required',this.checked)" style="accent-color:var(--accent-purple);"> Req
+      </label>
+      <button type="button" onclick="removeBlueprintField(${idx})" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);color:#f87171;padding:6px 9px;cursor:pointer;font-size:0.8rem;">✕</button>
+    </div>
+    ${f.type === 'select' ? `
+    <div style="margin:-4px 0 2px 0;padding:8px 12px;background:rgba(124,58,237,0.04);border:1px solid rgba(124,58,237,0.2);border-radius:0 0 var(--radius-md) var(--radius-md);">
+      <label style="font-size:0.72rem;color:var(--accent-purple);font-weight:600;">Dropdown Options (comma-separated)</label>
+      <input type="text" placeholder="e.g. Option A, Option B, Option C" value="${f.options.replace(/"/g, '&quot;')}" oninput="updateBlueprintField(${idx},'options',this.value)" style="width:100%;margin-top:5px;background:rgba(255,255,255,0.04);border:1px solid var(--border-glass);border-radius:var(--radius-sm);padding:6px 10px;font-size:0.8rem;color:var(--text-primary);">
+    </div>` : ''}
+  `).join('');
+}
+
+window.updateBlueprintField = function (idx, key, value) {
+  if (!_fmsBlueprintFields[idx]) return;
+  _fmsBlueprintFields[idx][key] = value;
+  if (key === 'type') renderBlueprintFieldRows(); // Re-render to show/hide options input
+};
+
+window.removeBlueprintField = function (idx) {
+  _fmsBlueprintFields.splice(idx, 1);
+  renderBlueprintFieldRows();
+};
 
 function closeCustomFmsCreatorSection() {
   $('fms-blueprint-form-section').style.display = 'none';
@@ -920,31 +1015,44 @@ function renderCustomFmsBlueprintsList() {
     return;
   }
 
-  container.innerHTML = blueprints.map(bp => `
+  container.innerHTML = blueprints.map(bp => {
+    const isIndependent = bp.scope === 'independent';
+    const fieldCount = (bp.fields || []).length;
+    const scopeBadge = isIndependent
+      ? `<span style="font-size:0.62rem;padding:2px 7px;background:rgba(245,158,11,0.15);color:var(--accent-amber);border-radius:99px;font-weight:700;border:1px solid rgba(245,158,11,0.3);">📱 Independent</span>`
+      : `<span style="font-size:0.62rem;padding:2px 7px;background:rgba(99,102,241,0.15);color:#818cf8;border-radius:99px;font-weight:700;border:1px solid rgba(99,102,241,0.3);">🌐 Dependent</span>`;
+    const fieldBadge = fieldCount > 0
+      ? `<span style="font-size:0.62rem;padding:2px 7px;background:rgba(16,185,129,0.12);color:var(--accent-emerald);border-radius:99px;font-weight:700;border:1px solid rgba(16,185,129,0.25);">⚡ ${fieldCount} field${fieldCount > 1 ? 's' : ''}</span>`
+      : '';
+    return `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:rgba(255,255,255,0.02);border:1px solid var(--border-glass);border-radius:var(--radius-md);gap:12px;">
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:600;font-size:0.9rem;color:var(--text-primary);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="font-weight:600;font-size:0.9rem;color:var(--text-primary);display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
           <span>${bp.name}</span>
           <span style="font-size:0.65rem;padding:2px 7px;background:rgba(124,58,237,0.15);color:var(--accent-purple);border-radius:99px;font-weight:700;border:1px solid rgba(124,58,237,0.3);text-transform:uppercase;letter-spacing:0.05em;">${bp.type}</span>
+          ${scopeBadge}
+          ${fieldBadge}
         </div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-top:5px;">
           ${[
-            bp.stagesNeeded ? '📋 Stages' : '',
-            bp.linksNeeded ? '🔗 Links' : '',
-            bp.offsetsNeeded ? '↔️ Offsets' : '',
-            bp.marksNeeded ? '🎯 Marks' : '',
-            bp.scoringSystem ? '🏆 Scoring' : ''
-          ].filter(Boolean).join(' &nbsp;·&nbsp; ') || '📦 Pure Item Tracking'}
+        bp.stagesNeeded ? '📋 Stages' : '',
+        bp.linksNeeded ? '🔗 Links' : '',
+        bp.offsetsNeeded ? '↔️ Offsets' : '',
+        bp.marksNeeded ? '🎯 Marks' : '',
+        bp.scoringSystem ? '🏆 Scoring' : '',
+        fieldCount > 0 ? ('📝 Fields: ' + (bp.fields || []).map(f => f.label).join(', ')) : ''
+      ].filter(Boolean).join(' &nbsp;·&nbsp; ') || '📦 Pure Item Tracking'
+      }
         </div>
       </div>
-      <button onclick="confirmDeleteFmsBlueprint('${bp.id}','${bp.name.replace(/'/g,"\\'")}')"
+      <button onclick="confirmDeleteFmsBlueprint('${bp.id}','${bp.name.replace(/'/g, "\\'")}')" 
         style="flex-shrink:0;display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:99px;border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.08);color:#f87171;font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.2s;white-space:nowrap;"
         onmouseover="this.style.background='rgba(239,68,68,0.18)';this.style.borderColor='rgba(239,68,68,0.7)'"
         onmouseout="this.style.background='rgba(239,68,68,0.08)';this.style.borderColor='rgba(239,68,68,0.4)'">
         🗑️ Delete
       </button>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 // Shows an in-app confirm modal before deleting — no jarring browser confirm()
@@ -1099,6 +1207,26 @@ async function handleFmsBlueprintSubmit() {
   const marksNeeded = $('fms-bp-marks').checked;
   const scoringSystem = $('fms-bp-scoring').checked;
 
+  // Read scope
+  const scopeRadio = document.querySelector('input[name="fms-bp-scope"]:checked');
+  const scope = scopeRadio ? scopeRadio.value : 'dependent';
+
+  // Validate + collect custom fields
+  const fields = [];
+  for (const f of _fmsBlueprintFields) {
+    if (!f.label.trim()) {
+      showToast('All custom fields must have a label.', 'error');
+      return;
+    }
+    fields.push({
+      id: f.id,
+      label: f.label.trim(),
+      type: f.type,
+      required: !!f.required,
+      options: f.type === 'select' ? f.options : ''
+    });
+  }
+
   const roles = ['admin'];
   document.querySelectorAll('input[name="fms-bp-roles"]:checked').forEach(cb => {
     roles.push(cb.value);
@@ -1107,13 +1235,15 @@ async function handleFmsBlueprintSubmit() {
   const blueprintId = 'fms_' + slug.toLowerCase() + '_' + Date.now();
   const newBlueprint = {
     id: blueprintId,
-    name: name,
+    name,
     type: slug,
+    scope,
     stagesNeeded,
     linksNeeded,
     offsetsNeeded,
     marksNeeded,
     scoringSystem,
+    fields,
     roles
   };
 
@@ -1125,6 +1255,59 @@ async function handleFmsBlueprintSubmit() {
 window.deleteCustomFmsBlueprint = deleteCustomFmsBlueprint;
 window.confirmDeleteFmsBlueprint = confirmDeleteFmsBlueprint;
 
+// =============================================
+// INDEPENDENT FMS — localStorage helpers
+// =============================================
+
+/** Returns the localStorage key for an independent FMS's entries */
+function _independentFmsKey(type) {
+  const user = (state.currentUser || 'anon').toString().toLowerCase().replace(/[^a-z0-9]/g, '_');
+  return `svm_ind_fms_${type.toLowerCase()}_${user}`;
+}
+
+/** Get all entries for an independent FMS */
+function getIndependentFmsEntries(type) {
+  try {
+    return JSON.parse(localStorage.getItem(_independentFmsKey(type)) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+/** Upsert an entry into an independent FMS */
+function saveIndependentFmsEntry(type, entry) {
+  const entries = getIndependentFmsEntries(type);
+  const idx = entries.findIndex(e => e.testId === entry.testId);
+  if (idx > -1) {
+    entries[idx] = entry;
+  } else {
+    entries.unshift(entry);
+  }
+  localStorage.setItem(_independentFmsKey(type), JSON.stringify(entries));
+  return entries;
+}
+
+/** Delete an entry from an independent FMS */
+function deleteIndependentFmsEntry(type, testId) {
+  const entries = getIndependentFmsEntries(type).filter(e => e.testId !== testId);
+  localStorage.setItem(_independentFmsKey(type), JSON.stringify(entries));
+  return entries;
+}
+
+/** Update a single stage in an independent FMS entry */
+function updateIndependentFmsStage(type, testId, stageId, update) {
+  const entries = getIndependentFmsEntries(type);
+  const entry = entries.find(e => e.testId === testId);
+  if (!entry) return;
+  if (!entry.stages) entry.stages = [];
+  const stage = entry.stages.find(s => s.id === stageId);
+  if (stage) {
+    Object.assign(stage, update);
+  } else {
+    entry.stages.push({ id: stageId, ...update });
+  }
+  localStorage.setItem(_independentFmsKey(type), JSON.stringify(entries));
+}
 
 function setActiveTab(id) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
@@ -1140,6 +1323,24 @@ async function openTestTracker(viewType = 'tests') {
   const btnSettings = $('btn-test-settings');
   if (btnSettings) {
     btnSettings.style.display = isAdmin ? 'flex' : 'none';
+  }
+
+  // Check if the current view is an independent-scope custom FMS
+  const blueprints = getCustomFmsBlueprints();
+  const activeBp = blueprints.find(bp => bp.type.toLowerCase() === viewType.toLowerCase());
+  const isIndependent = activeBp && activeBp.scope === 'independent';
+
+  if (isIndependent) {
+    // Independent FMS — load from localStorage only, no Supabase
+    const entries = getIndependentFmsEntries(activeBp.type);
+    // Merge into state.tests (filter out any previously loaded independent entries of this type)
+    state.tests = [
+      ...(state.tests || []).filter(t => (t.type || '').toLowerCase() !== activeBp.type.toLowerCase()),
+      ...entries
+    ];
+    if (!state.testSettings) state.testSettings = [];
+    renderTests(state.tests);
+    return;
   }
 
   // SWR Caching: If we already have cached data, render it INSTANTLY without showing a spinner or waiting!
@@ -1580,7 +1781,7 @@ function renderTests(tests) {
     // Friendly scoring label per FMS context
     const scoringLabel = testType === 'Video' ? 'Score / Rating'
       : testType === 'AfterFee' ? 'Fee / Score'
-      : 'Marks';
+        : 'Marks';
 
     // Check if any stage is overdue to apply card styling
     const relevantSettings = (state.testSettings || []).filter(s => s.type === testType);
@@ -1610,11 +1811,11 @@ function renderTests(tests) {
             ${test.subject ? `<span class="subject-badge subject-${test.subject.toLowerCase()}">${test.subject === 'Math' ? 'Maths' : test.subject}</span>` : ''}
             <span class="test-type-pill type-${(test.type || '').toLowerCase()}">${test.type === 'BeforeFee' ? 'Enquiry' : (test.type === 'AfterFee' ? 'Admission' : (test.type || ''))}</span>
             ${totalStages > 0 && showStages ? (() => {
-              const pct = Math.round((completedStages / totalStages) * 100);
-              if (completedStages === totalStages) return `<span class="test-status-badge status-complete">✓ Complete</span>`;
-              if (hasOverdueStage) return `<span class="test-status-badge status-overdue">⚠ Overdue</span>`;
-              return `<span class="test-status-badge status-progress">${pct}% done</span>`;
-            })() : ''}
+        const pct = Math.round((completedStages / totalStages) * 100);
+        if (completedStages === totalStages) return `<span class="test-status-badge status-complete">✓ Complete</span>`;
+        if (hasOverdueStage) return `<span class="test-status-badge status-overdue">⚠ Overdue</span>`;
+        return `<span class="test-status-badge status-progress">${pct}% done</span>`;
+      })() : ''}
             ${!showStages ? `
               <span class="test-status-badge ${test.status === 'done' ? 'status-complete' : 'status-progress'}">
                 ${test.status === 'done' ? '✓ Complete' : '⏳ Pending'}
@@ -1670,9 +1871,9 @@ function renderTests(tests) {
               <span class="meta-v meta-bold">${formatDate(test.heldOn)}</span>
             </div>
             ${totalStages > 0 && showStages ? (() => {
-              const pct = Math.round((completedStages / totalStages) * 100);
-              const pctColor = completedStages === totalStages ? 'var(--accent-emerald)' : (hasOverdueStage ? 'var(--accent-red)' : 'var(--accent-purple)');
-              return `
+        const pct = Math.round((completedStages / totalStages) * 100);
+        const pctColor = completedStages === totalStages ? 'var(--accent-emerald)' : (hasOverdueStage ? 'var(--accent-red)' : 'var(--accent-purple)');
+        return `
               <div class="meta-kv">
                 <span class="meta-k">Progress</span>
                 <span class="meta-v" style="color:${pctColor}; font-weight:800;">${completedStages}/${totalStages} <span style="font-weight:600; font-size:0.7rem; opacity:0.8;">(${pct}%)</span></span>
@@ -1680,20 +1881,43 @@ function renderTests(tests) {
               <div style="margin-top:5px;">
                 <div style="background:rgba(255,255,255,0.06); height:5px; border-radius:3px; overflow:hidden; display:flex; gap:2px; border:1px solid var(--border-glass);">
                   ${testStages.map(stage => {
-                    const plannedDate = new Date(heldOnDate);
-                    plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
-                    plannedDate.setHours(23, 59, 59, 999);
-                    const isDelayed = stage.status !== 'done' && new Date() > plannedDate;
-                    let bg = 'rgba(255,255,255,0.12)';
-                    if (stage.status === 'done') bg = 'var(--accent-emerald)';
-                    else if (isDelayed && showOffsets) bg = 'var(--accent-red)';
-                    return `<div style="flex:1; background:${bg}; height:100%; transition:background 0.3s;" title="${stage.label || 'Stage'}: ${stage.status === 'done' ? 'Done' : (isDelayed && showOffsets ? 'Overdue' : 'Pending')}"></div>`;
-                  }).join('')}
+          const plannedDate = new Date(heldOnDate);
+          plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
+          plannedDate.setHours(23, 59, 59, 999);
+          const isDelayed = stage.status !== 'done' && new Date() > plannedDate;
+          let bg = 'rgba(255,255,255,0.12)';
+          if (stage.status === 'done') bg = 'var(--accent-emerald)';
+          else if (isDelayed && showOffsets) bg = 'var(--accent-red)';
+          return `<div style="flex:1; background:${bg}; height:100%; transition:background 0.3s;" title="${stage.label || 'Stage'}: ${stage.status === 'done' ? 'Done' : (isDelayed && showOffsets ? 'Overdue' : 'Pending')}"></div>`;
+        }).join('')}
                 </div>
               </div>`;
-            })() : ''}
+      })() : ''}
           </div>
         </div>
+
+        ${(() => {
+        // Custom fields data display for custom blueprints
+        if (!isCustom || !bp.fields || bp.fields.length === 0) return '';
+        const customData = test.customData || {};
+        const fieldPairs = bp.fields.filter(f => customData[f.id] !== undefined && customData[f.id] !== '');
+        if (fieldPairs.length === 0) return '';
+        const half = Math.ceil(fieldPairs.length / 2);
+        const leftFields = fieldPairs.slice(0, half);
+        const rightFields = fieldPairs.slice(half);
+        const renderField = f => {
+          let val = customData[f.id];
+          if (f.type === 'url') val = `<a href="${val}" target="_blank" style="color:var(--accent-purple);text-decoration:underline;word-break:break-all;">${val}</a>`;
+          else if (f.type === 'date') { try { val = formatDate(val); } catch (e) { } }
+          else val = String(val).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          return `<div class="meta-kv"><span class="meta-k">${f.label}</span><span class="meta-v">${val}</span></div>`;
+        };
+        return `
+          <div class="test-meta-grid" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-glass);">
+            <div class="meta-col">${leftFields.map(renderField).join('')}</div>
+            <div class="meta-col">${rightFields.map(renderField).join('')}</div>
+          </div>`;
+      })()}
 
         ${(test.sheetLink || test.folderLink) && showLinks ? `
         <div style="display:flex; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border-glass);">
@@ -1712,15 +1936,15 @@ function renderTests(tests) {
         ${showStages ? `
         <div class="test-pipeline">
           ${testStages.map((stage, sIdx) => {
-            const plannedDate = new Date(heldOnDate);
-            plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
-            const pDateCheck = new Date(plannedDate);
-            pDateCheck.setHours(23, 59, 59, 999);
-            const isDelayed = stage.status !== 'done' && new Date() > pDateCheck;
-            const statusClass = stage.status === 'done' ? 'done' : (isDelayed && showOffsets ? 'delayed' : 'pending');
-            const doneIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+        const plannedDate = new Date(heldOnDate);
+        plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
+        const pDateCheck = new Date(plannedDate);
+        pDateCheck.setHours(23, 59, 59, 999);
+        const isDelayed = stage.status !== 'done' && new Date() > pDateCheck;
+        const statusClass = stage.status === 'done' ? 'done' : (isDelayed && showOffsets ? 'delayed' : 'pending');
+        const doneIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
 
-            return `
+        return `
               <div class="pipeline-step ${statusClass}" onclick="handleToggleTestStage('${test.testId}', ${stage.id})" title="Click to toggle status.">
                 <div class="pipeline-step-left">
                   <div class="step-indicator">${stage.status === 'done' ? doneIcon : (sIdx + 1)}</div>
@@ -1747,7 +1971,7 @@ function renderTests(tests) {
                   </div>
                 </div>
               </div>`;
-          }).join('')}
+      }).join('')}
         </div>` : ''}
       </div>
     `;
@@ -1769,11 +1993,32 @@ async function handleToggleTestStage(testId, stageId) {
   const test = state.tests.find(t => t.testId === testId);
   if (!test) return;
 
-  const stage = test.stages.find(s => s.id === stageId);
+  const stage = (test.stages || []).find(s => s.id === stageId);
   const newStatus = (!stage || stage.status !== 'done') ? 'done' : 'pending';
   const newDate = newStatus === 'done' ? new Date().toISOString() : '';
   const doneBy = newStatus === 'done' ? state.currentUser : '';
   const doneAt = newStatus === 'done' ? new Date().toLocaleString() : '';
+
+  // Check if independent FMS
+  const blueprints = getCustomFmsBlueprints();
+  const bp = blueprints.find(b => b.type === test.type);
+  const isIndependent = bp && bp.scope === 'independent';
+
+  if (isIndependent) {
+    if (!test.stages) test.stages = [];
+    if (stage) {
+      stage.status = newStatus;
+      stage.actualDate = newDate;
+      stage.doneBy = doneBy;
+      stage.doneAt = doneAt;
+    } else {
+      test.stages.push({ id: stageId, status: newStatus, actualDate: newDate, doneBy, doneAt });
+    }
+    updateIndependentFmsStage(test.type, testId, stageId, { status: newStatus, actualDate: newDate, doneBy, doneAt });
+    renderTests(state.tests);
+    showToast(`Stage updated.`);
+    return;
+  }
 
   try {
     showToast('Updating stage...', 'info');
@@ -1787,6 +2032,7 @@ async function handleToggleTestStage(testId, stageId) {
     }, 'POST');
 
     if (res.success) {
+      if (!test.stages) test.stages = [];
       if (stage) {
         stage.status = newStatus;
         stage.actualDate = newDate;
@@ -1812,7 +2058,20 @@ async function handleToggleTestStage(testId, stageId) {
 }
 
 async function handleDeleteTestTracker(testId) {
-  if (!confirm('Permanently delete this Test FMS?')) return;
+  if (!confirm('Permanently delete this FMS entry?')) return;
+
+  const test = state.tests.find(t => t.testId === testId);
+  const blueprints = getCustomFmsBlueprints();
+  const bp = test ? blueprints.find(b => b.type === test.type) : null;
+  const isIndependent = bp && bp.scope === 'independent';
+
+  if (isIndependent) {
+    deleteIndependentFmsEntry(test.type, testId);
+    state.tests = state.tests.filter(t => t.testId !== testId);
+    renderTests(state.tests);
+    showToast('Entry deleted.');
+    return;
+  }
 
   try {
     const res = await apiFetch('deleteTestTracker', { testId }, 'POST');
@@ -4012,20 +4271,20 @@ async function init() {
       state.userRole = (userData.role || 'member').toLowerCase();
 
       networkPromise = Promise.all([
-        apiFetch('getTeam').then(res => { state.teamMembers = res.data || []; }).catch(() => {}),
-        apiFetch('getTasks', { user: state.currentUser }).then(res => { state.tasks = res.data || []; }).catch(() => {}),
-        apiFetch('getScores', { user: state.currentUser }).then(res => { state.stats = res.data; }).catch(() => {}),
-        apiFetch('getTestSettings').then(res => { if (res.success) state.testSettings = res.data; }).catch(() => {}),
-        apiFetch('getTests').then(res => { if (res.success) state.tests = res.data; }).catch(() => {})
+        apiFetch('getTeam').then(res => { state.teamMembers = res.data || []; }).catch(() => { }),
+        apiFetch('getTasks', { user: state.currentUser }).then(res => { state.tasks = res.data || []; }).catch(() => { }),
+        apiFetch('getScores', { user: state.currentUser }).then(res => { state.stats = res.data; }).catch(() => { }),
+        apiFetch('getTestSettings').then(res => { if (res.success) state.testSettings = res.data; }).catch(() => { }),
+        apiFetch('getTests').then(res => { if (res.success) state.tests = res.data; }).catch(() => { })
       ]);
     } catch (e) {
       networkPromise = Promise.all([
-        apiFetch('getTeam').then(res => { state.teamMembers = res.data || []; }).catch(() => {})
+        apiFetch('getTeam').then(res => { state.teamMembers = res.data || []; }).catch(() => { })
       ]);
     }
   } else {
     networkPromise = Promise.all([
-      apiFetch('getTeam').then(res => { state.teamMembers = res.data || []; }).catch(() => {})
+      apiFetch('getTeam').then(res => { state.teamMembers = res.data || []; }).catch(() => { })
     ]);
   }
 
@@ -5828,7 +6087,7 @@ function openAddTestModal() {
   const isAdmissionView = state.currentView === 'admissions';
   const isEnquiryView = state.currentView === 'enquiries';
   const isParentsView = state.currentView === 'parents';
-  
+
   const blueprints = getCustomFmsBlueprints();
   const activeCustomBlueprint = blueprints.find(bp => bp.type.toLowerCase() === state.currentView);
   const isCustomView = !!activeCustomBlueprint;
@@ -5925,6 +6184,79 @@ function openAddTestModal() {
     }));
   }
   renderIndividualFormStages();
+
+  // Inject custom fields for custom blueprints
+  const customFieldsContainer = $('custom-fms-fields-container');
+  const pipelineSection = $('pipeline-stages-section');
+  const formRowClassSubject = $('form-row-class-subject');
+  const formRowChapter = $('form-row-chapter');
+  const formRowMarks = $('form-row-marks');
+  const heldOnLabel = $('test-form-held-on-label');
+  const nameLabel2 = $('test-form-name-label');
+
+  if (isCustomView && activeCustomBlueprint.fields && activeCustomBlueprint.fields.length > 0) {
+    // Hide standard test-specific rows for custom FMS
+    if (formRowClassSubject) formRowClassSubject.style.display = 'none';
+    if (formRowChapter) formRowChapter.style.display = 'none';
+    if (formRowMarks) formRowMarks.style.display = activeCustomBlueprint.marksNeeded ? 'flex' : 'none';
+
+    // Update labels
+    if (nameLabel2) nameLabel2.textContent = activeCustomBlueprint.name + ' Entry Title';
+    if (heldOnLabel) heldOnLabel.textContent = 'Entry Date';
+
+    // Render custom fields
+    const fieldRows = activeCustomBlueprint.fields.map(f => {
+      const isRequired = f.required ? 'required' : '';
+      const reqMark = f.required ? ' <span style="color:var(--accent-red);">*</span>' : '';
+      if (f.type === 'select') {
+        const opts = (f.options || '').split(',').map(o => o.trim()).filter(Boolean);
+        return `
+          <div class="form-group">
+            <label>${f.label}${reqMark}</label>
+            <select id="custom-field-${f.id}" data-field-id="${f.id}" ${isRequired} style="width:100%;">
+              <option value="">-- Select --</option>
+              ${opts.map(o => `<option value="${o}">${o}</option>`).join('')}
+            </select>
+          </div>`;
+      } else if (f.type === 'textarea') {
+        return `
+          <div class="form-group">
+            <label>${f.label}${reqMark}</label>
+            <textarea id="custom-field-${f.id}" data-field-id="${f.id}" ${isRequired} rows="3" style="width:100%;resize:vertical;" placeholder="Enter ${f.label}..."></textarea>
+          </div>`;
+      } else {
+        return `
+          <div class="form-group">
+            <label>${f.label}${reqMark}</label>
+            <input type="${f.type}" id="custom-field-${f.id}" data-field-id="${f.id}" ${isRequired} placeholder="Enter ${f.label}..." style="width:100%;box-sizing:border-box;">
+          </div>`;
+      }
+    }).join('');
+
+    customFieldsContainer.innerHTML = `
+      <div style="border-top:1px solid var(--border-glass);padding-top:var(--space-md);margin-top:var(--space-sm);margin-bottom:var(--space-md);">
+        <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--accent-purple);margin-bottom:var(--space-md);">📋 ${activeCustomBlueprint.name} Details</div>
+        ${fieldRows}
+      </div>`;
+    customFieldsContainer.style.display = 'block';
+    if (pipelineSection) pipelineSection.style.display = currentFmsBp && currentFmsBp.stagesNeeded ? 'block' : 'none';
+  } else if (isCustomView) {
+    // Custom FMS but no custom fields defined
+    if (formRowClassSubject) formRowClassSubject.style.display = 'none';
+    if (formRowChapter) formRowChapter.style.display = 'none';
+    if (formRowMarks) formRowMarks.style.display = activeCustomBlueprint.marksNeeded ? 'flex' : 'none';
+    if (customFieldsContainer) { customFieldsContainer.innerHTML = ''; customFieldsContainer.style.display = 'none'; }
+    if (pipelineSection) pipelineSection.style.display = currentFmsBp && currentFmsBp.stagesNeeded ? 'block' : 'none';
+  } else {
+    // Standard FMS — show all standard rows
+    if (formRowClassSubject) formRowClassSubject.style.display = isEnquiryView || isAdmissionView || isVideoView || isParentsView ? 'none' : 'flex';
+    if (formRowChapter) formRowChapter.style.display = isEnquiryView || isAdmissionView || isVideoView || isParentsView ? 'none' : 'flex';
+    if (formRowMarks) formRowMarks.style.display = isEnquiryView || isParentsView ? 'none' : 'flex';
+    if (customFieldsContainer) { customFieldsContainer.innerHTML = ''; customFieldsContainer.style.display = 'none'; }
+    if (pipelineSection) pipelineSection.style.display = 'block';
+    if (nameLabel2) nameLabel2.textContent = isEnquiryView || isAdmissionView ? 'Student Name' : isVideoView ? 'Video Title' : 'Test Name (Auto-generated)';
+    if (heldOnLabel) heldOnLabel.textContent = isAdmissionView ? 'Date Registered' : isEnquiryView ? 'Date Registered' : 'Held On';
+  }
 
   $('add-test-modal').style.display = 'flex';
 }
@@ -6065,30 +6397,68 @@ async function handleAddTestSubmit(e) {
 
   saveCurrentFormStagesFromDOM();
 
+  // Collect custom fields data
+  const customData = {};
+  document.querySelectorAll('#custom-fms-fields-container [data-field-id]').forEach(el => {
+    customData[el.dataset.fieldId] = el.value;
+  });
+
+  // Determine if this is an independent FMS
+  const blueprints = getCustomFmsBlueprints();
+  const activeBp = blueprints.find(b => b.type === type);
+  const isIndependent = activeBp && activeBp.scope === 'independent';
+
   const submitBtn = e.target.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
-  submitBtn.textContent = 'Starting...';
+  submitBtn.textContent = 'Saving...';
 
   try {
-    const res = await apiFetch('addTest', {
-      testName: name,
-      className,
-      maxScore,
-      heldOn,
-      type,
-      subject,
-      chapter,
-      sheetLink,
-      folderLink,
-      minScore,
-      avgScore,
-      stages: currentFormStages
-    }, 'POST');
-
-    if (res.success) {
-      showToast('Test Tracking Started!');
+    if (isIndependent) {
+      // Independent FMS — save to localStorage only
+      const newEntry = {
+        testId: 'ind_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+        testName: name,
+        type,
+        heldOn,
+        className: className || '',
+        maxScore: maxScore || '',
+        minScore: minScore || '',
+        avgScore: avgScore || '',
+        subject: subject || '',
+        chapter: chapter || '',
+        sheetLink: sheetLink || '',
+        folderLink: folderLink || '',
+        customData,
+        stages: currentFormStages.map(s => ({ ...s })),
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      };
+      saveIndependentFmsEntry(type, newEntry);
+      showToast('Entry saved locally! (Independent FMS)');
       closeAddTestModal();
-      openTestTracker(state.currentView); // Refresh current view
+      openTestTracker(state.currentView);
+    } else {
+      const res = await apiFetch('addTest', {
+        testName: name,
+        className,
+        maxScore,
+        heldOn,
+        type,
+        subject,
+        chapter,
+        sheetLink,
+        folderLink,
+        minScore,
+        avgScore,
+        customData: JSON.stringify(customData),
+        stages: currentFormStages
+      }, 'POST');
+
+      if (res.success) {
+        showToast('Test Tracking Started!');
+        closeAddTestModal();
+        openTestTracker(state.currentView); // Refresh current view
+      }
     }
   } catch (err) {
     showToast('Failed to start tracking', 'error');
@@ -6232,12 +6602,79 @@ function handleEditTestDetailsModal(testId) {
     if (isAdmission) nameLabel.textContent = 'Student Name';
     else if (isVideo) nameLabel.textContent = 'Video Title';
     else if (isParents) nameLabel.textContent = 'Checklist Title';
-    else if (isCustom) nameLabel.textContent = activeCustomBlueprint.name + ' Student/Item Name';
+    else if (isCustom) nameLabel.textContent = activeCustomBlueprint.name + ' Entry Title';
     else nameLabel.textContent = 'Test Name';
   }
 
   $('add-test-modal').querySelector('h3').textContent = isAdmission ? 'Edit Admission Details' : (isVideo ? 'Edit Video Details' : (isParents ? 'Edit Parents Checklist' : (isCustom ? 'Edit ' + activeCustomBlueprint.name + ' Details' : 'Edit Test Details')));
   $('add-test-modal').querySelector('button[type="submit"]').textContent = 'Save Changes';
+
+  // Inject custom fields for edit mode
+  const customFieldsContainerEdit = $('custom-fms-fields-container');
+  const formRowCSEdit = $('form-row-class-subject');
+  const formRowChEdit = $('form-row-chapter');
+  const formRowMkEdit = $('form-row-marks');
+  const pipelineSectionEdit = $('pipeline-stages-section');
+  const heldOnLabelEdit = $('test-form-held-on-label');
+
+  if (isCustom && activeCustomBlueprint.fields && activeCustomBlueprint.fields.length > 0) {
+    if (formRowCSEdit) formRowCSEdit.style.display = 'none';
+    if (formRowChEdit) formRowChEdit.style.display = 'none';
+    if (formRowMkEdit) formRowMkEdit.style.display = activeCustomBlueprint.marksNeeded ? 'flex' : 'none';
+    if (heldOnLabelEdit) heldOnLabelEdit.textContent = 'Entry Date';
+
+    const customDataEdit = test.customData || {};
+    const fieldRows = activeCustomBlueprint.fields.map(f => {
+      const isRequired = f.required ? 'required' : '';
+      const reqMark = f.required ? ' <span style="color:var(--accent-red);">*</span>' : '';
+      const val = (customDataEdit[f.id] || '').toString().replace(/"/g, '&quot;');
+      if (f.type === 'select') {
+        const opts = (f.options || '').split(',').map(o => o.trim()).filter(Boolean);
+        return `
+          <div class="form-group">
+            <label>${f.label}${reqMark}</label>
+            <select id="custom-field-${f.id}" data-field-id="${f.id}" ${isRequired} style="width:100%;">
+              <option value="">-- Select --</option>
+              ${opts.map(o => `<option value="${o}" ${customDataEdit[f.id] === o ? 'selected' : ''}>${o}</option>`).join('')}
+            </select>
+          </div>`;
+      } else if (f.type === 'textarea') {
+        return `
+          <div class="form-group">
+            <label>${f.label}${reqMark}</label>
+            <textarea id="custom-field-${f.id}" data-field-id="${f.id}" ${isRequired} rows="3" style="width:100%;resize:vertical;">${val}</textarea>
+          </div>`;
+      } else {
+        return `
+          <div class="form-group">
+            <label>${f.label}${reqMark}</label>
+            <input type="${f.type}" id="custom-field-${f.id}" data-field-id="${f.id}" ${isRequired} value="${val}" style="width:100%;box-sizing:border-box;">
+          </div>`;
+      }
+    }).join('');
+
+    if (customFieldsContainerEdit) {
+      customFieldsContainerEdit.innerHTML = `
+        <div style="border-top:1px solid var(--border-glass);padding-top:var(--space-md);margin-top:var(--space-sm);margin-bottom:var(--space-md);">
+          <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--accent-purple);margin-bottom:var(--space-md);">📋 ${activeCustomBlueprint.name} Details</div>
+          ${fieldRows}
+        </div>`;
+      customFieldsContainerEdit.style.display = 'block';
+    }
+    if (pipelineSectionEdit) pipelineSectionEdit.style.display = activeCustomBlueprint.stagesNeeded ? 'block' : 'none';
+  } else if (isCustom) {
+    if (formRowCSEdit) formRowCSEdit.style.display = 'none';
+    if (formRowChEdit) formRowChEdit.style.display = 'none';
+    if (formRowMkEdit) formRowMkEdit.style.display = activeCustomBlueprint.marksNeeded ? 'flex' : 'none';
+    if (customFieldsContainerEdit) { customFieldsContainerEdit.innerHTML = ''; customFieldsContainerEdit.style.display = 'none'; }
+    if (pipelineSectionEdit) pipelineSectionEdit.style.display = activeCustomBlueprint.stagesNeeded ? 'block' : 'none';
+  } else {
+    if (formRowCSEdit) formRowCSEdit.style.display = isAdmission || isVideo || isParents ? 'none' : 'flex';
+    if (formRowChEdit) formRowChEdit.style.display = isAdmission || isVideo || isParents ? 'none' : 'flex';
+    if (formRowMkEdit) formRowMkEdit.style.display = isParents ? 'none' : 'flex';
+    if (customFieldsContainerEdit) { customFieldsContainerEdit.innerHTML = ''; customFieldsContainerEdit.style.display = 'none'; }
+    if (pipelineSectionEdit) pipelineSectionEdit.style.display = 'block';
+  }
 
   // Override form submit for edit mode
   const form = $('add-test-form');
@@ -6252,6 +6689,14 @@ function handleEditTestDetailsModal(testId) {
 
     saveCurrentFormStagesFromDOM();
 
+    // Collect custom fields
+    const editCustomData = {};
+    document.querySelectorAll('#custom-fms-fields-container [data-field-id]').forEach(el => {
+      editCustomData[el.dataset.fieldId] = el.value;
+    });
+
+    const isIndependent = activeCustomBlueprint && activeCustomBlueprint.scope === 'independent';
+
     const payload = {
       testId: editingTestTrackerId,
       testName: $('test-form-name').value.trim(),
@@ -6265,15 +6710,32 @@ function handleEditTestDetailsModal(testId) {
       folderLink: $('test-form-folder-link').value.trim(),
       minScore: $('test-form-min').value.trim(),
       avgScore: $('test-form-avg').value.trim(),
-      stages: currentFormStages
+      stages: currentFormStages,
+      customData: editCustomData
     };
 
     try {
-      const res = await apiFetch('editTestDetails', payload, 'POST');
-      if (res.success) {
-        showToast('Test details updated.');
+      if (isIndependent) {
+        // Update entry in localStorage
+        const existingEntries = getIndependentFmsEntries(payload.type);
+        const idx = existingEntries.findIndex(e => e.testId === payload.testId);
+        if (idx > -1) {
+          existingEntries[idx] = { ...existingEntries[idx], ...payload };
+          localStorage.setItem(_independentFmsKey(payload.type), JSON.stringify(existingEntries));
+        }
+        // Update in state
+        const stateIdx = state.tests.findIndex(t => t.testId === payload.testId);
+        if (stateIdx > -1) state.tests[stateIdx] = { ...state.tests[stateIdx], ...payload };
+        showToast('Entry updated locally.');
         closeAddTestModal();
-        openTestTracker(state.currentView); // Refresh current view
+        renderTests(state.tests);
+      } else {
+        const res = await apiFetch('editTestDetails', { ...payload, customData: JSON.stringify(editCustomData) }, 'POST');
+        if (res.success) {
+          showToast('Test details updated.');
+          closeAddTestModal();
+          openTestTracker(state.currentView); // Refresh current view
+        }
       }
     } catch (err) {
       showToast('Update failed', 'error');
@@ -6596,9 +7058,21 @@ async function toggleCustomFmsCardStatus(testId) {
   const test = (state.tests || []).find(t => t.testId === testId);
   if (!test) return;
   const newStatus = test.status === 'done' ? 'pending' : 'done';
-  
+
   test.status = newStatus;
-  
+
+  // Check if independent FMS
+  const blueprints = getCustomFmsBlueprints();
+  const bp = blueprints.find(b => b.type === test.type);
+  const isIndependent = bp && bp.scope === 'independent';
+
+  if (isIndependent) {
+    saveIndependentFmsEntry(test.type, test);
+    showToast('Status updated!', 'success');
+    renderTests(state.tests);
+    return;
+  }
+
   const res = await apiFetch('editTestDetails', {
     testId: test.testId,
     testName: test.testName,
@@ -6614,7 +7088,7 @@ async function toggleCustomFmsCardStatus(testId) {
     minScore: test.minScore,
     avgScore: test.avgScore
   });
-  
+
   if (res.success) {
     showToast('FMS card status updated!', 'success');
     renderTests(state.tests);

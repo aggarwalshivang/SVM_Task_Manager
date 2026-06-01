@@ -449,6 +449,40 @@
               </label>
             </div>
 
+            <!-- ─── Scope Control ─────────────────────────────────────────── -->
+            <div class="form-group" style="margin-bottom: var(--space-lg);">
+              <label style="margin-bottom: var(--space-sm); display: block; font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">FMS Scope</label>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <label id="fms-scope-dependent-label" style="display:flex; align-items:flex-start; gap:12px; padding:var(--space-md); background:rgba(99,102,241,0.08); border:2px solid var(--accent-purple); border-radius:var(--radius-md); cursor:pointer; transition:all 0.2s;">
+                  <input type="radio" name="fms-bp-scope" id="fms-bp-scope-dependent" value="dependent" checked style="margin-top:3px; accent-color:var(--accent-purple);">
+                  <div>
+                    <div style="font-weight:700; font-size:0.85rem; color:var(--text-primary);">🌐 Dependent</div>
+                    <div style="font-size:0.72rem; color:var(--text-muted); margin-top:3px; line-height:1.4;">Synced to Supabase. Visible to all permitted users across all devices.</div>
+                  </div>
+                </label>
+                <label id="fms-scope-independent-label" style="display:flex; align-items:flex-start; gap:12px; padding:var(--space-md); background:rgba(255,255,255,0.015); border:2px solid var(--border-glass); border-radius:var(--radius-md); cursor:pointer; transition:all 0.2s;">
+                  <input type="radio" name="fms-bp-scope" id="fms-bp-scope-independent" value="independent" style="margin-top:3px; accent-color:var(--accent-purple);">
+                  <div>
+                    <div style="font-weight:700; font-size:0.85rem; color:var(--text-primary);">📱 Independent</div>
+                    <div style="font-size:0.72rem; color:var(--text-muted); margin-top:3px; line-height:1.4;">Stored locally. Personal to your account on this device only.</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- ─── Custom Entry Fields ──────────────────────────────────── -->
+            <div class="form-group" style="margin-bottom: var(--space-lg);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-sm);">
+                <label style="font-weight:600; font-size:0.85rem; color:var(--text-secondary); margin:0;">Custom Entry Fields</label>
+                <button type="button" id="btn-add-fms-field" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;border:1px solid rgba(124,58,237,0.4);background:rgba(124,58,237,0.08);color:var(--accent-purple);font-size:0.78rem;font-weight:700;cursor:pointer;">+ Add Field</button>
+              </div>
+              <div id="fms-custom-fields-list" style="display:flex;flex-direction:column;gap:8px;">
+                <!-- Dynamic field rows injected by JS -->
+              </div>
+              <div id="fms-custom-fields-empty" style="font-size:0.8rem;color:var(--text-muted);padding:10px;text-align:center;background:rgba(255,255,255,0.015);border:1px dashed var(--border-glass);border-radius:var(--radius-md);">No custom fields yet. Click "+ Add Field" to define what data each entry captures.</div>
+            </div>
+
+            <!-- ─── Allowed Roles ─────────────────────────────────────────── -->
             <div class="form-group" style="margin-bottom: var(--space-lg);">
               <label style="margin-bottom: var(--space-sm); display: block; font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">Allowed Roles (Permission Access)</label>
               <div style="display: flex; flex-wrap: wrap; gap: var(--space-lg); padding: var(--space-md); background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: var(--radius-md);">
@@ -837,19 +871,22 @@
         <input type="hidden" id="test-form-folder-link" value="">
 
         <div class="form-group">
-          <label for="test-form-name">Test Name (Auto-generated)</label>
+          <label for="test-form-name" id="test-form-name-label">Test Name (Auto-generated)</label>
           <input type="text" id="test-form-name" placeholder="e.g. Maths - Chapter 1" required>
         </div>
 
         <div class="form-row">
           <div class="form-group" style="flex: 1;">
-            <label for="test-form-held-on">Held On</label>
+            <label for="test-form-held-on" id="test-form-held-on-label">Held On</label>
             <input type="date" id="test-form-held-on" required>
           </div>
         </div>
+
+        <!-- Custom FMS Fields injection point (rendered by JS for custom blueprints) -->
+        <div id="custom-fms-fields-container" style="display:none;"></div>
         
         <!-- Individual Pipeline Stages Config -->
-        <div style="border-top: 1px solid var(--border-glass); margin-top: var(--space-md); padding-top: var(--space-md); margin-bottom: var(--space-md);">
+        <div id="pipeline-stages-section" style="border-top: 1px solid var(--border-glass); margin-top: var(--space-md); padding-top: var(--space-md); margin-bottom: var(--space-md);">
           <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: var(--space-sm); display: flex; justify-content: space-between; align-items: center;">
             <span>Pipeline Stages Configuration</span>
             <button type="button" class="btn-ghost btn-xs" onclick="addIndividualTestStageRow()" style="color: var(--accent-purple); font-weight: bold; width: auto; padding: 2px 8px;">+ Add Stage</button>
