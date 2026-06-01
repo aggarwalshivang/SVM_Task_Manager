@@ -633,6 +633,7 @@ function handleUserSignedOut() {
   $('app-footer').style.display = 'none';
   $('task-view-container').style.display = 'none';
   $('admin-dashboard-container').style.display = 'none';
+  if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
 }
 
 function handleUserSignedIn(userData) {
@@ -673,6 +674,7 @@ function handleUserSignedIn(userData) {
   if ($('monitoring-header')) $('monitoring-header').style.display = 'none';
   if ($('admin-dashboard-container')) $('admin-dashboard-container').style.display = 'none';
   if ($('test-tracker-container')) $('test-tracker-container').style.display = 'none';
+  if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
   if ($('task-view-container')) $('task-view-container').style.display = 'block';
 
   renderHeader(state.currentUser);
@@ -683,8 +685,108 @@ function handleUserSignedIn(userData) {
     Notification.requestPermission();
   }
 
-  // Bind tab events
-  $('tab-my-tasks').onclick = () => {
+  // Bind tab events dynamically
+  renderNavigationTabs();
+
+
+  const builderClose = $('custom-fms-builder-close-btn');
+  if (builderClose) builderClose.onclick = closeCustomFmsBuilderModal;
+
+  const showCreatorBtn = $('btn-show-fms-creator');
+  if (showCreatorBtn) showCreatorBtn.onclick = openCustomFmsCreatorSection;
+
+  const cancelCreatorBtn = $('btn-cancel-fms-blueprint');
+  if (cancelCreatorBtn) cancelCreatorBtn.onclick = closeCustomFmsCreatorSection;
+
+  const saveBlueprintBtn = $('btn-save-fms-blueprint');
+  if (saveBlueprintBtn) saveBlueprintBtn.onclick = handleFmsBlueprintSubmit;
+
+  checkBroadcast();
+}
+
+// =============================================
+// DYNAMIC FMS BLUEPRINT BUILDER
+// =============================================
+// Static FMS types that support the scoring system (max score / min score fields).
+// Enquiry FMS (BeforeFee) is intentionally excluded per design.
+const FMS_SCORING_ENABLED = new Set(['Sheet', 'App', 'Video', 'AfterFee']);
+
+function getCustomFmsBlueprints() {
+  let blueprints = [];
+  if (state.testSettings && state.testSettings.length > 0) {
+    const blueprintRows = state.testSettings.filter(s => s.type === 'fms_blueprint');
+    blueprints = blueprintRows.map(row => {
+      try {
+        const bp = JSON.parse(row.label);
+        bp.id = bp.id || row.stage_id || row.id;
+        return bp;
+      } catch (e) {
+        return null;
+      }
+    }).filter(Boolean);
+    localStorage.setItem('svm_custom_fms_blueprints', JSON.stringify(blueprints));
+  } else {
+    blueprints = JSON.parse(localStorage.getItem('svm_custom_fms_blueprints') || '[]');
+  }
+  return blueprints;
+}
+
+function renderNavigationTabs() {
+  const container = $('header-nav');
+  if (!container) return;
+
+  const isPrivileged = ['admin', 'coordinator', 'process_coordinator'].includes(state.userRole);
+
+  let html = `
+    <button class="nav-tab ${state.currentView === 'tasks' ? 'active' : ''}" id="tab-my-tasks">My Tasks</button>
+    <button class="nav-tab ${state.currentView === 'dashboard' ? 'active' : ''}" id="tab-team" style="position:relative; display:${isPrivileged ? 'block' : 'none'};">Team <span id="team-badge" style="display:none; position:absolute; top:-5px; right:-5px; background:var(--accent-red); color:white; font-size:0.6rem; padding:2px 5px; border-radius:10px; border:2px solid var(--bg-primary);">!</span></button>
+  `;
+
+  // Append FMS Builder tab beside the team tab, visible to ADMIN ONLY
+  if (state.userRole === 'admin') {
+    html += `
+      <button class="nav-tab ${state.currentView === 'fms-builder' ? 'active' : ''}" id="tab-fms-builder">🛠️ FMS Builder</button>
+    `;
+  }
+
+  html += `
+    <button class="nav-tab ${state.currentView === 'tests' ? 'active' : ''}" id="tab-tests">Test FMS</button>
+    <button class="nav-tab ${state.currentView === 'videos' ? 'active' : ''}" id="tab-videos">Video FMS</button>
+    <button class="nav-tab ${state.currentView === 'enquiries' ? 'active' : ''}" id="tab-enquiries">Enquiry FMS</button>
+    <button class="nav-tab ${state.currentView === 'admissions' ? 'active' : ''}" id="tab-admissions">Admission FMS</button>
+    <button class="nav-tab ${state.currentView === 'parents' ? 'active' : ''}" id="tab-parents">Parents FMS</button>
+  `;
+
+  // Append custom blueprints — admin sees inline × delete button on the pill
+  const blueprints = getCustomFmsBlueprints();
+  blueprints.forEach(bp => {
+    const allowed = bp.roles && bp.roles.length > 0 ? bp.roles.includes(state.userRole) : true;
+    if (!allowed) return;
+
+    const lowerSlug = bp.type.toLowerCase();
+    if (state.userRole === 'admin') {
+      // Admin gets a compound pill: tab label + inline × delete button
+      html += `
+        <span class="nav-tab-group ${state.currentView === lowerSlug ? 'active' : ''}" style="display:inline-flex;align-items:center;gap:0;">
+          <button class="nav-tab nav-tab-custom ${state.currentView === lowerSlug ? 'active' : ''}" id="tab-custom-${lowerSlug}" style="border-radius:var(--radius-full) 0 0 var(--radius-full);border-right:none;padding-right:6px;">${bp.name}</button><button class="nav-tab-delete-btn" id="tab-custom-del-${lowerSlug}" title="Delete ${bp.name} FMS" style="border-radius:0 var(--radius-full) var(--radius-full) 0;padding:0 8px;font-size:0.85rem;line-height:1;">✕</button>
+        </span>
+      `;
+    } else {
+      html += `
+        <button class="nav-tab ${state.currentView === lowerSlug ? 'active' : ''}" id="tab-custom-${lowerSlug}">${bp.name}</button>
+      `;
+    }
+  });
+
+  container.innerHTML = html;
+  bindTabClickListeners();
+}
+
+function bindTabClickListeners() {
+  const isPrivileged = ['admin', 'coordinator', 'process_coordinator'].includes(state.userRole);
+
+  const myTasks = $('tab-my-tasks');
+  if (myTasks) myTasks.onclick = () => {
     state.currentView = 'tasks';
     state.tasksFilterUser = null;
     state.currentGlobalView = false;
@@ -693,52 +795,336 @@ function handleUserSignedIn(userData) {
     $('task-view-container').style.display = 'block';
     $('admin-dashboard-container').style.display = 'none';
     $('test-tracker-container').style.display = 'none';
+    if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
     $('stats-section').style.display = 'block';
     $('briefing-section').style.display = 'block';
     initForUser(state.currentUser);
   };
-  $('tab-team').onclick = () => {
+
+  const teamTab = $('tab-team');
+  if (teamTab) teamTab.onclick = () => {
     setActiveTab('tab-team');
+    state.currentView = 'dashboard';
     openDashboard();
     $('task-view-container').style.display = 'none';
     $('test-tracker-container').style.display = 'none';
-  };
-  $('tab-tests').onclick = () => {
-    setActiveTab('tab-tests');
-    state.testFmsFilter = 'all';
-    openTestTracker('tests');
-    $('task-view-container').style.display = 'none';
-    $('admin-dashboard-container').style.display = 'none';
-    $('test-tracker-container').style.display = 'block';
-  };
-  $('tab-videos').onclick = () => {
-    setActiveTab('tab-videos');
-    state.testFmsFilter = 'all';
-    openTestTracker('videos');
-    $('task-view-container').style.display = 'none';
-    $('admin-dashboard-container').style.display = 'none';
-    $('test-tracker-container').style.display = 'block';
-  };
-  $('tab-admissions').onclick = () => {
-    setActiveTab('tab-admissions');
-    state.testFmsFilter = 'all';
-    openTestTracker('admissions');
-    $('task-view-container').style.display = 'none';
-    $('admin-dashboard-container').style.display = 'none';
-    $('test-tracker-container').style.display = 'block';
-  };
-  $('tab-parents').onclick = () => {
-    setActiveTab('tab-parents');
-    state.testFmsFilter = 'all';
-    openTestTracker('parents');
-    $('task-view-container').style.display = 'none';
-    $('admin-dashboard-container').style.display = 'none';
-    $('test-tracker-container').style.display = 'block';
+    if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
   };
 
-  checkBroadcast();
-  $('loading-screen').classList.add('hidden');
+  const staticFms = [
+    { id: 'tab-tests', view: 'tests' },
+    { id: 'tab-videos', view: 'videos' },
+    { id: 'tab-enquiries', view: 'enquiries' },
+    { id: 'tab-admissions', view: 'admissions' },
+    { id: 'tab-parents', view: 'parents' }
+  ];
+
+  staticFms.forEach(f => {
+    const el = $(f.id);
+    if (el) el.onclick = () => {
+      setActiveTab(f.id);
+      state.testFmsFilter = 'all';
+      openTestTracker(f.view);
+      $('task-view-container').style.display = 'none';
+      $('admin-dashboard-container').style.display = 'none';
+      if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+      $('test-tracker-container').style.display = 'block';
+    };
+  });
+
+  // Bind dynamic blueprint tabs
+  const blueprints = getCustomFmsBlueprints();
+  blueprints.forEach(bp => {
+    const lowerSlug = bp.type.toLowerCase();
+    const el = $(`tab-custom-${lowerSlug}`);
+    if (el) {
+      el.onclick = () => {
+        setActiveTab(`tab-custom-${lowerSlug}`);
+        state.testFmsFilter = 'all';
+        openTestTracker(lowerSlug);
+        $('task-view-container').style.display = 'none';
+        $('admin-dashboard-container').style.display = 'none';
+        if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+        $('test-tracker-container').style.display = 'block';
+      };
+    }
+    // Bind inline delete button on nav pill (admin only)
+    const delBtn = $(`tab-custom-del-${lowerSlug}`);
+    if (delBtn) {
+      delBtn.onclick = (e) => {
+        e.stopPropagation();
+        confirmDeleteFmsBlueprint(bp.id, bp.name);
+      };
+    }
+  });
+
+  // Bind FMS Builder tab (visible to admin only)
+  const fmsBuilderTab = $('tab-fms-builder');
+  if (fmsBuilderTab) {
+    fmsBuilderTab.onclick = () => {
+      setActiveTab('tab-fms-builder');
+      state.currentView = 'fms-builder';
+      $('task-view-container').style.display = 'none';
+      $('admin-dashboard-container').style.display = 'none';
+      $('test-tracker-container').style.display = 'none';
+      if ($('fms-builder-container')) $('fms-builder-container').style.display = 'block';
+      renderCustomFmsBlueprintsList();
+      closeCustomFmsCreatorSection();
+    };
+  }
+
 }
+
+
+function openCustomFmsBuilderModal() {
+  const tab = $('tab-fms-builder');
+  if (tab) {
+    tab.click();
+  } else {
+    // Fallback if elements not ready
+    if ($('fms-builder-container')) $('fms-builder-container').style.display = 'block';
+    renderCustomFmsBlueprintsList();
+    closeCustomFmsCreatorSection();
+  }
+}
+
+function closeCustomFmsBuilderModal() {
+  if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+}
+
+function openCustomFmsCreatorSection() {
+  $('fms-blueprint-form-section').style.display = 'block';
+  $('fms-blueprint-form').reset();
+  $('fms-bp-stages').checked = true;
+  $('fms-bp-links').checked = true;
+  $('fms-bp-offsets').checked = true;
+  $('fms-bp-marks').checked = false;
+  $('fms-bp-scoring').checked = false;
+  
+  document.querySelectorAll('input[name="fms-bp-roles"]').forEach(cb => {
+    if (cb.value !== 'admin') cb.checked = cb.value !== 'member';
+  });
+}
+
+function closeCustomFmsCreatorSection() {
+  $('fms-blueprint-form-section').style.display = 'none';
+}
+
+function renderCustomFmsBlueprintsList() {
+  const blueprints = getCustomFmsBlueprints();
+  const container = $('fms-blueprints-list');
+  if (!container) return;
+
+  if (blueprints.length === 0) {
+    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: var(--space-md);">No custom pipelines created yet. Click "+ New Pipeline" to build one!</div>`;
+    return;
+  }
+
+  container.innerHTML = blueprints.map(bp => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:rgba(255,255,255,0.02);border:1px solid var(--border-glass);border-radius:var(--radius-md);gap:12px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:0.9rem;color:var(--text-primary);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span>${bp.name}</span>
+          <span style="font-size:0.65rem;padding:2px 7px;background:rgba(124,58,237,0.15);color:var(--accent-purple);border-radius:99px;font-weight:700;border:1px solid rgba(124,58,237,0.3);text-transform:uppercase;letter-spacing:0.05em;">${bp.type}</span>
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:5px;">
+          ${[
+            bp.stagesNeeded ? '📋 Stages' : '',
+            bp.linksNeeded ? '🔗 Links' : '',
+            bp.offsetsNeeded ? '↔️ Offsets' : '',
+            bp.marksNeeded ? '🎯 Marks' : '',
+            bp.scoringSystem ? '🏆 Scoring' : ''
+          ].filter(Boolean).join(' &nbsp;·&nbsp; ') || '📦 Pure Item Tracking'}
+        </div>
+      </div>
+      <button onclick="confirmDeleteFmsBlueprint('${bp.id}','${bp.name.replace(/'/g,"\\'")}')"
+        style="flex-shrink:0;display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:99px;border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.08);color:#f87171;font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.2s;white-space:nowrap;"
+        onmouseover="this.style.background='rgba(239,68,68,0.18)';this.style.borderColor='rgba(239,68,68,0.7)'"
+        onmouseout="this.style.background='rgba(239,68,68,0.08)';this.style.borderColor='rgba(239,68,68,0.4)'">
+        🗑️ Delete
+      </button>
+    </div>
+  `).join('');
+}
+
+// Shows an in-app confirm modal before deleting — no jarring browser confirm()
+function confirmDeleteFmsBlueprint(blueprintId, blueprintName) {
+  // Build and inject an inline confirmation banner
+  const existingConfirm = document.getElementById('fms-delete-confirm-banner');
+  if (existingConfirm) existingConfirm.remove();
+
+  const banner = document.createElement('div');
+  banner.id = 'fms-delete-confirm-banner';
+  banner.style.cssText = `
+    position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+    background:linear-gradient(135deg,#1a0a0a,#2d0f0f);
+    border:1px solid rgba(239,68,68,0.5);border-radius:16px;
+    padding:16px 20px;z-index:9999;display:flex;flex-direction:column;
+    gap:10px;min-width:300px;max-width:90vw;
+    box-shadow:0 8px 32px rgba(239,68,68,0.25),0 0 0 1px rgba(239,68,68,0.15);
+    animation:slideUpIn 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  `;
+  banner.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:1.3rem;">🗑️</span>
+      <div>
+        <div style="font-weight:700;font-size:0.9rem;color:#fca5a5;">Delete "${blueprintName}"?</div>
+        <div style="font-size:0.75rem;color:rgba(252,165,165,0.7);margin-top:2px;">This will permanently remove the FMS and its tab.</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button id="fms-del-confirm-yes"
+        style="flex:1;padding:8px;border-radius:99px;border:1px solid rgba(239,68,68,0.6);background:rgba(239,68,68,0.2);color:#fca5a5;font-weight:700;font-size:0.82rem;cursor:pointer;"
+        onmouseover="this.style.background='rgba(239,68,68,0.35)'"
+        onmouseout="this.style.background='rgba(239,68,68,0.2)'">
+        Yes, Delete
+      </button>
+      <button id="fms-del-confirm-no"
+        style="flex:1;padding:8px;border-radius:99px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:var(--text-muted);font-weight:600;font-size:0.82rem;cursor:pointer;"
+        onmouseover="this.style.background='rgba(255,255,255,0.1)'"
+        onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+        Cancel
+      </button>
+    </div>
+  `;
+  document.body.appendChild(banner);
+
+  document.getElementById('fms-del-confirm-no').onclick = () => banner.remove();
+  document.getElementById('fms-del-confirm-yes').onclick = async () => {
+    banner.remove();
+    await deleteCustomFmsBlueprint(blueprintId);
+  };
+
+  // Auto-dismiss after 8s
+  setTimeout(() => { if (banner.parentNode) banner.remove(); }, 8000);
+}
+
+async function deleteCustomFmsBlueprint(blueprintId) {
+  // Fallback to My Tasks if currently viewing the tab being deleted
+  const blueprints = getCustomFmsBlueprints();
+  const bpToDelete = blueprints.find(b => String(b.id) === String(blueprintId));
+  if (bpToDelete && state.currentView === bpToDelete.type.toLowerCase()) {
+    state.currentView = 'tasks';
+    if ($('task-view-container')) $('task-view-container').style.display = 'block';
+    if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+    if ($('test-tracker-container')) $('test-tracker-container').style.display = 'none';
+    const myTasksTab = $('tab-my-tasks');
+    if (myTasksTab) {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      myTasksTab.classList.add('active');
+    }
+  }
+
+  state.testSettings = (state.testSettings || []).filter(s => {
+    if (s.type === 'fms_blueprint') {
+      try {
+        const bp = JSON.parse(s.label);
+        return String(bp.id) !== String(blueprintId);
+      } catch (e) { return true; }
+    }
+    return true;
+  });
+
+  const res = await apiFetch('updateTestSettings', { settings: state.testSettings });
+  if (res.success) {
+    showToast('FMS "' + (bpToDelete ? bpToDelete.name : '') + '" deleted.', 'success');
+    renderCustomFmsBlueprintsList();
+    renderNavigationTabs();
+  } else {
+    showToast('Failed to delete: ' + res.error, 'error');
+  }
+}
+
+async function saveCustomFmsBlueprint(blueprint) {
+  const blueprintRow = {
+    stage_id: 2000 + Math.floor(Math.random() * 1000000),
+    label: JSON.stringify(blueprint),
+    offset_days: 0,
+    doer: '',
+    type: 'fms_blueprint',
+    link: '',
+    hidden: false
+  };
+
+  if (!state.testSettings) state.testSettings = [];
+  state.testSettings = state.testSettings.filter(s => {
+    if (s.type === 'fms_blueprint') {
+      try {
+        const bp = JSON.parse(s.label);
+        return bp.id !== blueprint.id;
+      } catch (e) { return true; }
+    }
+    return true;
+  });
+  state.testSettings.push(blueprintRow);
+
+  const res = await apiFetch('updateTestSettings', { settings: state.testSettings });
+  if (res.success) {
+    showToast('FMS Blueprint saved successfully!', 'success');
+    renderNavigationTabs();
+  } else {
+    showToast('Failed to save blueprint: ' + res.error, 'error');
+  }
+}
+
+async function handleFmsBlueprintSubmit() {
+  const name = $('fms-bp-name').value.trim();
+  const slug = $('fms-bp-type').value.trim();
+
+  if (!name || !slug) {
+    showToast('Please fill in Name and Slug fields.', 'error');
+    return;
+  }
+
+  if (!/^[a-zA-Z]+$/.test(slug)) {
+    showToast('Slug must contain letters only, without spaces.', 'error');
+    return;
+  }
+
+  const forbiddenSlugs = ['tests', 'videos', 'enquiries', 'admissions', 'parents', 'tasks', 'dashboard', 'sheet', 'app', 'video', 'beforefee', 'afterfee'];
+  if (forbiddenSlugs.includes(slug.toLowerCase())) {
+    showToast(`The slug key "${slug}" is reserved. Please use another slug.`, 'error');
+    return;
+  }
+
+  const blueprints = getCustomFmsBlueprints();
+  if (blueprints.some(bp => bp.type.toLowerCase() === slug.toLowerCase())) {
+    showToast(`An FMS with slug "${slug}" already exists!`, 'error');
+    return;
+  }
+
+  const stagesNeeded = $('fms-bp-stages').checked;
+  const linksNeeded = $('fms-bp-links').checked;
+  const offsetsNeeded = $('fms-bp-offsets').checked;
+  const marksNeeded = $('fms-bp-marks').checked;
+  const scoringSystem = $('fms-bp-scoring').checked;
+
+  const roles = ['admin'];
+  document.querySelectorAll('input[name="fms-bp-roles"]:checked').forEach(cb => {
+    roles.push(cb.value);
+  });
+
+  const blueprintId = 'fms_' + slug.toLowerCase() + '_' + Date.now();
+  const newBlueprint = {
+    id: blueprintId,
+    name: name,
+    type: slug,
+    stagesNeeded,
+    linksNeeded,
+    offsetsNeeded,
+    marksNeeded,
+    scoringSystem,
+    roles
+  };
+
+  await saveCustomFmsBlueprint(newBlueprint);
+  closeCustomFmsCreatorSection();
+  renderCustomFmsBlueprintsList();
+}
+
+window.deleteCustomFmsBlueprint = deleteCustomFmsBlueprint;
+window.confirmDeleteFmsBlueprint = confirmDeleteFmsBlueprint;
+
 
 function setActiveTab(id) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
@@ -777,7 +1163,7 @@ async function openTestTracker(viewType = 'tests') {
         if (testsRes.success) state.tests = testsRes.data;
         sanitizeTestSettings();
         // Only re-render if we are still on an FMS view and the data actually changed!
-        const fmsViews = ['tests', 'videos', 'admissions', 'parents'];
+        const fmsViews = ['tests', 'videos', 'enquiries', 'admissions', 'parents'];
         if (fmsViews.includes(state.currentView)) {
           renderTests(state.tests);
         }
@@ -823,7 +1209,9 @@ function getTestStages(test) {
       status: 'pending',
       actualDate: '',
       doneBy: '',
-      doneAt: ''
+      doneAt: '',
+      link: s.link || '',
+      hidden: s.hidden || false
     }));
   }
 
@@ -837,7 +1225,9 @@ function getTestStages(test) {
       status: s.status || 'pending',
       actualDate: s.actualDate || '',
       doneBy: s.doneBy || '',
-      doneAt: s.doneAt || ''
+      doneAt: s.doneAt || '',
+      link: s.link !== undefined ? s.link : (globalStage.link || ''),
+      hidden: s.hidden !== undefined ? s.hidden : (globalStage.hidden || false)
     };
   });
 }
@@ -874,6 +1264,7 @@ window.resetParentsChecklist = function () {
 function renderFmsSortDropdownOptions() {
   const isVideoView = state.currentView === 'videos';
   const isAdmissionView = state.currentView === 'admissions';
+  const isEnquiryView = state.currentView === 'enquiries';
 
   const menu = $('sort-dropdown-menu');
   if (!menu) return;
@@ -882,7 +1273,8 @@ function renderFmsSortDropdownOptions() {
   let sortType = state.testFmsSort;
 
   let options = [];
-  if (isAdmissionView) {
+  if (isEnquiryView) {
+    // Enquiry FMS — no scoring, date/name only
     if (!sortType || !['held-desc', 'held-asc', 'name-asc', 'name-desc'].includes(sortType)) {
       sortType = 'held-desc';
       state.testFmsSort = 'held-desc';
@@ -893,8 +1285,23 @@ function renderFmsSortDropdownOptions() {
       { value: 'name-asc', label: '🔤 Student Name (A–Z)', display: 'Student Name A–Z' },
       { value: 'name-desc', label: '🔤 Student Name (Z–A)', display: 'Student Name Z–A' }
     ];
+  } else if (isAdmissionView) {
+    // Admissions FMS — has scoring (Fee / Score)
+    if (!sortType || !['held-desc', 'held-asc', 'name-asc', 'name-desc', 'max-desc', 'max-asc'].includes(sortType)) {
+      sortType = 'held-desc';
+      state.testFmsSort = 'held-desc';
+    }
+    options = [
+      { value: 'held-desc', label: '📅 Date Registered (Newest First)', display: 'Date Registered ↓' },
+      { value: 'held-asc', label: '📅 Date Registered (Oldest First)', display: 'Date Registered ↑' },
+      { value: 'name-asc', label: '🔤 Student Name (A–Z)', display: 'Student Name A–Z' },
+      { value: 'name-desc', label: '🔤 Student Name (Z–A)', display: 'Student Name Z–A' },
+      { value: 'max-desc', label: '💰 Fee / Score (High → Low)', display: 'Fee / Score ↓' },
+      { value: 'max-asc', label: '💰 Fee / Score (Low → High)', display: 'Fee / Score ↑' }
+    ];
   } else if (isVideoView) {
-    if (!sortType || !['held-desc', 'held-asc', 'name-asc', 'name-desc'].includes(sortType)) {
+    // Video FMS — has scoring
+    if (!sortType || !['held-desc', 'held-asc', 'name-asc', 'name-desc', 'max-desc', 'max-asc'].includes(sortType)) {
       sortType = 'held-desc';
       state.testFmsSort = 'held-desc';
     }
@@ -902,7 +1309,9 @@ function renderFmsSortDropdownOptions() {
       { value: 'held-desc', label: '📅 Date Created (Newest First)', display: 'Date Created ↓' },
       { value: 'held-asc', label: '📅 Date Created (Oldest First)', display: 'Date Created ↑' },
       { value: 'name-asc', label: '🎥 Video Title (A–Z)', display: 'Video Title A–Z' },
-      { value: 'name-desc', label: '🎥 Video Title (Z–A)', display: 'Video Title Z–A' }
+      { value: 'name-desc', label: '🎥 Video Title (Z–A)', display: 'Video Title Z–A' },
+      { value: 'max-desc', label: '⭐ Score (High → Low)', display: 'Score ↓' },
+      { value: 'max-asc', label: '⭐ Score (Low → High)', display: 'Score ↑' }
     ];
   } else { // default tests view
     if (!sortType || ['name-asc', 'name-desc'].includes(sortType)) {
@@ -943,8 +1352,13 @@ function renderTests(tests) {
   // Update toolbar filter tabs visibility depending on active main tab
   const isVideoView = state.currentView === 'videos';
   const isAdmissionView = state.currentView === 'admissions';
+  const isEnquiryView = state.currentView === 'enquiries';
   const isParentsView = state.currentView === 'parents';
   const isTestView = state.currentView === 'tests';
+
+  const blueprints = getCustomFmsBlueprints();
+  const activeCustomBlueprint = blueprints.find(bp => bp.type.toLowerCase() === state.currentView);
+  const isCustomView = !!activeCustomBlueprint;
 
   const sheetPill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="sheet"]');
   const appPill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="app"]');
@@ -955,8 +1369,8 @@ function renderTests(tests) {
   if (sheetPill) sheetPill.style.display = isTestView ? 'inline-block' : 'none';
   if (appPill) appPill.style.display = isTestView ? 'inline-block' : 'none';
   if (videoPill) videoPill.style.display = 'none';
-  if (beforeFeePill) beforeFeePill.style.display = isAdmissionView ? 'inline-block' : 'none';
-  if (afterFeePill) afterFeePill.style.display = isAdmissionView ? 'inline-block' : 'none';
+  if (beforeFeePill) beforeFeePill.style.display = 'none';
+  if (afterFeePill) afterFeePill.style.display = 'none';
 
   // Show/Hide FMS Toolbar (search/sort) and FMS subtabs for Parents FMS
   const toolbar = document.querySelector('.test-fms-toolbar');
@@ -973,7 +1387,7 @@ function renderTests(tests) {
     }
   } else {
     if (toolbar) toolbar.style.display = 'flex';
-    if (filterTabs) filterTabs.style.display = 'flex';
+    if (filterTabs) filterTabs.style.display = isTestView ? 'flex' : 'none';
     if (settingsBtn) {
       const canEditSettings = state.userRole === 'admin' || state.userRole === 'coordinator' || state.userRole === 'process_coordinator';
       settingsBtn.style.display = canEditSettings ? 'flex' : 'none';
@@ -983,23 +1397,27 @@ function renderTests(tests) {
   // Dynamic header titles & add button label based on view type
   const fmsHeaderTitle = document.querySelector('.test-fms-title h2');
   if (fmsHeaderTitle) {
-    if (isAdmissionView) fmsHeaderTitle.textContent = 'Admission FMS';
+    if (isEnquiryView) fmsHeaderTitle.textContent = 'Enquiry FMS';
+    else if (isAdmissionView) fmsHeaderTitle.textContent = 'Admission FMS';
     else if (isVideoView) fmsHeaderTitle.textContent = 'Video FMS';
     else if (isParentsView) fmsHeaderTitle.textContent = 'Parents FMS';
+    else if (isCustomView) fmsHeaderTitle.textContent = activeCustomBlueprint.name;
     else fmsHeaderTitle.textContent = 'Test FMS';
   }
 
   const addBtn = $('btn-add-test');
   if (addBtn) {
-    if (isAdmissionView) addBtn.textContent = '+ Add Admission';
+    if (isEnquiryView) addBtn.textContent = '+ Add Enquiry';
+    else if (isAdmissionView) addBtn.textContent = '+ Add Admission';
     else if (isVideoView) addBtn.textContent = '+ Add Video';
     else if (isParentsView) addBtn.textContent = '+ Reset Checklist';
+    else if (isCustomView) addBtn.textContent = '+ Add ' + activeCustomBlueprint.name;
     else addBtn.textContent = '+ Add Test';
   }
 
   const fmsHeaderIcon = document.querySelector('.test-fms-title-icon');
   if (fmsHeaderIcon) {
-    if (isAdmissionView) {
+    if (isAdmissionView || isEnquiryView) {
       fmsHeaderIcon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="17" y1="11" x2="23" y2="11"/></svg>';
     } else if (isVideoView) {
       fmsHeaderIcon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>';
@@ -1080,26 +1498,40 @@ function renderTests(tests) {
     const isAfterFee = (test.type || '').toLowerCase() === 'afterfee';
     const isParents = (test.type || '').toLowerCase() === 'parents';
 
-    // 1. Partition by Main Navigation Tab
-    if (isParentsView && !isParents) return false;
-    if (isAdmissionView && !isBeforeFee && !isAfterFee) return false;
-    if (isVideoView && !isVideo) return false;
-    if (isTestView && (isVideo || isBeforeFee || isAfterFee || isParents)) return false;
+    // 1. Partition by Main Navigation Tab Dynamically
+    const currentViewLower = state.currentView;
+    const testTypeLower = (test.type || '').toLowerCase();
+
+    if (currentViewLower === 'tests') {
+      if (testTypeLower !== 'sheet' && testTypeLower !== 'app') return false;
+    } else if (currentViewLower === 'videos') {
+      if (testTypeLower !== 'video') return false;
+    } else if (currentViewLower === 'enquiries') {
+      if (testTypeLower !== 'beforefee') return false;
+    } else if (currentViewLower === 'admissions') {
+      if (testTypeLower !== 'afterfee') return false;
+    } else if (currentViewLower === 'parents') {
+      if (testTypeLower !== 'parents') return false;
+    } else if (isCustomView) {
+      if (testTypeLower !== currentViewLower) return false;
+    } else {
+      return false; // Unknown view
+    }
 
     // 2. Sub-tab Toolbar Filters
-    const testStages = getTestStages(test);
+    const testStages = getTestStages(test).filter(s => !s.hidden);
     const totalStages = testStages.length;
     const completedStages = testStages.filter(s => s.status === 'done').length;
     const isCompleted = totalStages > 0 && completedStages === totalStages;
 
     if (filter === 'complete' && !isCompleted) return false;
     if (filter === 'progress' && isCompleted) return false;
-    if (filter === 'sheet' && (test.type || '').toLowerCase() !== 'sheet') return false;
-    if (filter === 'app' && (test.type || '').toLowerCase() !== 'app') return false;
+    if (filter === 'sheet' && testTypeLower !== 'sheet') return false;
+    if (filter === 'app' && testTypeLower !== 'app') return false;
     if (filter === 'beforefee' && !isBeforeFee) return false;
     if (filter === 'afterfee' && !isAfterFee) return false;
 
-    // 2. Search Query Filter
+    // 3. Search Query Filter
     if (searchQuery) {
       const nameMatch = (test.testName || '').toLowerCase().includes(searchQuery);
       const subMatch = (test.subject || '').toLowerCase().includes(searchQuery);
@@ -1133,14 +1565,30 @@ function renderTests(tests) {
 
   container.innerHTML = filteredTests.map(test => {
     const heldOnDate = new Date(test.heldOn);
+    const testType = test.type || 'Sheet';
+
+    // Check if dynamic custom blueprint governs this card
+    const bp = blueprints.find(b => b.type === testType);
+    const isCustom = !!bp;
+    const showOffsets = isCustom ? bp.offsetsNeeded : (testType !== 'BeforeFee' && testType !== 'AfterFee');
+    const showLinks = isCustom ? bp.linksNeeded : true;
+    const showStages = isCustom ? bp.stagesNeeded : true;
+    const showMarks = isCustom
+      ? (bp.marksNeeded || bp.scoringSystem)
+      : FMS_SCORING_ENABLED.has(testType);
+
+    // Friendly scoring label per FMS context
+    const scoringLabel = testType === 'Video' ? 'Score / Rating'
+      : testType === 'AfterFee' ? 'Fee / Score'
+      : 'Marks';
 
     // Check if any stage is overdue to apply card styling
-    const testType = test.type || 'Sheet';
     const relevantSettings = (state.testSettings || []).filter(s => s.type === testType);
-    const hasOverdueStage = relevantSettings.some(stage => {
+    const hasOverdueStage = showOffsets && relevantSettings.some(stage => {
       const stages = test.stages || [];
       const testStage = stages.find(s => s.id === stage.id) || { status: 'pending' };
       if (testStage.status === 'done') return false;
+      if (testStage.hidden) return false;
 
       const pDate = new Date(heldOnDate);
       pDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
@@ -1149,7 +1597,7 @@ function renderTests(tests) {
     });
 
     // Calculate stage stats for the compact progress bar
-    const testStages = getTestStages(test);
+    const testStages = getTestStages(test).filter(s => !s.hidden);
     const totalStages = testStages.length;
     const completedStages = testStages.filter(s => s.status === 'done').length;
 
@@ -1160,15 +1608,25 @@ function renderTests(tests) {
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
           <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
             ${test.subject ? `<span class="subject-badge subject-${test.subject.toLowerCase()}">${test.subject === 'Math' ? 'Maths' : test.subject}</span>` : ''}
-            <span class="test-type-pill type-${(test.type || '').toLowerCase()}">${test.type || ''}</span>
-            ${totalStages > 0 ? (() => {
-        const pct = Math.round((completedStages / totalStages) * 100);
-        if (completedStages === totalStages) return `<span class="test-status-badge status-complete">✓ Complete</span>`;
-        if (hasOverdueStage) return `<span class="test-status-badge status-overdue">⚠ Overdue</span>`;
-        return `<span class="test-status-badge status-progress">${pct}% done</span>`;
-      })() : ''}
+            <span class="test-type-pill type-${(test.type || '').toLowerCase()}">${test.type === 'BeforeFee' ? 'Enquiry' : (test.type === 'AfterFee' ? 'Admission' : (test.type || ''))}</span>
+            ${totalStages > 0 && showStages ? (() => {
+              const pct = Math.round((completedStages / totalStages) * 100);
+              if (completedStages === totalStages) return `<span class="test-status-badge status-complete">✓ Complete</span>`;
+              if (hasOverdueStage) return `<span class="test-status-badge status-overdue">⚠ Overdue</span>`;
+              return `<span class="test-status-badge status-progress">${pct}% done</span>`;
+            })() : ''}
+            ${!showStages ? `
+              <span class="test-status-badge ${test.status === 'done' ? 'status-complete' : 'status-progress'}">
+                ${test.status === 'done' ? '✓ Complete' : '⏳ Pending'}
+              </span>
+            ` : ''}
           </div>
           <div style="display:flex; align-items:center; gap:6px;">
+            ${!showStages ? `
+              <button class="btn-ghost btn-sm" onclick="toggleCustomFmsCardStatus('${test.testId}')" style="color:${test.status === 'done' ? 'var(--text-muted)' : 'var(--accent-emerald)'}; font-weight:bold;">
+                ${test.status === 'done' ? '⏳ Reopen' : '✓ Done'}
+              </button>
+            ` : ''}
             <button class="btn-ghost btn-sm" onclick="handleEditTestDetailsModal('${test.testId}')">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
               Edit
@@ -1177,9 +1635,10 @@ function renderTests(tests) {
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
               Delete
             </button>
+            ${showStages ? `
             <div class="expand-chevron" style="transition:transform var(--transition-base); color:var(--text-muted); display:flex; align-items:center;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-            </div>
+            </div>` : ''}
           </div>
         </div>
 
@@ -1189,24 +1648,20 @@ function renderTests(tests) {
         <!-- 2-column meta grid -->
         <div class="test-meta-grid">
           <div class="meta-col">
+            ${test.className && test.className !== 'undefined' ? `
             <div class="meta-kv">
               <span class="meta-k">Class</span>
               <span class="meta-v meta-bold">${test.className}</span>
-            </div>
-            ${test.type !== 'Video' && test.type !== 'BeforeFee' && test.type !== 'AfterFee' ? `
+            </div>` : ''}
+          ${showMarks && test.maxScore ? `
             <div class="meta-kv">
-              <span class="meta-k">Max Marks</span>
+              <span class="meta-k">${scoringLabel} (Max)</span>
               <span class="meta-v meta-bold">${test.maxScore}</span>
             </div>` : ''}
-            ${test.minScore !== undefined && test.minScore !== '' && test.type !== 'Video' ? `
+            ${showMarks && test.minScore !== undefined && test.minScore !== '' ? `
             <div class="meta-kv">
-              <span class="meta-k">Min Marks</span>
-              <span class="meta-v">${test.minScore}</span>
-            </div>` : ''}
-            ${test.avgScore !== undefined && test.avgScore !== '' ? `
-            <div class="meta-kv">
-              <span class="meta-k">Avg Marks</span>
-              <span class="meta-v">${test.avgScore}</span>
+              <span class="meta-k">${scoringLabel} (Min)</span>
+              <span class="meta-v">${test.minScore}${test.avgScore ? ` / avg ${test.avgScore}` : ''}</span>
             </div>` : ''}
           </div>
           <div class="meta-col">
@@ -1214,33 +1669,33 @@ function renderTests(tests) {
               <span class="meta-k">Held On</span>
               <span class="meta-v meta-bold">${formatDate(test.heldOn)}</span>
             </div>
-            ${totalStages > 0 ? (() => {
-        const pct = Math.round((completedStages / totalStages) * 100);
-        const pctColor = completedStages === totalStages ? 'var(--accent-emerald)' : (hasOverdueStage ? 'var(--accent-red)' : 'var(--accent-purple)');
-        return `
-            <div class="meta-kv">
-              <span class="meta-k">Progress</span>
-              <span class="meta-v" style="color:${pctColor}; font-weight:800;">${completedStages}/${totalStages} <span style="font-weight:600; font-size:0.7rem; opacity:0.8;">(${pct}%)</span></span>
-            </div>
-            <div style="margin-top:5px;">
-              <div style="background:rgba(255,255,255,0.06); height:5px; border-radius:3px; overflow:hidden; display:flex; gap:2px; border:1px solid var(--border-glass);">
-                ${testStages.map(stage => {
-          const plannedDate = new Date(heldOnDate);
-          plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
-          plannedDate.setHours(23, 59, 59, 999);
-          const isDelayed = stage.status !== 'done' && new Date() > plannedDate;
-          let bg = 'rgba(255,255,255,0.12)';
-          if (stage.status === 'done') bg = 'var(--accent-emerald)';
-          else if (isDelayed) bg = 'var(--accent-red)';
-          return `<div style="flex:1; background:${bg}; height:100%; transition:background 0.3s;" title="${stage.label || 'Stage'}: ${stage.status === 'done' ? 'Done' : (isDelayed ? 'Overdue' : 'Pending')}"></div>`;
-        }).join('')}
+            ${totalStages > 0 && showStages ? (() => {
+              const pct = Math.round((completedStages / totalStages) * 100);
+              const pctColor = completedStages === totalStages ? 'var(--accent-emerald)' : (hasOverdueStage ? 'var(--accent-red)' : 'var(--accent-purple)');
+              return `
+              <div class="meta-kv">
+                <span class="meta-k">Progress</span>
+                <span class="meta-v" style="color:${pctColor}; font-weight:800;">${completedStages}/${totalStages} <span style="font-weight:600; font-size:0.7rem; opacity:0.8;">(${pct}%)</span></span>
               </div>
-            </div>`;
-      })() : ''}
+              <div style="margin-top:5px;">
+                <div style="background:rgba(255,255,255,0.06); height:5px; border-radius:3px; overflow:hidden; display:flex; gap:2px; border:1px solid var(--border-glass);">
+                  ${testStages.map(stage => {
+                    const plannedDate = new Date(heldOnDate);
+                    plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
+                    plannedDate.setHours(23, 59, 59, 999);
+                    const isDelayed = stage.status !== 'done' && new Date() > plannedDate;
+                    let bg = 'rgba(255,255,255,0.12)';
+                    if (stage.status === 'done') bg = 'var(--accent-emerald)';
+                    else if (isDelayed && showOffsets) bg = 'var(--accent-red)';
+                    return `<div style="flex:1; background:${bg}; height:100%; transition:background 0.3s;" title="${stage.label || 'Stage'}: ${stage.status === 'done' ? 'Done' : (isDelayed && showOffsets ? 'Overdue' : 'Pending')}"></div>`;
+                  }).join('')}
+                </div>
+              </div>`;
+            })() : ''}
           </div>
         </div>
 
-        ${(test.sheetLink || test.folderLink) ? `
+        ${(test.sheetLink || test.folderLink) && showLinks ? `
         <div style="display:flex; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border-glass);">
           ${test.sheetLink ? `
             <a href="${test.sheetLink}" target="_blank" class="btn-ghost btn-xs" style="display:inline-flex; align-items:center; gap:5px; text-decoration:none; color:var(--accent-emerald); font-weight:700; padding:4px 10px; font-size:0.75rem;">
@@ -1254,28 +1709,37 @@ function renderTests(tests) {
             </a>` : ''}
         </div>` : ''}
         
+        ${showStages ? `
         <div class="test-pipeline">
           ${testStages.map((stage, sIdx) => {
-        const plannedDate = new Date(heldOnDate);
-        plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
-        const pDateCheck = new Date(plannedDate);
-        pDateCheck.setHours(23, 59, 59, 999);
-        const isDelayed = stage.status !== 'done' && new Date() > pDateCheck;
-        const statusClass = stage.status === 'done' ? 'done' : (isDelayed ? 'delayed' : 'pending');
-        const doneIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+            const plannedDate = new Date(heldOnDate);
+            plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
+            const pDateCheck = new Date(plannedDate);
+            pDateCheck.setHours(23, 59, 59, 999);
+            const isDelayed = stage.status !== 'done' && new Date() > pDateCheck;
+            const statusClass = stage.status === 'done' ? 'done' : (isDelayed && showOffsets ? 'delayed' : 'pending');
+            const doneIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
 
-        return `
+            return `
               <div class="pipeline-step ${statusClass}" onclick="handleToggleTestStage('${test.testId}', ${stage.id})" title="Click to toggle status.">
                 <div class="pipeline-step-left">
                   <div class="step-indicator">${stage.status === 'done' ? doneIcon : (sIdx + 1)}</div>
                 </div>
                 <div class="step-details">
                   <div class="step-main-info">
-                    <div class="step-label">${stage.label || 'Step'}</div>
-                    ${(test.type !== 'BeforeFee' && test.type !== 'AfterFee') ? `<div class="step-date">Planned: ${formatDate(plannedDate)}</div>` : ''}
+                    <div class="step-label" style="display:flex; align-items:center; gap:8px; width:100%;">
+                      <span>${stage.label || 'Step'}</span>
+                      ${stage.link && showLinks ? `
+                        <a href="${stage.link}" target="_blank" onclick="event.stopPropagation();" class="btn-ghost btn-xs" style="display:inline-flex; align-items:center; gap:3px; text-decoration:none; color:var(--accent-purple); font-weight:700; padding:2px 6px; font-size:0.68rem; border-radius:4px; border:1px solid rgba(124,58,237,0.25); background:rgba(124,58,237,0.05); margin-left:auto;">
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="flex-shrink:0;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                          Link
+                        </a>
+                      ` : ''}
+                    </div>
+                    ${showOffsets ? `<div class="step-date">Planned: ${formatDate(plannedDate)}</div>` : ''}
                   </div>
                   <div class="step-meta-info">
-                    ${(test.type !== 'BeforeFee' && test.type !== 'AfterFee') ? `<div><strong>Assigned:</strong> ${stage.doer || 'Unassigned'}</div>` : ''}
+                    ${showOffsets ? `<div><strong>Assigned:</strong> ${stage.doer || 'Unassigned'}</div>` : ''}
                     ${stage.status === 'done' ? `
                       <div><strong>Done by:</strong> ${stage.doneBy || 'System'}</div>
                       <div><strong>At:</strong> ${stage.doneAt || 'N/A'}</div>
@@ -1283,8 +1747,8 @@ function renderTests(tests) {
                   </div>
                 </div>
               </div>`;
-      }).join('')}
-        </div>
+          }).join('')}
+        </div>` : ''}
       </div>
     `;
   }).join('');
@@ -1377,11 +1841,19 @@ function openTestSettingsModal() {
     return;
   }
 
+  const blueprints = getCustomFmsBlueprints();
+  const activeCustomBlueprint = blueprints.find(bp => bp.type.toLowerCase() === state.currentView);
+  const isCustomView = !!activeCustomBlueprint;
+
   // Pre-select tab based on the active view
-  if (state.currentView === 'parents') {
+  if (isCustomView) {
+    state.activeSettingsTab = activeCustomBlueprint.type;
+  } else if (state.currentView === 'parents') {
     state.activeSettingsTab = 'Parents';
-  } else if (state.currentView === 'admissions') {
+  } else if (state.currentView === 'enquiries') {
     state.activeSettingsTab = 'BeforeFee';
+  } else if (state.currentView === 'admissions') {
+    state.activeSettingsTab = 'AfterFee';
   } else if (state.currentView === 'videos') {
     state.activeSettingsTab = 'Video';
   } else {
@@ -1399,28 +1871,25 @@ function openTestSettingsModal() {
   // Dynamically filter visibility of settings tabs to prevent clutter and truncating
   const tabsContainer = document.querySelector('.test-settings-tabs');
   if (tabsContainer) {
-    if (state.currentView === 'parents') {
+    if (isCustomView) {
+      tabsContainer.style.display = 'none'; // Only this custom FMS setting is active
+    } else if (state.currentView === 'parents') {
       tabsContainer.style.display = 'none'; // Only Parents setting is available
     } else if (state.currentView === 'videos') {
       tabsContainer.style.display = 'none'; // Only Video setting is available
+    } else if (state.currentView === 'enquiries') {
+      tabsContainer.style.display = 'none'; // Only Enquiry setting is available
+    } else if (state.currentView === 'admissions') {
+      tabsContainer.style.display = 'none'; // Only Admission setting is available
     } else {
       tabsContainer.style.display = 'flex';
 
-      if (state.currentView === 'admissions') {
-        if (sheetTab) sheetTab.style.display = 'none';
-        if (appTab) appTab.style.display = 'none';
-        if (videoTab) videoTab.style.display = 'none';
-        if (beforeFeeTab) beforeFeeTab.style.display = 'inline-flex';
-        if (afterFeeTab) afterFeeTab.style.display = 'inline-flex';
-        if (parentsTab) parentsTab.style.display = 'none';
-      } else { // default to 'tests' view
-        if (sheetTab) sheetTab.style.display = 'inline-flex';
-        if (appTab) appTab.style.display = 'inline-flex';
-        if (videoTab) videoTab.style.display = 'none';
-        if (beforeFeeTab) beforeFeeTab.style.display = 'none';
-        if (afterFeeTab) afterFeeTab.style.display = 'none';
-        if (parentsTab) parentsTab.style.display = 'none';
-      }
+      if (sheetTab) sheetTab.style.display = 'inline-flex';
+      if (appTab) appTab.style.display = 'inline-flex';
+      if (videoTab) videoTab.style.display = 'none';
+      if (beforeFeeTab) beforeFeeTab.style.display = 'none';
+      if (afterFeeTab) afterFeeTab.style.display = 'none';
+      if (parentsTab) parentsTab.style.display = 'none';
     }
   }
 
@@ -1443,15 +1912,21 @@ function updateTestSettingsModalTitleAndDesc() {
   const descEl = document.querySelector('#test-settings-modal .modal-body-text');
   const activeTab = state.activeSettingsTab || 'Sheet';
 
+  const blueprints = getCustomFmsBlueprints();
+  const activeCustomBlueprint = blueprints.find(bp => bp.type === activeTab);
+  const isCustom = !!activeCustomBlueprint;
+
   if (titleEl) {
-    if (activeTab === 'Parents') {
+    if (isCustom) {
+      titleEl.textContent = '⚙️ ' + activeCustomBlueprint.name + ' Settings';
+    } else if (activeTab === 'Parents') {
       titleEl.textContent = '👪 Parents FMS Settings';
     } else if (activeTab === 'Video') {
       titleEl.textContent = '🎬 Video FMS Settings';
     } else if (activeTab === 'BeforeFee') {
-      titleEl.textContent = '⏳ Admission (Before Fee) Settings';
+      titleEl.textContent = '⏳ Enquiry Settings';
     } else if (activeTab === 'AfterFee') {
-      titleEl.textContent = '💳 Admission (After Fee) Settings';
+      titleEl.textContent = '💳 Admission Settings';
     } else if (activeTab === 'Sheet') {
       titleEl.textContent = '📄 Sheet Test FMS Settings';
     } else if (activeTab === 'App') {
@@ -1462,14 +1937,16 @@ function updateTestSettingsModalTitleAndDesc() {
   }
 
   if (descEl) {
-    if (activeTab === 'Parents') {
+    if (isCustom) {
+      descEl.textContent = 'Configure the pipeline stages for the custom ' + activeCustomBlueprint.name + ' FMS. These templates will initialize stages for newly tracked records.';
+    } else if (activeTab === 'Parents') {
       descEl.textContent = 'Configure the checklist guidelines for the Parents FMS. These settings will determine the checklist items displayed under the Parents Guidelines tab.';
     } else if (activeTab === 'Video') {
       descEl.textContent = 'Configure the stages for the Video FMS pipeline. These templates will initialize stages for newly tracked videos.';
     } else if (activeTab === 'BeforeFee') {
-      descEl.textContent = 'Configure the pre-payment stages for the Admission FMS pipeline. These templates will initialize stages for newly tracked admissions.';
+      descEl.textContent = 'Configure the pipeline stages for the Enquiry FMS. These templates will initialize stages for newly tracked enquiries.';
     } else if (activeTab === 'AfterFee') {
-      descEl.textContent = 'Configure the post-payment stages for the Admission FMS pipeline. These templates will initialize stages for newly tracked admissions.';
+      descEl.textContent = 'Configure the pipeline stages for the Admission FMS. These templates will initialize stages for newly tracked admissions.';
     } else if (activeTab === 'Sheet') {
       descEl.textContent = 'Configure the stages for the Sheet Test FMS pipeline. These templates will initialize stages for newly tracked academic tests.';
     } else if (activeTab === 'App') {
@@ -1544,6 +2021,7 @@ window.selectTypeSegment = function (type) {
 
 function toggleAcademicFields(type) {
   const isAcademic = type === 'Sheet' || type === 'App';
+  const hasScoring = FMS_SCORING_ENABLED.has(type); // Video, AfterFee also score-enabled
 
   const classSubRow = $('form-row-class-subject');
   const chapterRow = $('form-row-chapter');
@@ -1555,6 +2033,20 @@ function toggleAcademicFields(type) {
   const chapterInput = $('test-form-chapter');
   const customChapterInput = $('test-form-custom-chapter');
   const maxInput = $('test-form-max');
+  const maxLabel = document.querySelector('label[for="test-form-max"]');
+  const minLabel = document.querySelector('label[for="test-form-min"]');
+
+  // Adapt label text for non-academic scoring types
+  if (maxLabel) {
+    if (type === 'Video') { maxLabel.textContent = 'Video Score (Max)'; }
+    else if (type === 'AfterFee') { maxLabel.textContent = 'Fee / Score (Max)'; }
+    else { maxLabel.textContent = 'Max Marks'; }
+  }
+  if (minLabel) {
+    if (type === 'Video') { minLabel.textContent = 'Video Score (Min)'; }
+    else if (type === 'AfterFee') { minLabel.textContent = 'Fee / Score (Min)'; }
+    else { minLabel.textContent = 'Min Marks'; }
+  }
 
   if (isAcademic) {
     if (classSubRow) classSubRow.style.display = 'flex';
@@ -1568,41 +2060,89 @@ function toggleAcademicFields(type) {
   } else {
     if (classSubRow) classSubRow.style.display = 'none';
     if (chapterRow) chapterRow.style.display = 'none';
-    if (marksRow) marksRow.style.display = 'none';
     if (customChapterGrp) customChapterGrp.style.display = 'none';
 
     if (classSel) classSel.removeAttribute('required');
     if (subjectSel) subjectSel.removeAttribute('required');
     if (chapterInput) chapterInput.removeAttribute('required');
-    if (maxInput) maxInput.removeAttribute('required');
     if (customChapterInput) customChapterInput.removeAttribute('required');
+
+    // Show marks row for score-enabled non-academic types (Video, AfterFee)
+    if (marksRow) marksRow.style.display = hasScoring ? 'flex' : 'none';
+    // Max score is optional for these types (not required)
+    if (maxInput) maxInput.removeAttribute('required');
   }
 }
 
 function renderTestSettingsRows() {
   const container = $('test-settings-list');
   const activeType = state.activeSettingsTab || 'Sheet';
+
+  const blueprints = getCustomFmsBlueprints();
+  const bp = blueprints.find(b => b.type === activeType);
+  const isCustom = !!bp;
+
+  if (isCustom && !bp.stagesNeeded) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 40px var(--space-md); color: var(--text-dim);">
+        <span style="font-size: 2.2rem; display: block; margin-bottom: var(--space-md);">⚙️</span>
+        <h4 style="font-weight: 700; color: var(--text-primary); margin-bottom: 5px;">Checklist Stages Disabled</h4>
+        <p style="font-size: 0.78rem; line-height: 1.4; max-width: 320px; margin: 0 auto; color: var(--text-muted);">This FMS pipeline blueprint does not use stages checklist. Individual stages template configuration is not needed.</p>
+      </div>
+    `;
+    const addBtn = $('btn-add-setting-row');
+    if (addBtn) addBtn.style.display = 'none';
+    return;
+  }
+
+  // Restore normal Add Stage button if enabled
+  const addBtn = $('btn-add-setting-row');
+  if (addBtn) addBtn.style.display = 'flex';
+
   const activeSettings = (state.testSettings || []).filter(s => s.type === activeType);
+  const hideOffsetsAndDoer = isCustom ? !bp.offsetsNeeded : (activeType === 'Parents' || activeType === 'BeforeFee' || activeType === 'AfterFee');
+  const hideLinks = isCustom ? !bp.linksNeeded : false;
 
   container.innerHTML = activeSettings.map((s, idx) => `
-    <div class="form-row setting-row" data-index="${idx}" data-id="${s.id}" draggable="true" ondragstart="handleSettingDragStart(event)" ondragover="handleSettingDragOver(event)" ondrop="handleSettingDrop(event)" style="align-items: flex-end; margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; cursor: move; position: relative;">
-      <!-- Drag handle -->
-      <div class="drag-handle" style="padding: 10px 5px; color: rgba(255,255,255,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; height: 100%;">☰</div>
-      <div class="form-group" style="flex: 2; margin-left: 5px;">
-        <label>Label</label>
-        <input type="text" class="setting-label" value="${s.label}">
+    <div class="form-row setting-row" data-index="${idx}" data-id="${s.id}" draggable="true" ondragstart="handleSettingDragStart(event)" ondragover="handleSettingDragOver(event)" ondrop="handleSettingDrop(event)" style="display:flex; flex-direction:column; gap:6px; margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; cursor: move; position: relative;">
+      
+      <!-- Row 1: Label, Offset, Doer, Delete -->
+      <div style="display:flex; flex-direction:row; align-items:center; flex-wrap:nowrap; gap:6px; width:100%;">
+        <!-- Drag handle -->
+        <div class="drag-handle" style="padding: 10px 5px; color: rgba(255,255,255,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; height: 100%; user-select:none;">☰</div>
+        <div class="form-group" style="flex: 2; margin-left: 5px;">
+          <label>Label</label>
+          <input type="text" class="setting-label" value="${s.label}">
+        </div>
+        <div class="form-group" style="flex: 1; ${hideOffsetsAndDoer ? 'display: none;' : ''}">
+          <label>Offset (Days)</label>
+          <input type="number" class="setting-offset" value="${s.offset}">
+        </div>
+        <div class="form-group" style="flex: 1.5; ${hideOffsetsAndDoer ? 'display: none;' : ''}">
+          <label>Doer</label>
+          <select class="setting-doer" style="width:100%; padding:6px 8px; font-size:0.8rem; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:var(--text-primary); cursor:pointer;">
+            ${getDoerDropdownOptions(s.doer)}
+          </select>
+        </div>
+        <button class="btn-ghost" onclick="removeSettingRow(${idx})" style="padding: 10px; color: var(--accent-red); margin-left: 5px;">✕</button>
       </div>
-      <div class="form-group" style="flex: 1; ${(activeType === 'Parents' || activeType === 'BeforeFee' || activeType === 'AfterFee') ? 'display: none;' : ''}">
-        <label>Offset (Days)</label>
-        <input type="number" class="setting-offset" value="${s.offset}">
+
+      <!-- Row 2: Link and Admin Hide option -->
+      <div style="display:flex; flex-direction:row; align-items:center; gap:8px; width:100%; padding-left:25px;">
+        <!-- Link Field -->
+        <div class="form-group" style="flex:1; ${hideLinks ? 'display: none;' : ''}">
+          <label style="display:flex; align-items:center; gap:4px;">🔗 Link <span style="font-size:0.65rem; font-weight:normal; color:var(--text-muted);">(optional URL)</span></label>
+          <input type="text" class="setting-link" value="${s.link || ''}" style="width:100%;" placeholder="Stage Link URL">
+        </div>
+        <!-- Hide Stage option -->
+        <div class="form-group" style="flex-shrink:0; display:flex; align-items:center; margin-top:20px;">
+          <label style="display:flex; align-items:center; gap:4px; font-size:0.75rem; color:var(--text-muted); cursor:pointer; user-select:none;">
+            <input type="checkbox" class="setting-hidden" ${s.hidden ? 'checked' : ''} style="cursor:pointer; width:14px; height:14px;">
+            <span>Hide Stage</span>
+          </label>
+        </div>
       </div>
-      <div class="form-group" style="flex: 1.5; ${(activeType === 'Parents' || activeType === 'BeforeFee' || activeType === 'AfterFee') ? 'display: none;' : ''}">
-        <label>Doer</label>
-        <select class="setting-doer" style="width:100%; padding:6px 8px; font-size:0.8rem; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:var(--text-primary); cursor:pointer;">
-          ${getDoerDropdownOptions(s.doer)}
-        </select>
-      </div>
-      <button class="btn-ghost" onclick="removeSettingRow(${idx})" style="padding: 10px; color: var(--accent-red); margin-left: 5px;">✕</button>
+
     </div>
   `).join('');
 }
@@ -1610,7 +2150,7 @@ function renderTestSettingsRows() {
 function addSettingRow() {
   const activeType = state.activeSettingsTab || 'Sheet';
   const newId = state.testSettings.length > 0 ? Math.max(...state.testSettings.map(s => s.id)) + 1 : 1;
-  state.testSettings.push({ id: newId, label: 'New Stage', offset: 0, doer: '', type: activeType });
+  state.testSettings.push({ id: newId, label: 'New Stage', offset: 0, doer: '', type: activeType, link: '', hidden: false });
   renderTestSettingsRows();
 }
 
@@ -1632,17 +2172,25 @@ function saveActiveSettingsFromDOM() {
   const activeType = state.activeSettingsTab || 'Sheet';
 
   // First, filter out the old stages of the activeType
-  const otherSettings = state.testSettings.filter(s => s.type !== activeType);
+  const otherSettings = (state.testSettings || []).filter(s => s.type !== activeType);
 
   // Create updated objects for the active type from inputs
   const updatedActiveSettings = Array.from(rows).map((row, idx) => {
     const existingId = parseInt(row.getAttribute('data-id'));
+    const existing = (state.testSettings || []).find(s => s.id === existingId) || {};
+    const labelInput = row.querySelector('.setting-label');
+    const offsetInput = row.querySelector('.setting-offset');
+    const doerSelect = row.querySelector('.setting-doer');
+    const linkInput = row.querySelector('.setting-link');
+    const hiddenCheckbox = row.querySelector('.setting-hidden');
     return {
       id: !isNaN(existingId) ? existingId : idx + 100,
-      label: row.querySelector('.setting-label').value.trim(),
-      offset: parseInt(row.querySelector('.setting-offset').value) || 0,
-      doer: row.querySelector('.setting-doer').value.trim(),
-      type: activeType
+      label: labelInput ? labelInput.value.trim() : (existing.label || 'Stage ' + (idx + 1)),
+      offset: offsetInput ? (parseInt(offsetInput.value) || 0) : (existing.offset || 0),
+      doer: doerSelect ? doerSelect.value.trim() : (existing.doer || ''),
+      type: activeType,
+      link: linkInput ? linkInput.value.trim() : (existing.link || ''),
+      hidden: hiddenCheckbox ? hiddenCheckbox.checked : (existing.hidden || false)
     };
   });
 
@@ -3449,28 +3997,63 @@ async function init() {
     });
   });
 
-  try {
-    const teamRes = await apiFetch('getTeam');
-    state.teamMembers = teamRes.data || [];
-  } catch (err) {
-    console.error('Could not load team data:', err);
-    if (CONFIG.DEMO_MODE) state.teamMembers = MOCK_TEAM;
-  } finally {
-    const loader = $('loading-screen');
-    if (loader) loader.classList.add('hidden');
-  }
+  // Animation gate: minimum splash duration (4.5s cinematic reveal + 1s admire pause)
+  const animationPromise = new Promise(resolve => setTimeout(resolve, 5500));
 
-  // Check for local session
   const savedSession = localStorage.getItem('svm_session');
+
+  // ─── PHASE 1: FIRE ALL NETWORK FETCHES IMMEDIATELY ───────────────────────
+  // Data loads in parallel with the splash animation — no waiting.
+  let networkPromise;
   if (savedSession) {
     try {
       const userData = JSON.parse(savedSession);
-      handleUserSignedIn(userData);
+      state.currentUser = userData.name;
+      state.userRole = (userData.role || 'member').toLowerCase();
+
+      networkPromise = Promise.all([
+        apiFetch('getTeam').then(res => { state.teamMembers = res.data || []; }).catch(() => {}),
+        apiFetch('getTasks', { user: state.currentUser }).then(res => { state.tasks = res.data || []; }).catch(() => {}),
+        apiFetch('getScores', { user: state.currentUser }).then(res => { state.stats = res.data; }).catch(() => {}),
+        apiFetch('getTestSettings').then(res => { if (res.success) state.testSettings = res.data; }).catch(() => {}),
+        apiFetch('getTests').then(res => { if (res.success) state.tests = res.data; }).catch(() => {})
+      ]);
     } catch (e) {
-      handleUserSignedOut();
+      networkPromise = Promise.all([
+        apiFetch('getTeam').then(res => { state.teamMembers = res.data || []; }).catch(() => {})
+      ]);
     }
   } else {
-    handleUserSignedOut();
+    networkPromise = Promise.all([
+      apiFetch('getTeam').then(res => { state.teamMembers = res.data || []; }).catch(() => {})
+    ]);
+  }
+
+  // ─── PHASE 2: RENDER UI AS SOON AS DATA IS READY ─────────────────────────
+  // UI renders behind the splash screen the moment data arrives.
+  // This runs independently — does NOT wait for the animation to finish.
+  networkPromise.then(() => {
+    if (savedSession) {
+      try {
+        const userData = JSON.parse(savedSession);
+        handleUserSignedIn(userData);
+      } catch (e) {
+        handleUserSignedOut();
+      }
+    } else {
+      handleUserSignedOut();
+    }
+  });
+
+  // ─── PHASE 3: CURTAIN RISE AFTER FULL ANIMATION COMPLETES ────────────────
+  // Only the visual reveal waits for the animation gate.
+  // By this point the workspace is fully rendered and waiting beneath the splash.
+  await animationPromise;
+
+  const loader = $('loading-screen');
+  if (loader) {
+    loader.classList.add('pull-up-reveal');
+    setTimeout(() => loader.classList.add('hidden'), 1300);
   }
 }
 
@@ -4456,12 +5039,14 @@ async function switchView(view) {
     teamTab?.classList.remove('active');
     $('task-view-container').style.display = 'block';
     $('admin-dashboard-container').style.display = 'none';
+    if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
     await initForUser(state.currentUser);
   } else {
     myTasksTab?.classList.remove('active');
     teamTab?.classList.add('active');
     $('task-view-container').style.display = 'none';
     $('admin-dashboard-container').style.display = 'block';
+    if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
     await openDashboard();
   }
 }
@@ -5057,28 +5642,54 @@ function renderIndividualFormStages() {
       ondragover="${isAdmin ? 'handleFormStageDragOver(event)' : ''}"
       ondrop="${isAdmin ? 'handleFormStageDrop(event)' : ''}"
       ondragend="${isAdmin ? 'handleFormStageDragEnd(event)' : ''}"
-      style="display:flex; flex-direction:row; align-items:center; flex-wrap:nowrap; gap:6px; margin-bottom:8px; padding:8px; background:rgba(255,255,255,0.015); border:1px solid ${isUnlocked && !isAdmin ? 'rgba(16,185,129,0.25)' : 'var(--border-glass)'}; border-radius:6px; transition:border-color 0.3s;">
-      ${isAdmin ? `<div class="drag-handle" onmousedown="enableFormRowDrag(this)" style="flex-shrink:0; color:rgba(255,255,255,0.4); font-size:1.1rem; cursor:grab; line-height:1; padding:0 4px; user-select:none;">☰</div>` : ''}
-      <input type="text" class="form-stage-label" value="${s.label || ''}" ${canEdit ? '' : 'readonly disabled'}
-        style="flex:2; min-width:0; padding:6px 8px; font-size:0.8rem;
-               background:${canEdit ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)'};
-               border:1px solid var(--border-glass); border-radius:4px;
-               color:${canEdit ? 'var(--text-primary)' : 'var(--text-muted)'};
-               cursor:${canEdit ? 'text' : 'not-allowed'};" placeholder="Stage name">
-      <input type="number" class="form-stage-offset" value="${s.offset || 0}"
-        style="flex:0 0 55px; min-width:0; padding:6px 8px; font-size:0.8rem; font-weight:600;
-               background:rgba(255,255,255,0.04);
-               border:1px solid var(--accent-purple); border-radius:4px;
-               color:var(--text-primary); ${isParents ? 'display: none;' : ''}" title="Offset days — always editable">
-      <select class="form-stage-doer"
-        style="flex:1.5; min-width:0; padding:6px 8px; font-size:0.8rem;
-               background:rgba(255,255,255,0.05);
-               border:1px solid var(--border-glass); border-radius:4px;
-               color:var(--text-primary);
-               cursor:pointer; ${isParents ? 'display: none;' : ''}">
-        ${getDoerDropdownOptions(s.doer)}
-      </select>
-      ${isAdmin ? `<button type="button" onclick="removeIndividualTestStageRow(${idx})" style="flex-shrink:0; background:none; border:none; color:var(--accent-red); cursor:pointer; font-size:1rem; line-height:1; padding:2px 4px;">✕</button>` : ''}
+      style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px; padding:8px; background:rgba(255,255,255,0.015); border:1px solid ${isUnlocked && !isAdmin ? 'rgba(16,185,129,0.25)' : 'var(--border-glass)'}; border-radius:6px; transition:border-color 0.3s;">
+      
+      <!-- Row 1: Core Fields -->
+      <div style="display:flex; flex-direction:row; align-items:center; flex-wrap:nowrap; gap:6px; width:100%;">
+        ${isAdmin ? `<div class="drag-handle" onmousedown="enableFormRowDrag(this)" style="flex-shrink:0; color:rgba(255,255,255,0.4); font-size:1.1rem; cursor:grab; line-height:1; padding:0 4px; user-select:none;">☰</div>` : ''}
+        <input type="text" class="form-stage-label" value="${s.label || ''}" ${canEdit ? '' : 'readonly disabled'}
+          style="flex:2; min-width:0; padding:6px 8px; font-size:0.8rem;
+                 background:${canEdit ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)'};
+                 border:1px solid var(--border-glass); border-radius:4px;
+                 color:${canEdit ? 'var(--text-primary)' : 'var(--text-muted)'};
+                 cursor:${canEdit ? 'text' : 'not-allowed'};" placeholder="Stage name">
+        <input type="number" class="form-stage-offset" value="${s.offset || 0}"
+          style="flex:0 0 55px; min-width:0; padding:6px 8px; font-size:0.8rem; font-weight:600;
+                 background:rgba(255,255,255,0.04);
+                 border:1px solid var(--accent-purple); border-radius:4px;
+                 color:var(--text-primary); ${isParents ? 'display: none;' : ''}" title="Offset days — always editable">
+        <select class="form-stage-doer"
+          style="flex:1.5; min-width:0; padding:6px 8px; font-size:0.8rem;
+                 background:rgba(255,255,255,0.05);
+                 border:1px solid var(--border-glass); border-radius:4px;
+                 color:var(--text-primary);
+                 cursor:pointer; ${isParents ? 'display: none;' : ''}">
+          ${getDoerDropdownOptions(s.doer)}
+        </select>
+        ${isAdmin ? `<button type="button" onclick="removeIndividualTestStageRow(${idx})" style="flex-shrink:0; background:none; border:none; color:var(--accent-red); cursor:pointer; font-size:1rem; line-height:1; padding:2px 4px;">✕</button>` : ''}
+      </div>
+
+      <!-- Row 2: Link and Admin Hide option -->
+      <div style="display:flex; flex-direction:row; align-items:center; gap:8px; width:100%;">
+        <!-- Link Field -->
+        <div style="display:flex; align-items:center; gap:4px; flex:1;">
+          <span style="font-size:0.75rem; color:var(--text-muted); flex-shrink:0;">🔗</span>
+          <input type="text" class="form-stage-link" value="${s.link || ''}" ${canEdit ? '' : 'readonly disabled'}
+            style="flex:1; padding:4px 8px; font-size:0.75rem;
+                   background:${canEdit ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)'};
+                   border:1px solid var(--border-glass); border-radius:4px;
+                   color:${canEdit ? 'var(--text-primary)' : 'var(--text-muted)'};
+                   cursor:${canEdit ? 'text' : 'not-allowed'};" placeholder="Stage Link (Optional URL)">
+        </div>
+        <!-- Hide Stage option -->
+        ${isAdmin ? `
+        <label style="display:flex; align-items:center; gap:4px; font-size:0.72rem; color:var(--text-muted); cursor:pointer; user-select:none; flex-shrink:0;">
+          <input type="checkbox" class="form-stage-hidden" ${s.hidden ? 'checked' : ''} style="cursor:pointer; width:12px; height:12px;">
+          <span>Hide Stage</span>
+        </label>
+        ` : ''}
+      </div>
+
     </div>
   `).join('');
 }
@@ -5098,7 +5709,9 @@ window.addIndividualTestStageRow = function () {
     status: 'pending',
     actualDate: '',
     doneBy: '',
-    doneAt: ''
+    doneAt: '',
+    link: '',
+    hidden: false
   });
   renderIndividualFormStages();
 };
@@ -5117,6 +5730,8 @@ function saveCurrentFormStagesFromDOM() {
   const rows = document.querySelectorAll('.form-stage-row');
   currentFormStages = Array.from(rows).map((row, idx) => {
     const existing = currentFormStages[idx] || {};
+    const linkInput = row.querySelector('.form-stage-link');
+    const hiddenCheckbox = row.querySelector('.form-stage-hidden');
     return {
       id: existing.id || idx + 1,
       label: row.querySelector('.form-stage-label').value.trim(),
@@ -5125,7 +5740,9 @@ function saveCurrentFormStagesFromDOM() {
       status: existing.status || 'pending',
       actualDate: existing.actualDate || '',
       doneBy: existing.doneBy || '',
-      doneAt: existing.doneAt || ''
+      doneAt: existing.doneAt || '',
+      link: linkInput ? linkInput.value.trim() : (existing.link || ''),
+      hidden: hiddenCheckbox ? hiddenCheckbox.checked : (existing.hidden || false)
     };
   });
 }
@@ -5209,8 +5826,14 @@ function openAddTestModal() {
   // Set default type dynamically based on current view
   const isVideoView = state.currentView === 'videos';
   const isAdmissionView = state.currentView === 'admissions';
+  const isEnquiryView = state.currentView === 'enquiries';
   const isParentsView = state.currentView === 'parents';
-  const defaultType = isParentsView ? 'Parents' : (isAdmissionView ? 'BeforeFee' : (isVideoView ? 'Video' : 'Sheet'));
+  
+  const blueprints = getCustomFmsBlueprints();
+  const activeCustomBlueprint = blueprints.find(bp => bp.type.toLowerCase() === state.currentView);
+  const isCustomView = !!activeCustomBlueprint;
+
+  const defaultType = isCustomView ? activeCustomBlueprint.type : (isParentsView ? 'Parents' : (isEnquiryView ? 'BeforeFee' : (isAdmissionView ? 'AfterFee' : (isVideoView ? 'Video' : 'Sheet'))));
   selectTypeSegment(defaultType);
 
   // Dynamic Modal Header and Form Groups based on view type
@@ -5234,19 +5857,24 @@ function openAddTestModal() {
     if (submitBtn) submitBtn.textContent = 'Start Tracking Checklist';
     if (nameLabel) nameLabel.textContent = 'Checklist Title';
     if (nameInput) nameInput.placeholder = 'e.g., Student Rahul Kumar - Parents Checklist';
+  } else if (isCustomView) {
+    if (modalTitle) modalTitle.textContent = 'Track New ' + activeCustomBlueprint.name;
+    if (typeFormGroup) typeFormGroup.style.display = 'none'; // Hide type segmented control completely
+    if (submitBtn) submitBtn.textContent = 'Start Tracking ' + activeCustomBlueprint.name;
+    if (nameLabel) nameLabel.textContent = activeCustomBlueprint.name + ' Student/Item Name';
+    if (nameInput) nameInput.placeholder = 'e.g., Rahul Kumar';
+  } else if (isEnquiryView) {
+    if (modalTitle) modalTitle.textContent = 'Track New Enquiry';
+    if (typeFormGroup) typeFormGroup.style.display = 'none'; // Hide type segmented control completely
+    if (submitBtn) submitBtn.textContent = 'Start Tracking Enquiry';
+    if (nameLabel) nameLabel.textContent = 'Student Name';
+    if (nameInput) nameInput.placeholder = 'e.g., Rahul Kumar';
   } else if (isAdmissionView) {
     if (modalTitle) modalTitle.textContent = 'Track New Admission';
-    if (typeFormGroup) typeFormGroup.style.display = 'block'; // Show type segmented control for Admissions
+    if (typeFormGroup) typeFormGroup.style.display = 'none'; // Hide type segmented control completely
     if (submitBtn) submitBtn.textContent = 'Start Tracking Admission';
     if (nameLabel) nameLabel.textContent = 'Student Name';
     if (nameInput) nameInput.placeholder = 'e.g., Rahul Kumar';
-
-    if (sheetSeg) sheetSeg.style.display = 'none';
-    if (appSeg) appSeg.style.display = 'none';
-    if (videoSeg) videoSeg.style.display = 'none';
-    if (beforeFeeSeg) beforeFeeSeg.style.display = 'block';
-    if (afterFeeSeg) afterFeeSeg.style.display = 'block';
-    if (parentsSeg) parentsSeg.style.display = 'none';
   } else if (isVideoView) {
     if (modalTitle) modalTitle.textContent = 'Track New Video';
     if (typeFormGroup) typeFormGroup.style.display = 'none'; // Hide type segmented control completely
@@ -5269,17 +5897,33 @@ function openAddTestModal() {
   }
 
   // Pre-populate individual stages with global blueprints
-  const blueprint = (state.testSettings || []).filter(s => s.type === defaultType);
-  currentFormStages = blueprint.map(s => ({
-    id: s.id,
-    label: s.label,
-    offset: s.offset,
-    doer: s.doer,
-    status: 'pending',
-    actualDate: '',
-    doneBy: '',
-    doneAt: ''
-  }));
+  const currentFmsBp = blueprints.find(b => b.type === defaultType);
+  if (currentFmsBp && !currentFmsBp.stagesNeeded) {
+    currentFormStages = [{
+      id: 999,
+      label: 'Complete',
+      offset: 0,
+      doer: 'All',
+      status: 'pending',
+      actualDate: '',
+      doneBy: '',
+      doneAt: '',
+      hidden: false
+    }];
+  } else {
+    const blueprint = (state.testSettings || []).filter(s => s.type === defaultType);
+    currentFormStages = blueprint.map(s => ({
+      id: s.id,
+      label: s.label,
+      offset: s.offset,
+      doer: s.doer,
+      status: 'pending',
+      actualDate: '',
+      doneBy: '',
+      doneAt: '',
+      hidden: s.hidden || false
+    }));
+  }
   renderIndividualFormStages();
 
   $('add-test-modal').style.display = 'flex';
@@ -5346,19 +5990,19 @@ window.selectSortOption = function (el) {
     // Strip emoji prefixes
     displayLabel = displayLabel.replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
     if (value === 'held-desc') {
-      if (state.currentView === 'admissions') displayLabel = 'Date Registered ↓';
+      if (state.currentView === 'admissions' || state.currentView === 'enquiries') displayLabel = 'Date Registered ↓';
       else if (state.currentView === 'videos') displayLabel = 'Date Created ↓';
       else displayLabel = 'Date Held ↓';
     } else if (value === 'held-asc') {
-      if (state.currentView === 'admissions') displayLabel = 'Date Registered ↑';
+      if (state.currentView === 'admissions' || state.currentView === 'enquiries') displayLabel = 'Date Registered ↑';
       else if (state.currentView === 'videos') displayLabel = 'Date Created ↑';
       else displayLabel = 'Date Held ↑';
     } else if (value === 'name-asc') {
-      if (state.currentView === 'admissions') displayLabel = 'Student Name A–Z';
+      if (state.currentView === 'admissions' || state.currentView === 'enquiries') displayLabel = 'Student Name A–Z';
       else if (state.currentView === 'videos') displayLabel = 'Video Title A–Z';
       else displayLabel = 'Name A–Z';
     } else if (value === 'name-desc') {
-      if (state.currentView === 'admissions') displayLabel = 'Student Name Z–A';
+      if (state.currentView === 'admissions' || state.currentView === 'enquiries') displayLabel = 'Student Name Z–A';
       else if (state.currentView === 'videos') displayLabel = 'Video Title Z–A';
       else displayLabel = 'Name Z–A';
     }
@@ -5547,6 +6191,10 @@ function handleEditTestDetailsModal(testId) {
   currentFormStages = getTestStages(test);
   renderIndividualFormStages();
 
+  const blueprints = getCustomFmsBlueprints();
+  const activeCustomBlueprint = blueprints.find(bp => bp.type === test.type);
+  const isCustom = !!activeCustomBlueprint;
+
   const isVideo = (test.type || '').toLowerCase() === 'video';
   const isBeforeFee = (test.type || '').toLowerCase() === 'beforefee';
   const isAfterFee = (test.type || '').toLowerCase() === 'afterfee';
@@ -5554,7 +6202,7 @@ function handleEditTestDetailsModal(testId) {
   const isAdmission = isBeforeFee || isAfterFee;
 
   const typeFormGroup = $('test-type-form-group');
-  if (typeFormGroup) typeFormGroup.style.display = (isVideo || isParents) ? 'none' : 'block';
+  if (typeFormGroup) typeFormGroup.style.display = (isVideo || isParents || isCustom) ? 'none' : 'block';
 
   const sheetSeg = $('type-segment-sheet');
   const appSeg = $('type-segment-app');
@@ -5570,7 +6218,7 @@ function handleEditTestDetailsModal(testId) {
     if (beforeFeeSeg) beforeFeeSeg.style.display = 'block';
     if (afterFeeSeg) afterFeeSeg.style.display = 'block';
     if (parentsSeg) parentsSeg.style.display = 'none';
-  } else if (!isVideo && !isParents) {
+  } else if (!isVideo && !isParents && !isCustom) {
     if (sheetSeg) sheetSeg.style.display = 'block';
     if (appSeg) appSeg.style.display = 'block';
     if (videoSeg) videoSeg.style.display = 'none';
@@ -5584,10 +6232,11 @@ function handleEditTestDetailsModal(testId) {
     if (isAdmission) nameLabel.textContent = 'Student Name';
     else if (isVideo) nameLabel.textContent = 'Video Title';
     else if (isParents) nameLabel.textContent = 'Checklist Title';
+    else if (isCustom) nameLabel.textContent = activeCustomBlueprint.name + ' Student/Item Name';
     else nameLabel.textContent = 'Test Name';
   }
 
-  $('add-test-modal').querySelector('h3').textContent = isAdmission ? 'Edit Admission Details' : (isVideo ? 'Edit Video Details' : (isParents ? 'Edit Parents Checklist' : 'Edit Test Details'));
+  $('add-test-modal').querySelector('h3').textContent = isAdmission ? 'Edit Admission Details' : (isVideo ? 'Edit Video Details' : (isParents ? 'Edit Parents Checklist' : (isCustom ? 'Edit ' + activeCustomBlueprint.name + ' Details' : 'Edit Test Details')));
   $('add-test-modal').querySelector('button[type="submit"]').textContent = 'Save Changes';
 
   // Override form submit for edit mode
@@ -5637,8 +6286,8 @@ function handleEditTestDetailsModal(testId) {
 // Reset modal when closing
 function closeAddTestModal() {
   $('add-test-modal').style.display = 'none';
-  const defaultHeader = state.currentView === 'videos' ? 'Track New Video' : (state.currentView === 'admissions' ? 'Track New Admission' : (state.currentView === 'parents' ? 'Track Parents Checklist' : 'Track New Test'));
-  const defaultBtn = state.currentView === 'videos' ? 'Start Tracking Video' : (state.currentView === 'admissions' ? 'Start Tracking Admission' : (state.currentView === 'parents' ? 'Start Tracking Checklist' : 'Start Tracking'));
+  const defaultHeader = state.currentView === 'videos' ? 'Track New Video' : (state.currentView === 'enquiries' ? 'Track New Enquiry' : (state.currentView === 'admissions' ? 'Track New Admission' : (state.currentView === 'parents' ? 'Track Parents Checklist' : 'Track New Test')));
+  const defaultBtn = state.currentView === 'videos' ? 'Start Tracking Video' : (state.currentView === 'enquiries' ? 'Start Tracking Enquiry' : (state.currentView === 'admissions' ? 'Start Tracking Admission' : (state.currentView === 'parents' ? 'Start Tracking Checklist' : 'Start Tracking')));
   $('add-test-modal').querySelector('h3').textContent = defaultHeader;
   $('add-test-modal').querySelector('button[type="submit"]').textContent = defaultBtn;
   $('add-test-form').onsubmit = handleAddTestSubmit;
@@ -5942,6 +6591,38 @@ window.onunhandledrejection = function (event) {
   const loader = document.getElementById('loading-screen');
   if (loader) loader.classList.add('hidden');
 };
+
+async function toggleCustomFmsCardStatus(testId) {
+  const test = (state.tests || []).find(t => t.testId === testId);
+  if (!test) return;
+  const newStatus = test.status === 'done' ? 'pending' : 'done';
+  
+  test.status = newStatus;
+  
+  const res = await apiFetch('editTestDetails', {
+    testId: test.testId,
+    testName: test.testName,
+    className: test.className,
+    maxScore: test.maxScore,
+    type: test.type,
+    heldOn: test.heldOn,
+    stages: test.stages || [],
+    subject: test.subject,
+    chapter: test.chapter,
+    sheetLink: test.sheetLink,
+    folderLink: test.folderLink,
+    minScore: test.minScore,
+    avgScore: test.avgScore
+  });
+  
+  if (res.success) {
+    showToast('FMS card status updated!', 'success');
+    renderTests(state.tests);
+  } else {
+    showToast('Failed to toggle status: ' + res.error, 'error');
+  }
+}
+window.toggleCustomFmsCardStatus = toggleCustomFmsCardStatus;
 
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {

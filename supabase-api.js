@@ -457,7 +457,25 @@ async function supabaseApiFetch(action, params = {}) {
     case 'getTestSettings': {
       const { data, error } = await sb.from('test_settings').select('*').order('stage_id', { ascending: true });
       if (error || !data || data.length === 0) return apiFetchSheet('getTestSettings', params, 'GET');
-      return { success: true, data: data.map(r => ({ id: r.stage_id, label: r.label, offset: r.offset_days, doer: r.doer, type: r.type || 'Sheet' })) };
+      return {
+        success: true,
+        data: data.map(r => {
+          // Support both plain label strings AND enriched JSON labels (link/hidden packed in)
+          let label = r.label || '';
+          let link = r.link || '';
+          let hidden = r.hidden || false;
+          try {
+            const parsed = JSON.parse(label);
+            // If label is a JSON object with a _label key it's an enriched record
+            if (parsed && typeof parsed === 'object' && parsed._label !== undefined) {
+              label = parsed._label;
+              link = parsed._link || link;
+              hidden = parsed._hidden ?? hidden;
+            }
+          } catch (e) { /* plain string label — use as-is */ }
+          return { id: r.stage_id, label, offset: r.offset_days, doer: r.doer, type: r.type || 'Sheet', link, hidden };
+        })
+      };
     }
 
     case 'addTest': {
@@ -510,10 +528,34 @@ async function supabaseApiFetch(action, params = {}) {
 
     case 'updateTestSettings': {
       const { settings } = params;
-      await sb.from('test_settings').delete().neq('stage_id', 0);
-      if (settings && settings.length > 0) {
-        await sb.from('test_settings').insert(settings.map(s => ({ stage_id: s.id, label: s.label, offset_days: s.offset, doer: s.doer, type: s.type || 'Sheet' })));
+
+      // Always write only the guaranteed base columns that exist in every deployment.
+      // link and hidden are encoded into the label field as enriched JSON so no ALTER TABLE is needed.
+      const toInsert = (settings || []).map(s => {
+        // Encode link/hidden into label as {_label, _link, _hidden} JSON
+        // so we never touch columns that may not exist in the schema.
+        const hasExtras = s.link || s.hidden;
+        const labelVal = hasExtras
+          ? JSON.stringify({ _label: s.label, _link: s.link || '', _hidden: !!s.hidden })
+          : s.label;
+        return {
+          stage_id: s.id,
+          label: labelVal,
+          offset_days: s.offset,
+          doer: s.doer,
+          type: s.type || 'Sheet'
+        };
+      });
+
+      // Wipe existing rows then re-insert — both steps in a safe sequential flow
+      const { error: delError } = await sb.from('test_settings').delete().neq('stage_id', 0);
+      if (delError) return { success: false, error: 'Failed to clear settings: ' + delError.message };
+
+      if (toInsert.length > 0) {
+        const { error: insError } = await sb.from('test_settings').insert(toInsert);
+        if (insError) return { success: false, error: 'Failed to save settings: ' + insError.message };
       }
+
       syncToSheet('updateTestSettings', params);
       return { success: true };
     }

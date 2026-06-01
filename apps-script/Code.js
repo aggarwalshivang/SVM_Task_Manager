@@ -1823,66 +1823,66 @@ function handleGetTestSettings() {
   if (data.length <= 1 || hasOldStages || !hasVideoStages || !hasAdmissionStages || !hasParentsStages) {
     // Clear and reseed with all canonical pipelines
     sheet.clearContents();
-    sheet.getRange(1, 1, 1, 5).setValues([['StageId', 'Label', 'Offset', 'Doer', 'Type']]);
+    sheet.getRange(1, 1, 1, 7).setValues([['StageId', 'Label', 'Offset', 'Doer', 'Type', 'Link', 'Hidden']]);
     
     const defaults = [
       // ── Sheet Pipeline ──────────────────────────────────────
-      ['1', 'Create Test',       '2',  'All',    'Sheet'],
-      ['2', 'Sheet Checking',    '4',  'All',    'Sheet'],
-      ['3', 'Enter Score',       '6',  'Sidhi',  'Sheet'],
-      ['4', 'Sheet Distribution','8',  'All',    'Sheet'],
-      ['5', 'Discussion',        '10', 'Shivang','Sheet'],
-      ['6', 'Save Score',        '12', 'Sidhi',  'Sheet'],
-      ['7', 'Send to Parents',   '14', 'Komal',  'Sheet'],
+      ['1', 'Create Test',       '2',  'All',    'Sheet', '', false],
+      ['2', 'Sheet Checking',    '4',  'All',    'Sheet', '', false],
+      ['3', 'Enter Score',       '6',  'Sidhi',  'Sheet', '', false],
+      ['4', 'Sheet Distribution','8',  'All',    'Sheet', '', false],
+      ['5', 'Discussion',        '10', 'Shivang','Sheet', '', false],
+      ['6', 'Save Score',        '12', 'Sidhi',  'Sheet', '', false],
+      ['7', 'Send to Parents',   '14', 'Komal',  'Sheet', '', false],
 
       // ── App Pipeline ────────────────────────────────────────
-      ['8',  'Create Test',     '2',  'All',    'App'],
-      ['9',  'Enter Score',     '4',  'Sidhi',  'App'],
-      ['10', 'Save Score',      '6',  'Sidhi',  'App'],
-      ['11', 'Discussion',      '8',  'Shivang','App'],
-      ['12', 'Send to Parents', '10', 'Komal',  'App'],
+      ['8',  'Create Test',     '2',  'All',    'App', '', false],
+      ['9',  'Enter Score',     '4',  'Sidhi',  'App', '', false],
+      ['10', 'Save Score',      '6',  'Sidhi',  'App', '', false],
+      ['11', 'Discussion',      '8',  'Shivang','App', '', false],
+      ['12', 'Send to Parents', '10', 'Komal',  'App', '', false],
 
       // ── Video Pipeline ──────────────────────────────────────
-      ['13', 'Script Creation',               '1', 'Komal', 'Video'],
-      ['14', 'Shoot Planning & Recording',    '2', 'Komal', 'Video'],
-      ['15', 'Send to Editor',                '5', 'Komal', 'Video'],
-      ['16', 'Review Edited Video',           '6', 'Komal', 'Video'],
-      ['17', 'Receive Final Edited Video',    '7', 'Komal', 'Video'],
-      ['18', 'Instagram & Facebook Posting',  '8', 'Sidhi', 'Video'],
-      ['19', 'YouTube Posting',               '9', 'Komal', 'Video'],
+      ['13', 'Script Creation',               '1', 'Komal', 'Video', '', false],
+      ['14', 'Shoot Planning & Recording',    '2', 'Komal', 'Video', '', false],
+      ['15', 'Send to Editor',                '5', 'Komal', 'Video', '', false],
+      ['16', 'Review Edited Video',           '6', 'Komal', 'Video', '', false],
+      ['17', 'Receive Final Edited Video',    '7', 'Komal', 'Video', '', false],
+      ['18', 'Instagram & Facebook Posting',  '8', 'Sidhi', 'Video', '', false],
+      ['19', 'YouTube Posting',               '9', 'Komal', 'Video', '', false],
 
       // ── Before Fee Pipeline (Admission) ─────────────────────
-      ['20', 'Say Hi on Bot Number & Collect Details',      '1', 'Sidhi/Komal', 'BeforeFee'],
-      ['21', 'Show Orientation Video',                       '2', 'Sidhi/Komal', 'BeforeFee'],
-      ['22', 'Show Classroom',                               '3', 'Sidhi/Komal', 'BeforeFee'],
-      ['23', 'Show Student Dashboard',                       '4', 'Sidhi/Komal', 'BeforeFee'],
-      ['24', 'Show Past Results',                            '5', 'Sidhi/Komal', 'BeforeFee'],
-      ['25', 'Share Fee Structure from Telegram',            '6', 'Sidhi/Komal', 'BeforeFee'],
+      ['20', 'Say Hi on Bot Number & Collect Details',      '1', 'Sidhi/Komal', 'BeforeFee', '', false],
+      ['21', 'Show Orientation Video',                       '2', 'Sidhi/Komal', 'BeforeFee', '', false],
+      ['22', 'Show Classroom',                               '3', 'Sidhi/Komal', 'BeforeFee', '', false],
+      ['23', 'Show Student Dashboard',                       '4', 'Sidhi/Komal', 'BeforeFee', '', false],
+      ['24', 'Show Past Results',                            '5', 'Sidhi/Komal', 'BeforeFee', '', false],
+      ['25', 'Share Fee Structure from Telegram',            '6', 'Sidhi/Komal', 'BeforeFee', '', false],
 
       // ── After Fee Pipeline (Admission) ──────────────────────
-      ['26', 'Send Admission Confirmation Message',          '1', 'Sidhi/Komal', 'AfterFee'],
-      ['27', 'Change Name in Telegram',                      '2', 'Sidhi/Komal', 'AfterFee'],
-      ['28', 'Create Leads for Parent and Student',          '3', 'Sidhi/Komal', 'AfterFee'],
-      ['29', 'Create Lead in Classroom Main',                '4', 'Sidhi/Komal', 'AfterFee'],
-      ['30', 'Save Contact Number',                          '5', 'Sidhi/Komal', 'AfterFee'],
-      ['31', 'Change Level to Admission Done',               '6', 'Sidhi/Komal', 'AfterFee'],
-      ['32', 'Send Student Number to Shivang Sir',           '7', 'Sidhi/Komal', 'AfterFee'],
-      ['33', 'Add Student to Group',                         '8', 'Sidhi/Komal', 'AfterFee'],
-      ['34', 'Send Biometric ID to SVM Group',               '9', 'Sidhi/Komal', 'AfterFee'],
-      ['35', 'Create Dashboard',                            '10', 'Sidhi/Komal', 'AfterFee'],
-      ['36', 'Activate Class App',                          '11', 'Sidhi/Komal', 'AfterFee'],
+      ['26', 'Send Admission Confirmation Message',          '1', 'Sidhi/Komal', 'AfterFee', '', false],
+      ['27', 'Change Name in Telegram',                      '2', 'Sidhi/Komal', 'AfterFee', '', false],
+      ['28', 'Create Leads for Parent and Student',          '3', 'Sidhi/Komal', 'AfterFee', '', false],
+      ['29', 'Create Lead in Classroom Main',                '4', 'Sidhi/Komal', 'AfterFee', '', false],
+      ['30', 'Save Contact Number',                          '5', 'Sidhi/Komal', 'AfterFee', '', false],
+      ['31', 'Change Level to Admission Done',               '6', 'Sidhi/Komal', 'AfterFee', '', false],
+      ['32', 'Send Student Number to Shivang Sir',           '7', 'Sidhi/Komal', 'AfterFee', '', false],
+      ['33', 'Add Student to Group',                         '8', 'Sidhi/Komal', 'AfterFee', '', false],
+      ['34', 'Send Biometric ID to SVM Group',               '9', 'Sidhi/Komal', 'AfterFee', '', false],
+      ['35', 'Create Dashboard',                            '10', 'Sidhi/Komal', 'AfterFee', '', false],
+      ['36', 'Activate Class App',                          '11', 'Sidhi/Komal', 'AfterFee', '', false],
 
       // ── Parents Pipeline (Guidelines) ──────────────────────
-      ['37', 'Check Performance in Maths & Science',         '1', 'Parents', 'Parents'],
-      ['38', 'Ensure Child Understands Concepts',            '2', 'Parents', 'Parents'],
-      ['39', 'Encourage NCERT Science & Maths Practice',     '3', 'Parents', 'Parents'],
-      ['40', 'Practice Upadhyay Regularly',                  '4', 'Parents', 'Parents'],
-      ['41', 'Watch Video Lectures for Doubt Solving',       '5', 'Parents', 'Parents'],
-      ['42', 'Monitor Mobile/Tablet Usage during Study',     '6', 'Parents', 'Parents'],
-      ['43', 'Discuss Daily Test Scores with Child',         '7', 'Parents', 'Parents'],
-      ['44', 'Avoid Copying, Focus on Practice & Matching',  '8', 'Parents', 'Parents']
+      ['37', 'Check Performance in Maths & Science',         '1', 'Parents', 'Parents', '', false],
+      ['38', 'Ensure Child Understands Concepts',            '2', 'Parents', 'Parents', '', false],
+      ['39', 'Encourage NCERT Science & Maths Practice',     '3', 'Parents', 'Parents', '', false],
+      ['40', 'Practice Upadhyay Regularly',                  '4', 'Parents', 'Parents', '', false],
+      ['41', 'Watch Video Lectures for Doubt Solving',       '5', 'Parents', 'Parents', '', false],
+      ['42', 'Monitor Mobile/Tablet Usage during Study',     '6', 'Parents', 'Parents', '', false],
+      ['43', 'Discuss Daily Test Scores with Child',         '7', 'Parents', 'Parents', '', false],
+      ['44', 'Avoid Copying, Focus on Practice & Matching',  '8', 'Parents', 'Parents', '', false]
     ];
-    sheet.getRange(2, 1, defaults.length, 5).setValues(defaults);
+    sheet.getRange(2, 1, defaults.length, 7).setValues(defaults);
     data = sheet.getDataRange().getValues();
   }
   
@@ -1892,7 +1892,9 @@ function handleGetTestSettings() {
     label: row[1],
     offset: Number(row[2]),
     doer: row[3],
-    type: row[4] || 'Sheet' // Default to 'Sheet' if not specified
+    type: row[4] || 'Sheet',
+    link: row[5] || '',
+    hidden: row[6] === true || String(row[6]).toUpperCase() === 'TRUE'
   }));
 
   return { success: true, data: settings };
@@ -2003,17 +2005,17 @@ function handleDeleteTestTracker(body) {
 }
 
 function handleUpdateTestSettings(body) {
-  const { settings } = body; // Array of {id, label, offset, doer, type}
+  const { settings } = body; // Array of {id, label, offset, doer, type, link, hidden}
   const sheet = getSheet('TestSettings');
   
   // Clear existing (keep header)
   if (sheet.getLastRow() > 1) {
-    sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).clearContent();
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, 7).clearContent();
   }
   
   if (settings && settings.length > 0) {
-    const values = settings.map(s => [s.id, s.label, s.offset, s.doer, s.type || 'Sheet']);
-    sheet.getRange(2, 1, values.length, 5).setValues(values);
+    const values = settings.map(s => [s.id, s.label, s.offset, s.doer, s.type || 'Sheet', s.link || '', s.hidden || false]);
+    sheet.getRange(2, 1, values.length, 7).setValues(values);
   }
   
   return { success: true };
@@ -2456,7 +2458,9 @@ function syncRowToSupabase(sheetName, rowValues) {
           label: String(rowValues[1] || ''),
           offset_days: Number(rowValues[2] || 0),
           doer: String(rowValues[3] || ''),
-          type: String(rowValues[4] || 'Sheet')
+          type: String(rowValues[4] || 'Sheet'),
+          link: String(rowValues[5] || ''),
+          hidden: rowValues[6] === true || String(rowValues[6]).toUpperCase() === 'TRUE'
         };
         break;
       }

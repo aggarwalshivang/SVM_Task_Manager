@@ -30,10 +30,40 @@
 
   <!-- Loading Screen (Premium Reveal Splash) -->
   <div class="loading-screen" id="loading-screen">
-    <div class="splash-container">
-      <div class="splash-logo">SVM</div>
-      <div class="splash-subtitle">Task Tracker</div>
-      <div class="splash-glow"></div>
+    <div class="splash-glow-bg"></div>
+    <div class="splash-content">
+      <div class="splash-logo-assembly" id="splash-logo-assembly">
+        <div class="splash-shape-container" id="splash-shape-container">
+          <div class="splash-shape" id="splash-shape">
+            <div class="splash-shape-inner"></div>
+            <svg class="splash-svg-s" viewBox="0 0 100 100">
+              <path class="path-s-top" d="M50,50 C43,47 38,42 38,32 C38,18 62,18 62,32" fill="none" stroke="url(#s-grad)" stroke-width="12" stroke-linecap="round" />
+              <path class="path-s-bottom" d="M50,50 C57,53 62,58 62,68 C62,82 38,82 38,68" fill="none" stroke="url(#s-grad)" stroke-width="12" stroke-linecap="round" />
+              <defs>
+                <linearGradient id="s-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#c084fc" />
+                  <stop offset="100%" stop-color="#7c3aed" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+        </div>
+        <div class="splash-logo-text" id="splash-logo-text">
+          <span class="letter-hivang">h</span>
+          <span class="letter-hivang">i</span>
+          <span class="letter-hivang">v</span>
+          <span class="letter-hivang">a</span>
+          <span class="letter-hivang">n</span>
+          <span class="letter-hivang">g</span>
+        </div>
+      </div>
+      <div class="splash-text-container">
+        <h1 class="splash-title">
+          <span class="word saraswati">Saraswati</span>
+          <span class="word vidyamandir">Vidyamandir</span>
+          <span class="word taskmanager">Task Manager</span>
+        </h1>
+      </div>
     </div>
   </div>
 
@@ -139,6 +169,7 @@
         <button class="nav-tab" id="tab-team" style="position:relative;">Team <span id="team-badge" style="display:none; position:absolute; top:-5px; right:-5px; background:var(--accent-red); color:white; font-size:0.6rem; padding:2px 5px; border-radius:10px; border:2px solid var(--bg-primary);">!</span></button>
         <button class="nav-tab" id="tab-tests">Test FMS</button>
         <button class="nav-tab" id="tab-videos">Video FMS</button>
+        <button class="nav-tab" id="tab-enquiries">Enquiry FMS</button>
         <button class="nav-tab" id="tab-admissions">Admission FMS</button>
         <button class="nav-tab" id="tab-parents">Parents FMS</button>
       </div>
@@ -295,8 +326,8 @@
         <button class="tab-btn" data-filter="sheet" onclick="setTestFmsFilter('sheet')">📄 Sheet</button>
         <button class="tab-btn" data-filter="app" onclick="setTestFmsFilter('app')">📱 App</button>
         <button class="tab-btn" data-filter="video" onclick="setTestFmsFilter('video')">🎬 Video</button>
-        <button class="tab-btn" data-filter="beforefee" onclick="setTestFmsFilter('beforefee')">⏳ Before Fee</button>
-        <button class="tab-btn" data-filter="afterfee" onclick="setTestFmsFilter('afterfee')">💳 After Fee</button>
+        <button class="tab-btn" data-filter="beforefee" onclick="setTestFmsFilter('beforefee')">⏳ Enquiry</button>
+        <button class="tab-btn" data-filter="afterfee" onclick="setTestFmsFilter('afterfee')">💳 Admission</button>
       </div>
 
       <div id="test-list-content" class="dashboard-content" style="padding-top:0;">
@@ -346,6 +377,103 @@
         <div class="dashboard-grid" id="dashboard-grid">
           <!-- Populated by JS -->
         </div>
+      </div>
+    </div>
+
+    <!-- Custom FMS Builder Container (Page View) -->
+    <div id="fms-builder-container" style="display:none; padding: var(--space-lg); max-width: 1000px; margin: 0 auto;">
+      <div class="kpi-card" style="padding: var(--space-xl); background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: var(--radius-lg); box-shadow: var(--shadow-premium);">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--space-md); margin-bottom: var(--space-lg);">
+          <div>
+            <h2 style="font-size: 1.4rem; font-weight: 700; background: var(--gradient-purple); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+              🛠️ Custom FMS Builder
+            </h2>
+            <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">Design, configure, and manage dynamic FMS pipeline tabs with completely custom parameters.</p>
+          </div>
+        </div>
+
+        <!-- Blueprints List View -->
+        <div id="fms-blueprints-list-section" style="margin-bottom: var(--space-lg);">
+          <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: var(--space-md); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; justify-content: space-between; align-items: center;">
+            <span>Active Custom Pipelines</span>
+            <button class="btn-primary btn-xs" id="btn-show-fms-creator" style="background: var(--gradient-purple); border: none; font-weight: bold; width: auto; padding: 6px var(--space-md); border-radius: var(--radius-md); box-shadow: var(--shadow-glow-purple); font-size:0.75rem;">+ New Pipeline</button>
+          </h4>
+          <div id="fms-blueprints-list" style="max-height: 350px; overflow-y: auto; padding-right: 5px; display: flex; flex-direction: column; gap: 8px;">
+            <!-- Active custom blueprints will render here -->
+          </div>
+        </div>
+
+        <!-- Create/Edit Form View (hidden by default) -->
+        <div id="fms-blueprint-form-section" style="display: none; border-top: 1px solid var(--border-glass); padding-top: var(--space-lg);">
+          <h4 id="fms-blueprint-form-title" style="font-size: 0.95rem; font-weight: 700; margin-bottom: var(--space-md); color: var(--accent-purple); text-transform: uppercase; letter-spacing: 0.05em;">Create Custom Pipeline</h4>
+          
+          <form id="fms-blueprint-form" onsubmit="return false;">
+            <div class="form-row" style="margin-bottom: var(--space-md);">
+              <div class="form-group" style="flex: 1;">
+                <label for="fms-bp-name">Pipeline Name</label>
+                <input type="text" id="fms-bp-name" placeholder="e.g. Hostel FMS" required style="width:100%; box-sizing:border-box;">
+              </div>
+              <div class="form-group" style="flex: 1;">
+                <label for="fms-bp-type">Pipeline Slug / Type Key</label>
+                <input type="text" id="fms-bp-type" placeholder="e.g. Hostel (letters only)" required pattern="^[a-zA-Z]+$" style="width:100%; box-sizing:border-box;">
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); margin-bottom: var(--space-lg);">
+              <!-- Toggle switches for features -->
+              <label class="custom-toggle-label" style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: var(--radius-md); cursor: pointer;">
+                <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Enable Pipeline Stages</span>
+                <input type="checkbox" id="fms-bp-stages" checked style="width: 18px; height: 18px; accent-color: var(--accent-purple); cursor:pointer;">
+              </label>
+
+              <label class="custom-toggle-label" style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: var(--radius-md); cursor: pointer;">
+                <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Enable Stage Links</span>
+                <input type="checkbox" id="fms-bp-links" checked style="width: 18px; height: 18px; accent-color: var(--accent-purple); cursor:pointer;">
+              </label>
+
+              <label class="custom-toggle-label" style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: var(--radius-md); cursor: pointer;">
+                <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Enable Offsets & Due Dates</span>
+                <input type="checkbox" id="fms-bp-offsets" checked style="width: 18px; height: 18px; accent-color: var(--accent-purple); cursor:pointer;">
+              </label>
+
+              <label class="custom-toggle-label" style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: var(--radius-md); cursor: pointer;">
+                <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Enable Marks Fields</span>
+                <input type="checkbox" id="fms-bp-marks" style="width: 18px; height: 18px; accent-color: var(--accent-purple); cursor:pointer;">
+              </label>
+
+              <label class="custom-toggle-label" style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: var(--radius-md); cursor: pointer; grid-column: span 2;">
+                <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Enable Performance Scoring (Task Completion Integration)</span>
+                <input type="checkbox" id="fms-bp-scoring" style="width: 18px; height: 18px; accent-color: var(--accent-purple); cursor:pointer;">
+              </label>
+            </div>
+
+            <div class="form-group" style="margin-bottom: var(--space-lg);">
+              <label style="margin-bottom: var(--space-sm); display: block; font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">Allowed Roles (Permission Access)</label>
+              <div style="display: flex; flex-wrap: wrap; gap: var(--space-lg); padding: var(--space-md); background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: var(--radius-md);">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-primary);">
+                  <input type="checkbox" name="fms-bp-roles" value="admin" checked disabled style="accent-color: var(--accent-purple); cursor:pointer;"> Admin
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-primary);">
+                  <input type="checkbox" name="fms-bp-roles" value="coordinator" checked style="accent-color: var(--accent-purple); cursor:pointer;"> Coordinator
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-primary);">
+                  <input type="checkbox" name="fms-bp-roles" value="process_coordinator" checked style="accent-color: var(--accent-purple); cursor:pointer;"> Process Coordinator
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-primary);">
+                  <input type="checkbox" name="fms-bp-roles" value="member" style="accent-color: var(--accent-purple); cursor:pointer;"> Member
+                </label>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+              <button type="button" class="btn-ghost" id="btn-cancel-fms-blueprint" style="flex: 1;">Cancel</button>
+              <button type="button" class="btn-primary" id="btn-save-fms-blueprint" style="flex: 2;">Save Blueprint</button>
+            </div>
+          </form>
+        </div>
+
       </div>
     </div>
 
@@ -633,8 +761,8 @@
             <button type="button" class="segment-btn active" id="type-segment-sheet" onclick="selectTypeSegment('Sheet')" style="flex: 1; padding: 10px; border: none; background: var(--accent-purple); color: #ffffff; box-shadow: var(--shadow-glow-purple); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">📄 Sheet Test</button>
             <button type="button" class="segment-btn" id="type-segment-app" onclick="selectTypeSegment('App')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">📱 App Test</button>
             <button type="button" class="segment-btn" id="type-segment-video" onclick="selectTypeSegment('Video')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">🎬 Video</button>
-            <button type="button" class="segment-btn" id="type-segment-beforefee" onclick="selectTypeSegment('BeforeFee')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">⏳ Before Fee</button>
-            <button type="button" class="segment-btn" id="type-segment-afterfee" onclick="selectTypeSegment('AfterFee')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">💳 After Fee</button>
+            <button type="button" class="segment-btn" id="type-segment-beforefee" onclick="selectTypeSegment('BeforeFee')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">⏳ Enquiry</button>
+            <button type="button" class="segment-btn" id="type-segment-afterfee" onclick="selectTypeSegment('AfterFee')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">💳 Admission</button>
             <button type="button" class="segment-btn" id="type-segment-parents" onclick="selectTypeSegment('Parents')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">👪 Parents</button>
           </div>
           <input type="hidden" id="test-form-type" value="Sheet">
@@ -726,7 +854,7 @@
             <span>Pipeline Stages Configuration</span>
             <button type="button" class="btn-ghost btn-xs" onclick="addIndividualTestStageRow()" style="color: var(--accent-purple); font-weight: bold; width: auto; padding: 2px 8px;">+ Add Stage</button>
           </h4>
-          <div id="individual-test-stages-list" style="max-height: 250px; overflow-y: auto; padding-right: 5px; display: flex; flex-direction: column; gap: 8px;">
+          <div id="individual-test-stages-list" style="max-height: 400px; overflow-y: auto; padding-right: 5px; display: flex; flex-direction: column; gap: 8px;">
             <!-- Individual stages will be rendered here -->
           </div>
         </div>
@@ -753,8 +881,8 @@
         <button class="tab-btn active" id="settings-tab-sheet" onclick="setSettingsActiveTab('Sheet')" style="flex: 1; padding: 8px; font-weight: 600;">📄 Sheet Pipeline</button>
         <button class="tab-btn" id="settings-tab-app" onclick="setSettingsActiveTab('App')" style="flex: 1; padding: 8px; font-weight: 600;">📱 App Pipeline</button>
         <button class="tab-btn" id="settings-tab-video" onclick="setSettingsActiveTab('Video')" style="flex: 1; padding: 8px; font-weight: 600;">🎬 Video Pipeline</button>
-        <button class="tab-btn" id="settings-tab-beforefee" onclick="setSettingsActiveTab('BeforeFee')" style="flex: 1; padding: 8px; font-weight: 600;">⏳ Before Fee</button>
-        <button class="tab-btn" id="settings-tab-afterfee" onclick="setSettingsActiveTab('AfterFee')" style="flex: 1; padding: 8px; font-weight: 600;">💳 After Fee</button>
+        <button class="tab-btn" id="settings-tab-beforefee" onclick="setSettingsActiveTab('BeforeFee')" style="flex: 1; padding: 8px; font-weight: 600;">⏳ Enquiry</button>
+        <button class="tab-btn" id="settings-tab-afterfee" onclick="setSettingsActiveTab('AfterFee')" style="flex: 1; padding: 8px; font-weight: 600;">💳 Admission</button>
         <button class="tab-btn" id="settings-tab-parents" onclick="setSettingsActiveTab('Parents')" style="flex: 1; padding: 8px; font-weight: 600;">👪 Parents FMS</button>
       </div>
       <div id="test-settings-list" style="max-height: 400px; overflow-y: auto; margin-bottom: var(--space-md); padding-right: 5px;">
@@ -766,6 +894,7 @@
       </div>
     </div>
   </div>
+
 
   <script src="app.js"></script>
   <!-- Member Actions Modal -->
