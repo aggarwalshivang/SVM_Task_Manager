@@ -1108,9 +1108,11 @@ function confirmDeleteFmsBlueprint(blueprintId, blueprintName) {
 }
 
 async function deleteCustomFmsBlueprint(blueprintId) {
-  // Fallback to My Tasks if currently viewing the tab being deleted
+  // Identify the blueprint being deleted
   const blueprints = getCustomFmsBlueprints();
   const bpToDelete = blueprints.find(b => String(b.id) === String(blueprintId));
+
+  // Fallback to My Tasks if currently viewing the tab being deleted
   if (bpToDelete && state.currentView === bpToDelete.type.toLowerCase()) {
     state.currentView = 'tasks';
     if ($('task-view-container')) $('task-view-container').style.display = 'block';
@@ -1123,6 +1125,14 @@ async function deleteCustomFmsBlueprint(blueprintId) {
     }
   }
 
+  // If state.testSettings is empty/stale, fetch fresh data from Supabase first
+  // so we don't accidentally wipe existing stage settings
+  if (!state.testSettings || state.testSettings.length === 0) {
+    const freshSettings = await apiFetch('getTestSettings');
+    if (freshSettings.success) state.testSettings = freshSettings.data;
+  }
+
+  // Remove only the target blueprint row; leave all other settings intact
   state.testSettings = (state.testSettings || []).filter(s => {
     if (s.type === 'fms_blueprint') {
       try {
@@ -1135,6 +1145,12 @@ async function deleteCustomFmsBlueprint(blueprintId) {
 
   const res = await apiFetch('updateTestSettings', { settings: state.testSettings });
   if (res.success) {
+    // Clear the localStorage slug cache immediately so the tab disappears at once
+    const remaining = (state.testSettings || []).filter(s => s.type === 'fms_blueprint').map(s => {
+      try { return JSON.parse(s.label); } catch (e) { return null; }
+    }).filter(Boolean);
+    localStorage.setItem('svm_custom_fms_blueprints', JSON.stringify(remaining));
+
     showToast('FMS "' + (bpToDelete ? bpToDelete.name : '') + '" deleted.', 'success');
     renderCustomFmsBlueprintsList();
     renderNavigationTabs();
@@ -1144,10 +1160,12 @@ async function deleteCustomFmsBlueprint(blueprintId) {
 }
 
 async function saveCustomFmsBlueprint(blueprint) {
+  // Use the same shape that getTestSettings returns (id/offset, not stage_id/offset_days)
+  // so the updateTestSettings mapper in supabase-api.js can correctly build the INSERT row.
   const blueprintRow = {
-    stage_id: 2000 + Math.floor(Math.random() * 1000000),
+    id: 2000 + Math.floor(Math.random() * 1000000),
     label: JSON.stringify(blueprint),
-    offset_days: 0,
+    offset: 0,
     doer: '',
     type: 'fms_blueprint',
     link: '',
