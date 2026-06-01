@@ -164,6 +164,33 @@ function doPost(e) {
     let result;
 
     switch (action) {
+      case 'syncToSheet': {
+        const syncPayload = { ...body, action: body.syncAction };
+        switch (body.syncAction) {
+          case 'completeTask': result = handleCompleteTask(syncPayload); break;
+          case 'addTask': result = handleAddTask(syncPayload); break;
+          case 'deleteTask': result = handleDeleteTask(syncPayload); break;
+          case 'editTask': result = handleEditTask(syncPayload); break;
+          case 'addMember': result = handleAddMember(syncPayload); break;
+          case 'removeMember': result = handleRemoveMember(syncPayload); break;
+          case 'approveMember': result = handleReviewMember(syncPayload); break;
+          case 'shiftTask': result = handleShiftTask(syncPayload); break;
+          case 'updateTaskStatus': result = handleUpdateTaskStatus(syncPayload); break;
+          case 'addTaskComment': result = handleAddTaskComment(syncPayload); break;
+          case 'adminPenalty': result = handleAdminPenalty(syncPayload); break;
+          case 'adminTaskPenalty': result = handleAdminTaskPenalty(syncPayload); break;
+          case 'requestLeave': result = handleRequestLeave(syncPayload); break;
+          case 'approveLeave': result = handleApproveLeave(syncPayload); break;
+          case 'sendBroadcast': result = handleSendBroadcast(syncPayload); break;
+          case 'addTest': result = handleAddTest(syncPayload); break;
+          case 'updateTestStage': result = handleUpdateTestStage(syncPayload); break;
+          case 'editTestDetails': result = handleEditTestDetails(syncPayload); break;
+          case 'deleteTestTracker': result = handleDeleteTestTracker(syncPayload); break;
+          case 'updateTestSettings': result = handleUpdateTestSettings(syncPayload); break;
+          default: result = { success: false, error: 'Unknown sync action: ' + body.syncAction };
+        }
+        break;
+      }
       case 'sendResetOTP':
         result = handleSendResetOTP(body);
         break;
@@ -1282,12 +1309,10 @@ function getTaskDueDateTime(dateStr, timeStr) {
       minute = timeStr.getMinutes();
     } else {
       const timeStrClean = String(timeStr);
-      if (timeStrClean.includes(':')) {
-        const timeParts = timeStrClean.split(':').map(Number);
-        if (timeParts.length >= 2) {
-          hour = timeParts[0];
-          minute = timeParts[1];
-        }
+      const match = timeStrClean.match(/(?:^|\s)(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+      if (match) {
+        hour = parseInt(match[1], 10);
+        minute = parseInt(match[2], 10);
       }
     }
   }
@@ -2276,5 +2301,213 @@ function handleAdminTaskPenalty(body) {
   } catch (err) {
     lock.releaseLock();
     throw err;
+  }
+}
+
+// =============================================
+// BIDIRECTIONAL REAL-TIME GOOGLE SHEETS TO SUPABASE SYNC
+// =============================================
+
+const SUPABASE_SYNC_URL = 'https://nslhzkthcgjyqlejlrxk.supabase.co';
+const SUPABASE_SYNC_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zbGh6a3RoY2dqeXFsZWpscnhrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDE5NTMwNiwiZXhwIjoyMDk1NzcxMzA2fQ.ZdpBngyhWUnnHe4Qhv-LgdPjEYgI4mmH2w-zLRjFb6Y';
+
+function onEdit(e) {
+  if (!e) return;
+  try {
+    const range = e.range;
+    const sheet = range.getSheet();
+    const sheetName = sheet.getName();
+    const row = range.getRow();
+    if (row === 1) return; // ignore headers
+    
+    const lastCol = sheet.getLastColumn();
+    const rowValues = sheet.getRange(row, 1, 1, lastCol).getValues()[0];
+    
+    syncRowToSupabase(sheetName, rowValues);
+  } catch (err) {
+    Logger.log('Error in onEdit trigger: ' + err.message);
+  }
+}
+
+function syncRowToSupabase(sheetName, rowValues) {
+  try {
+    let table = '';
+    let payload = {};
+    
+    switch (sheetName) {
+      case 'Team': {
+        table = 'team';
+        payload = {
+          name: String(rowValues[0] || ''),
+          role: String(rowValues[1] || 'Member'),
+          active: rowValues[2] === true || String(rowValues[2]).toUpperCase() === 'TRUE',
+          email: String(rowValues[3] || '').toLowerCase().trim(),
+          join_date: rowValues[4] ? new Date(rowValues[4]).toISOString() : new Date().toISOString(),
+          password_hash: String(rowValues[5] || '')
+        };
+        break;
+      }
+      case 'Tasks': {
+        table = 'tasks';
+        payload = {
+          task_id: String(rowValues[0] || ''),
+          task_name: String(rowValues[1] || ''),
+          assigned_to: String(rowValues[2] || ''),
+          task_type: String(rowValues[3] || 'other').toLowerCase(),
+          planned_date: rowValues[4] ? formatDateForDBSync(rowValues[4]) : null,
+          completed_date: rowValues[5] ? new Date(rowValues[5]).toISOString() : null,
+          status: String(rowValues[6] || 'pending').toLowerCase(),
+          week_number: Number(rowValues[7] || 0),
+          points: Number(rowValues[8] || 0),
+          notes: String(rowValues[9] || ''),
+          priority: String(rowValues[10] || 'Medium'),
+          created_at: rowValues[11] ? new Date(rowValues[11]).toISOString() : new Date().toISOString(),
+          comments: parseJSONFieldSync(rowValues[12], []),
+          recurrence: String(rowValues[13] || 'one-time'),
+          time: String(rowValues[14] || '')
+        };
+        break;
+      }
+      case 'WeeklyScores': {
+        table = 'weekly_scores';
+        payload = {
+          name: String(rowValues[0] || ''),
+          week: Number(rowValues[1] || 0),
+          year: Number(rowValues[2] || 0),
+          assigned: Number(rowValues[3] || 0),
+          completed: Number(rowValues[4] || 0),
+          late: Number(rowValues[5] || 0),
+          missed: Number(rowValues[6] || 0),
+          score: Number(rowValues[7] || 0),
+          ai_summary: String(rowValues[8] || '')
+        };
+        break;
+      }
+      case 'TaskLog': {
+        table = 'task_log';
+        payload = {
+          log_id: String(rowValues[0] || ''),
+          task_id: String(rowValues[1] || ''),
+          task_name: String(rowValues[2] || ''),
+          user_name: String(rowValues[3] || ''),
+          status: String(rowValues[4] || ''),
+          points: Number(rowValues[5] || 0),
+          planned_date: rowValues[6] ? formatDateForDBSync(rowValues[6]) : null,
+          completed_date: rowValues[7] ? new Date(rowValues[7]).toISOString() : null,
+          week_number: Number(rowValues[8] || 0),
+          year: Number(rowValues[9] || 0)
+        };
+        break;
+      }
+      case 'Leaves': {
+        table = 'leaves';
+        payload = {
+          user_name: String(rowValues[0] || ''),
+          start_date: rowValues[1] ? formatDateForDBSync(rowValues[1]) : null,
+          end_date: rowValues[2] ? formatDateForDBSync(rowValues[2]) : null,
+          status: String(rowValues[3] || 'pending'),
+          reason: String(rowValues[4] || ''),
+          created_at: rowValues[5] ? new Date(rowValues[5]).toISOString() : new Date().toISOString(),
+          task_buddy: String(rowValues[6] || '')
+        };
+        break;
+      }
+      case 'Broadcasts': {
+        table = 'broadcasts';
+        payload = {
+          message: String(rowValues[0] || ''),
+          type: String(rowValues[1] || 'info'),
+          created_at: rowValues[2] ? new Date(rowValues[2]).toISOString() : new Date().toISOString()
+        };
+        break;
+      }
+      case 'ResetCodes': {
+        table = 'reset_codes';
+        payload = {
+          email: String(rowValues[0] || ''),
+          otp: String(rowValues[1] || ''),
+          expires_at: rowValues[2] ? new Date(rowValues[2]).toISOString() : new Date().toISOString()
+        };
+        break;
+      }
+      case 'Tests': {
+        table = 'tests';
+        payload = {
+          test_id: String(rowValues[0] || ''),
+          test_name: String(rowValues[1] || ''),
+          class_name: String(rowValues[2] || ''),
+          max_score: Number(rowValues[3] || 0),
+          type: String(rowValues[4] || 'Sheet'),
+          held_on: rowValues[5] ? formatDateForDBSync(rowValues[5]) : null,
+          stages: parseJSONFieldSync(rowValues[6], []),
+          subject: String(rowValues[7] || ''),
+          chapter: String(rowValues[8] || ''),
+          sheet_link: String(rowValues[9] || ''),
+          folder_link: String(rowValues[10] || ''),
+          min_score: rowValues[11] !== '' ? Number(rowValues[11]) : null,
+          avg_score: rowValues[12] !== '' ? Number(rowValues[12]) : null
+        };
+        break;
+      }
+      case 'TestSettings': {
+        table = 'test_settings';
+        payload = {
+          stage_id: Number(rowValues[0] || 0),
+          label: String(rowValues[1] || ''),
+          offset_days: Number(rowValues[2] || 0),
+          doer: String(rowValues[3] || ''),
+          type: String(rowValues[4] || 'Sheet')
+        };
+        break;
+      }
+      case 'Modifications': {
+        table = 'modifications';
+        payload = {
+          task_id: String(rowValues[0] || ''),
+          type: String(rowValues[1] || ''),
+          new_data: parseJSONFieldSync(rowValues[2], {}),
+          requested_by: String(rowValues[3] || ''),
+          requested_at: rowValues[4] ? new Date(rowValues[4]).toISOString() : new Date().toISOString(),
+          status: String(rowValues[5] || 'pending')
+        };
+        break;
+      }
+    }
+    
+    if (table && Object.keys(payload).length > 0) {
+      const url = `${SUPABASE_SYNC_URL}/rest/v1/${table}`;
+      const options = {
+        method: 'post',
+        contentType: 'application/json',
+        headers: {
+          'apikey': SUPABASE_SYNC_KEY,
+          'Authorization': `Bearer ${SUPABASE_SYNC_KEY}`,
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      };
+      const response = UrlFetchApp.fetch(url, options);
+      Logger.log(`Sync Row [${sheetName}] to Supabase: HTTP ${response.getResponseCode()}`);
+    }
+  } catch (err) {
+    Logger.log(`Error syncing row [${sheetName}]: ` + err.message);
+  }
+}
+
+function formatDateForDBSync(val) {
+  if (!val) return null;
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString().substring(0, 10);
+}
+
+function parseJSONFieldSync(val, defaultVal) {
+  if (!val) return defaultVal;
+  try {
+    if (typeof val === 'string') return JSON.parse(val);
+    return val;
+  } catch (e) {
+    return defaultVal;
   }
 }

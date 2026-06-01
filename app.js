@@ -6,19 +6,69 @@
 // CONFIGURATION
 // =============================================
 const CONFIG = {
-  //  REPLACE THIS with your deployed Apps Script Web App URL
-  API_URL: 'https://script.google.com/macros/s/AKfycbwmbi8zQ7A5MHsJdzD4n8ELe6Nw_RChgefVRVnoI_KkiFvdkc1cKL4SKMHJxE1cjCM/exec',
+  // Apps Script URL — kept for email/AI/scoring triggers and Sheet sync
+  API_URL: 'https://script.google.com/macros/s/AKfycbz7DXp_lIuFL2wG5_t_GgGPL0giAkIO01vq99XpiYT_eBow9e2lfoEDqFUeCU6Tk7E8/exec',
+
+  // Supabase — PRIMARY data store
+  SUPABASE_URL: 'https://nslhzkthcgjyqlejlrxk.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zbGh6a3RoY2dqeXFsZWpscnhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxOTUzMDYsImV4cCI6MjA5NTc3MTMwNn0.KCXg7pm9gH2ulG7uNtVmJoYKWP2laosAhwnvEfh15V8',
 
   // Retry settings
   MAX_RETRIES: 2,
   RETRY_DELAY: 1000,
 
   // Anti-spam settings
-  TASK_COOLDOWN_MS: 2000, // 2 seconds between task completions
+  TASK_COOLDOWN_MS: 2000,
 
   // Demo mode — set to true to use mock data without a backend
   DEMO_MODE: false,
 };
+
+// =============================================
+// SUPABASE CLIENT (Primary Data Store)
+// =============================================
+let _supabase = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+  }
+  return _supabase;
+}
+
+// SHA-256 hash using Web Crypto API (mirrors Apps Script Utilities.computeDigest)
+async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ISO week number (mirrors Apps Script getISOWeekNumber)
+function getISOWeekNum(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+// =============================================
+// BACKGROUND SHEET SYNC (fire-and-forget)
+// =============================================
+function syncToSheet(action, data) {
+  // Non-blocking — we don't await this
+  try {
+    const url = new URL(CONFIG.API_URL);
+    fetch(url.toString(), {
+      method: 'POST',
+      redirect: 'follow',
+      credentials: 'omit',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'syncToSheet', syncAction: action, ...data }),
+    }).catch(() => { }); // Silently ignore sheet sync errors
+  } catch (e) { }
+}
 
 // (Supabase removed - Using GSheet Auth)
 
@@ -312,34 +362,33 @@ function getMockBriefing(user, tasks) {
 }
 
 // =============================================
-// API LAYER
+// API LAYER — Supabase primary, Apps Script for AI/email
 // =============================================
-async function apiFetch(action, params = {}, method = 'GET') {
-  if (CONFIG.DEMO_MODE) {
-    return demoHandler(action, params, method);
-  }
+const APPS_SCRIPT_ACTIONS = new Set([
+  'getBriefing', 'processVoiceTask', 'generateRecurringTasks', 'recalculateScores',
+  'sendResetOTP', 'parseRecurrence', 'resetAllPasswords', 'forgotPassword', 'getWorkflowHealth'
+]);
 
+async function apiFetch(action, params = {}, method = 'GET') {
+  if (CONFIG.DEMO_MODE) return demoHandler(action, params, method);
+  if (APPS_SCRIPT_ACTIONS.has(action)) return apiFetchSheet(action, params, method);
+  return supabaseApiFetch(action, params);
+}
+
+async function apiFetchSheet(action, params = {}, method = 'GET') {
   const url = new URL(CONFIG.API_URL);
   let options = {};
-
   if (method === 'GET') {
     url.searchParams.set('action', action);
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-    options = {
-      method: 'GET',
-      redirect: 'follow',
-      credentials: 'omit' // Often helps with Apps Script CORS on localhost
-    };
+    options = { method: 'GET', redirect: 'follow', credentials: 'omit' };
   } else {
     options = {
-      method: 'POST',
-      redirect: 'follow',
-      credentials: 'omit',
+      method: 'POST', redirect: 'follow', credentials: 'omit',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, ...params }),
+      body: JSON.stringify({ action, ...params })
     };
   }
-
   let lastError;
   for (let attempt = 0; attempt <= CONFIG.MAX_RETRIES; attempt++) {
     try {
@@ -349,9 +398,7 @@ async function apiFetch(action, params = {}, method = 'GET') {
       return data;
     } catch (err) {
       lastError = err;
-      if (attempt < CONFIG.MAX_RETRIES) {
-        await sleep(CONFIG.RETRY_DELAY * (attempt + 1));
-      }
+      if (attempt < CONFIG.MAX_RETRIES) await sleep(CONFIG.RETRY_DELAY * (attempt + 1));
     }
   }
   throw lastError;
@@ -741,7 +788,7 @@ async function openTestTracker(viewType = 'tests') {
   }
 
   // If no cache, show spinner and fetch for the first time
-  container.innerHTML = '<div class="loading-spinner" style="margin: 3rem auto;"></div>';
+  container.innerHTML = '<div class="premium-loader"><div class="premium-loader-bar"></div><div class="premium-loader-bar mid"></div><div class="premium-loader-bar short"></div></div>';
 
   try {
     const [settingsRes, testsRes] = await Promise.all([
@@ -2113,7 +2160,7 @@ async function openDashboard() {
   }
 
   // If no cache, show spinner and fetch for the first time
-  if (content) content.innerHTML = '<div class="loading-spinner" style="margin: 3rem auto;"></div>';
+  if (content) content.innerHTML = '<div class="premium-loader"><div class="premium-loader-bar"></div><div class="premium-loader-bar mid"></div><div class="premium-loader-bar short"></div></div>';
 
   try {
     const [scoresRes, teamRes, leavesRes, perfRes, healthRes, modRes] = await Promise.all([
@@ -2616,7 +2663,7 @@ async function handleAdminPenalty(memberName, e) {
 
   document.getElementById('penalty-member-name').textContent = memberName;
   const listContainer = document.getElementById('penalty-tasks-list');
-  listContainer.innerHTML = '<div class="loading-spinner" style="margin: 20px auto;"></div>';
+  listContainer.innerHTML = '<div class="premium-loader"><div class="premium-loader-bar"></div><div class="premium-loader-bar mid"></div><div class="premium-loader-bar short"></div></div>';
   modal.style.display = 'flex';
 
   try {
@@ -2833,7 +2880,7 @@ async function handleViewAllTasks() {
   $('briefing-section').style.display = 'none';
 
   const content = $('recurring-section');
-  if (content) content.innerHTML = '<div class="loading-spinner" style="margin: 3rem auto;"></div>';
+  if (content) content.innerHTML = '<div class="premium-loader"><div class="premium-loader-bar"></div><div class="premium-loader-bar mid"></div><div class="premium-loader-bar short"></div></div>';
 
   try {
     showToast('Loading all tasks...');
@@ -2871,7 +2918,7 @@ async function handleViewMemberTasks(userName) {
   $('briefing-section').style.display = 'none';
 
   const content = $('recurring-section');
-  if (content) content.innerHTML = '<div class="loading-spinner" style="margin: 3rem auto;"></div>';
+  if (content) content.innerHTML = '<div class="premium-loader"><div class="premium-loader-bar"></div><div class="premium-loader-bar mid"></div><div class="premium-loader-bar short"></div></div>';
 
   try {
     showToast(`Loading tasks for ${userName}...`);
@@ -4937,18 +4984,18 @@ let currentFormStages = [];
 function getDoerDropdownOptions(currentDoer) {
   const names = (state.teamMembers || []).map(m => m.name);
   const options = [];
-  
+
   options.push(`<option value=""${!currentDoer ? ' selected' : ''}>Unassigned</option>`);
   options.push(`<option value="All"${currentDoer === 'All' ? ' selected' : ''}>All</option>`);
-  
+
   (state.teamMembers || []).forEach(m => {
     options.push(`<option value="${m.name}"${currentDoer === m.name ? ' selected' : ''}>${m.name}</option>`);
   });
-  
+
   if (currentDoer && currentDoer !== 'All' && !names.includes(currentDoer)) {
     options.push(`<option value="${currentDoer}" selected>${currentDoer}</option>`);
   }
-  
+
   return options.join('');
 }
 

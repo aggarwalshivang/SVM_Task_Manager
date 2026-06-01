@@ -28,10 +28,13 @@
 </head>
 <body>
 
-  <!-- Loading Screen -->
+  <!-- Loading Screen (Premium Reveal Splash) -->
   <div class="loading-screen" id="loading-screen">
-    <div class="loading-logo">SVM</div>
-    <div class="loading-spinner"></div>
+    <div class="splash-container">
+      <div class="splash-logo">SVM</div>
+      <div class="splash-subtitle">Task Tracker</div>
+      <div class="splash-glow"></div>
+    </div>
   </div>
 
   <!-- Auth Overlay -->
@@ -735,7 +738,9 @@
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Supabase JS Client -->
+  <!-- Supabase JS Client v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-api.js"></script>
   <!-- Test Settings Modal -->
   <div class="modal-overlay" id="test-settings-modal" style="display:none;">
     <div class="modal-card modal-card-lg">

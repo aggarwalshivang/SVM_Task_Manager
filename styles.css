@@ -134,17 +134,18 @@ body::before {
   padding-bottom: calc(var(--space-2xl) + env(safe-area-inset-bottom, 20px));
 }
 
-/* ---------- Loading Screen ---------- */
+/* ---------- Loading Screen (Premium Reveal Splash) ---------- */
 .loading-screen {
   position: fixed;
   inset: 0;
-  background: var(--bg-primary);
+  background: radial-gradient(circle at center, #0f0f2d 0%, #050510 100%);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  transition: opacity 0.5s ease, visibility 0.5s ease;
+  transition: opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1), 
+              backdrop-filter 0.6s cubic-bezier(0.25, 1, 0.5, 1),
+              visibility 0.6s ease;
 }
 
 .loading-screen.hidden {
@@ -153,24 +154,117 @@ body::before {
   pointer-events: none;
 }
 
-.loading-logo {
-  font-size: 2.5rem;
-  font-weight: 800;
-  background: var(--gradient-purple);
+.splash-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  animation: splashFadeIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.splash-logo {
+  font-size: 4.5rem;
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 50%, #4c1d95 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: var(--space-lg);
-  animation: pulse-scale 1.5s ease-in-out infinite;
+  filter: drop-shadow(0 0 35px rgba(124, 58, 237, 0.4));
+  animation: logoPulse 2.5s ease-in-out infinite;
 }
 
-.loading-spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid var(--border-glass);
-  border-top-color: var(--accent-purple);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+.splash-subtitle {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: var(--space-xs);
+  opacity: 0;
+  animation: subtitleFadeIn 1s cubic-bezier(0.25, 1, 0.5, 1) 0.3s forwards;
+}
+
+.splash-glow {
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.18) 0%, transparent 70%);
+  filter: blur(12px);
+  pointer-events: none;
+  z-index: -1;
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+/* Animations for Reveal Splash */
+@keyframes splashFadeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes subtitleFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  100% {
+    opacity: 0.7;
+    transform: translateY(0);
+  }
+}
+
+@keyframes logoPulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 30px rgba(124, 58, 237, 0.35));
+  }
+  50% {
+    transform: scale(1.03);
+    filter: drop-shadow(0 0 45px rgba(124, 58, 237, 0.55));
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+}
+
+/* ---------- Premium Shimmer Skeletal Loading ---------- */
+.premium-loader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  width: 100%;
+}
+
+.premium-loader-bar {
+  height: 18px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 25%, rgba(255, 255, 255, 0.09) 50%, rgba(255, 255, 255, 0.04) 75%);
+  background-size: 200% 100%;
+  border-radius: var(--radius-sm);
+  animation: shimmer 1.5s infinite;
+}
+
+.premium-loader-bar.short {
+  width: 60%;
+}
+
+.premium-loader-bar.mid {
+  width: 80%;
 }
 
 /* ---------- Auth Overlay ---------- */
@@ -502,25 +596,49 @@ body::before {
 .nav-tab {
   background: none;
   border: none;
-  padding: 6px 12px;
+  padding: 8px 16px;
   border-radius: var(--radius-full);
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: var(--text-muted);
   cursor: pointer;
   transition: all var(--transition-base);
   white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .nav-tab.active {
   background: var(--accent-purple);
   color: white;
   box-shadow: var(--shadow-glow-purple);
+  animation: activeTabPulse 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 .nav-tab:hover:not(.active) {
   background: var(--bg-card-hover);
   color: var(--text-primary);
+}
+
+.nav-tab::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  transition: all 0.6s ease;
+}
+
+.nav-tab:hover::before {
+  left: 100%;
+}
+
+@keyframes activeTabPulse {
+  0% { transform: scale(0.9); }
+  100% { transform: scale(1); }
 }
 
 /* ---------- AI Briefing Card ---------- */
@@ -664,16 +782,22 @@ body::before {
 
 .task-card:hover {
   background: var(--bg-card-hover);
-  border-color: var(--border-glass-active);
-  transform: translateX(4px);
+  border-color: rgba(124, 58, 237, 0.35);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35), 0 0 15px rgba(124, 58, 237, 0.12);
+  transform: translateY(-2px);
 }
 
 .task-card:active {
-  transform: scale(0.98);
+  transform: scale(0.995) translateY(0);
 }
 
 .task-card.overdue {
   border-left: 3px solid var(--accent-red);
+}
+
+.task-card.overdue:hover {
+  border-color: rgba(239, 68, 68, 0.4);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35), 0 0 15px rgba(239, 68, 68, 0.12);
 }
 
 .task-card.overdue::after {
@@ -692,9 +816,16 @@ body::before {
 }
 
 .task-card.done {
-  opacity: 0.5;
-  background: rgba(16, 185, 129, 0.05);
+  opacity: 0.6;
+  background: rgba(16, 185, 129, 0.03);
   border-color: rgba(16, 185, 129, 0.15);
+}
+
+.task-card.done:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: rgba(16, 185, 129, 0.25);
+  background: rgba(16, 185, 129, 0.05);
 }
 
 .task-card.done .task-name {
@@ -724,6 +855,28 @@ body::before {
   background: var(--accent-emerald);
   border-color: var(--accent-emerald);
   box-shadow: var(--shadow-glow-emerald);
+}
+
+.task-card.done .task-checkbox::after {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  border: 2px solid var(--accent-emerald);
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0.7);
+  animation: checkboxBurst 0.5s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+
+@keyframes checkboxBurst {
+  0% {
+    opacity: 0.85;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
 }
 
 .task-checkbox .check-icon {
@@ -1805,7 +1958,7 @@ body::before {
 .btn-primary {
   width: 100%;
   padding: var(--space-sm) var(--space-lg);
-  background: var(--gradient-purple);
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 50%, #6d28d9 100%);
   border: none;
   border-radius: var(--radius-md);
   color: white;
@@ -1813,23 +1966,27 @@ body::before {
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: all var(--transition-spring);
   margin-top: var(--space-sm);
+  position: relative;
+  overflow: hidden;
 }
 
 .btn-primary:hover {
-  box-shadow: var(--shadow-glow-purple);
-  transform: translateY(-1px);
+  box-shadow: 0 0 25px var(--accent-purple-glow), 0 4px 12px rgba(124, 58, 237, 0.3);
+  transform: translateY(-2px);
 }
 
 .btn-primary:active {
-  transform: scale(0.98);
+  transform: scale(0.96) translateY(0);
+  box-shadow: 0 0 10px var(--accent-purple-glow);
 }
 
 .btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
 }
 
 .btn-secondary {
@@ -1841,7 +1998,7 @@ body::before {
   color: var(--text-secondary);
   font-family: inherit;
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: all var(--transition-base);
 }
@@ -1849,6 +2006,12 @@ body::before {
 .btn-secondary:hover {
   background: var(--bg-card-hover);
   color: var(--text-primary);
+  border-color: var(--border-glass-active);
+  transform: translateY(-1px);
+}
+
+.btn-secondary:active {
+  transform: scale(0.97);
 }
 
 .btn-danger {
@@ -3211,5 +3374,19 @@ select option:hover {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+/* Segmented Control Scrollable Support */
+.segmented-control {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.segmented-control::-webkit-scrollbar {
+  display: none;
+}
+.segmented-control .segment-btn {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
 }
 
