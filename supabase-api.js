@@ -204,22 +204,151 @@ async function supabaseApiFetch(action, params = {}) {
       const user = params.user;
       const curWeek = getISOWeekNum(new Date());
       const curYear = new Date().getFullYear();
+
       if (user) {
-        const { data } = await sb.from('weekly_scores').select('*').eq('name', user).eq('week', curWeek).eq('year', curYear).maybeSingle();
-        if (!data) return { success: true, data: { weekScore: 0, streak: 0, tasksAssigned: 0, tasksCompleted: 0, tasksLate: 0, tasksMissed: 0 } };
-        return { success: true, data: { weekScore: data.score || 0, streak: 0, tasksAssigned: data.assigned || 0, tasksCompleted: data.completed || 0, tasksLate: data.late || 0, tasksMissed: data.missed || 0 } };
+        // Dynamic current week tasks for this user
+        const { data: userWeekTasks } = await sb.from('tasks').select('*').eq('assigned_to', user).eq('week_number', curWeek);
+        const todayStr = getTodayStr();
+
+        let weekScore = 0;
+        let tasksAssigned = 0;
+        let tasksCompleted = 0;
+        let tasksLate = 0;
+        let tasksMissed = 0;
+
+        (userWeekTasks || []).forEach(t => {
+          weekScore += (t.points || 0);
+          if (t.task_type !== 'penalty') {
+            tasksAssigned++;
+            if (t.status === 'done') {
+              tasksCompleted++;
+              const compDateStr = t.completed_date ? t.completed_date.substring(0, 10) : '';
+              const plannedDateStr = t.planned_date ? t.planned_date.substring(0, 10) : '';
+              if (compDateStr && plannedDateStr && compDateStr > plannedDateStr) {
+                tasksLate++;
+              }
+            } else if (t.status === 'missed') {
+              tasksMissed++;
+            }
+          }
+        });
+
+        // Fallback or merge with database row if present
+        const { data: dbRow } = await sb.from('weekly_scores').select('*').eq('name', user).eq('week', curWeek).eq('year', curYear).maybeSingle();
+        if (dbRow) {
+          weekScore = dbRow.score || weekScore;
+          tasksAssigned = dbRow.assigned || tasksAssigned;
+          tasksCompleted = dbRow.completed || tasksCompleted;
+          tasksLate = dbRow.late || tasksLate;
+          tasksMissed = dbRow.missed || tasksMissed;
+        }
+
+        return { success: true, data: { weekScore, streak: 0, tasksAssigned, tasksCompleted, tasksLate, tasksMissed } };
       }
+
       const { data: teamData } = await sb.from('team').select('name,role');
-      const adminNames = (teamData || []).filter(r => r.role?.toLowerCase() === 'admin' || r.role?.toLowerCase() === 'process_coordinator').map(r => r.name);
-      const { data: scores } = await sb.from('weekly_scores').select('*').eq('week', curWeek).eq('year', curYear);
+      const activeMembers = (teamData || []).filter(r => {
+        const role = r.role?.toLowerCase();
+        return role !== 'admin' && role !== 'process_coordinator';
+      });
+
+      // Fetch all tasks for the current week to calculate dynamic scores
+      const { data: weekTasks } = await sb.from('tasks').select('*').eq('week_number', curWeek);
+
+      // Fetch all historical scores to calculate all-time scores
       const { data: allScores } = await sb.from('weekly_scores').select('name,score');
       const overall = {};
       (allScores || []).forEach(r => { overall[r.name] = (overall[r.name] || 0) + (r.score || 0); });
-      return { success: true, data: (scores || []).filter(r => !adminNames.includes(r.name)).map(r => ({
-        name: r.name, weekNumber: r.week, year: r.year, tasksAssigned: r.assigned, tasksCompleted: r.completed,
-        tasksLate: r.late, tasksMissed: r.missed, score: r.score, aiSummary: r.ai_summary || '',
-        overallScore: overall[r.name] || 0, todayScore: 0, negativeToday: 0, negativeWeek: 0, negativeAllTime: 0
-      }))};
+
+      // Fetch all tasks with negative points to calculate penalties
+      const { data: allNegativeTasks } = await sb.from('tasks').select('assigned_to,points').lt('points', 0);
+
+      const todayStr = getTodayStr();
+
+      const scores = activeMembers.map(member => {
+        const name = member.name;
+        
+        let weekScore = 0;
+        let tasksAssigned = 0;
+        let tasksCompleted = 0;
+        let tasksLate = 0;
+        let tasksMissed = 0;
+
+        // Dynamic current week aggregates
+        (weekTasks || []).forEach(t => {
+          if (t.assigned_to === name) {
+            weekScore += (t.points || 0);
+            if (t.task_type !== 'penalty') {
+              tasksAssigned++;
+              if (t.status === 'done') {
+                tasksCompleted++;
+                const compDateStr = t.completed_date ? t.completed_date.substring(0, 10) : '';
+                const plannedDateStr = t.planned_date ? t.planned_date.substring(0, 10) : '';
+                if (compDateStr && plannedDateStr && compDateStr > plannedDateStr) {
+                  tasksLate++;
+                }
+              } else if (t.status === 'missed') {
+                tasksMissed++;
+              }
+            }
+          }
+        });
+
+        // Compute today's scores and penalties
+        let todayScore = 0;
+        let negativeToday = 0;
+        let negativeWeek = 0;
+        let negativeAllTime = 0;
+
+        (weekTasks || []).forEach(t => {
+          if (t.assigned_to === name) {
+            const compDateStr = t.completed_date ? t.completed_date.substring(0, 10) : '';
+            const plannedDateStr = t.planned_date ? t.planned_date.substring(0, 10) : '';
+            
+            // Today's score: points earned today
+            if (compDateStr === todayStr || (t.status === 'missed' && plannedDateStr === todayStr)) {
+              todayScore += (t.points || 0);
+            }
+
+            // Negative week
+            if (t.points < 0) {
+              negativeWeek += Math.abs(t.points);
+              if (compDateStr === todayStr || (t.status === 'missed' && plannedDateStr === todayStr)) {
+                negativeToday += Math.abs(t.points);
+              }
+            }
+          }
+        });
+
+        // Negative all time (from all negative tasks in tasks table)
+        (allNegativeTasks || []).forEach(t => {
+          if (t.assigned_to === name) {
+            negativeAllTime += Math.abs(t.points);
+          }
+        });
+
+        // Dynamic overall score = past weeks + current week's dynamic points
+        const overallScore = (overall[name] || 0) + weekScore;
+
+        return {
+          name,
+          weekNumber: curWeek,
+          year: curYear,
+          tasksAssigned,
+          tasksCompleted,
+          tasksLate,
+          tasksMissed,
+          score: weekScore,
+          aiSummary: '',
+          overallScore,
+          todayScore,
+          negativeToday,
+          negativeWeek,
+          negativeAllTime
+        };
+      });
+
+      return { success: true, data: scores };
     }
 
     case 'login': {
