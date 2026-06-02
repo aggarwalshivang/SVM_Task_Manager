@@ -198,10 +198,13 @@ async function supabaseApiFetch(action, params = {}) {
       }
 
       if (all) return { success: true, data: processedRows };
+      const allDates = params.allDates === true || params.allDates === 'true';
       return { success: true, data: processedRows.filter(t => {
         const isAssigned = user && t.assignedTo === user;
         const isBuddy = buddyFor.includes(t.assignedTo);
         if (!isAssigned && !isBuddy) return false;
+        
+        if (allDates) return true;
         
         const d = (t.plannedDate || '').substring(0, 10);
         return d === todayDate || ['overdue','stuck','in-progress','missed'].includes(t.status);

@@ -2582,8 +2582,19 @@ function renderBriefingSkeleton() {
 }
 
 function renderTasks(tasks) {
+  let displayedTasks = tasks;
+
+  // If not in calendar view, only show today's tasks or active/overdue/stuck/missed tasks (emulate legacy backend filter for task lists)
+  if (state.taskViewMode !== 'calendar') {
+    const todayDate = getTodayStr();
+    displayedTasks = tasks.filter(t => {
+      const d = (t.plannedDate || '').substring(0, 10);
+      return d === todayDate || ['overdue', 'stuck', 'in-progress', 'missed'].includes(t.status);
+    });
+  }
+
   // Apply Search and Status Filters
-  const filteredTasks = tasks.filter(t => {
+  const filteredTasks = displayedTasks.filter(t => {
     const matchesSearch = t.taskName.toLowerCase().includes(state.filters.search.toLowerCase());
     const matchesStatus = state.filters.status === 'all' ||
       t.status === state.filters.status ||
@@ -4321,7 +4332,7 @@ async function init() {
 
       networkPromise = Promise.all([
         apiFetch('getTeam').then(res => { state.teamMembers = res.data || []; }).catch(() => { }),
-        apiFetch('getTasks', { user: state.currentUser }).then(res => { state.tasks = res.data || []; }).catch(() => { }),
+        apiFetch('getTasks', { user: state.currentUser, allDates: true }).then(res => { state.tasks = res.data || []; }).catch(() => { }),
         apiFetch('getScores', { user: state.currentUser }).then(res => { state.stats = res.data; }).catch(() => { }),
         apiFetch('getTestSettings').then(res => { if (res.success) state.testSettings = res.data; }).catch(() => { }),
         apiFetch('getTests').then(res => { if (res.success) state.tests = res.data; }).catch(() => { })
@@ -4401,7 +4412,7 @@ async function initForUser(user) {
   try {
     // Fetch tasks, stats and team in parallel — no sequential blocking
     const [tasksRes, statsRes, teamRes] = await Promise.all([
-      apiFetch('getTasks', { user }),
+      apiFetch('getTasks', { user, allDates: true }),
       apiFetch('getScores', { user }),
       apiFetch('getTeam'),
     ]);
@@ -4518,7 +4529,7 @@ async function silentRefreshTasks(user) {
   _syncInProgress = true;
   try {
     const [tasksRes, statsRes] = await Promise.all([
-      apiFetch('getTasks', { user }),
+      apiFetch('getTasks', { user, allDates: true }),
       apiFetch('getScores', { user }),
     ]);
 
@@ -7463,11 +7474,24 @@ function renderCalendarView(tasks) {
 function renderCalendarCell(dayNum, cellDateStr, isOtherMonth, todayStr, tasks) {
   const isToday = cellDateStr === todayStr;
   
-  // Filter tasks for this specific date
-  const dayTasks = tasks.filter(t => {
-    if (!t.plannedDate) return false;
-    const taskDate = t.plannedDate.substring(0, 10);
-    return taskDate === cellDateStr;
+  const cellDate = new Date(cellDateStr + 'T00:00:00');
+  const isSunday = cellDate.getDay() === 0;
+
+  const dayTasks = [];
+  tasks.forEach(t => {
+    if (t.taskType === 'daily') {
+      if (!isSunday) {
+        let status = t.status;
+        if (cellDateStr !== todayStr) {
+          status = cellDateStr < todayStr ? 'done' : 'pending';
+        }
+        dayTasks.push({ ...t, status });
+      }
+    } else {
+      if (t.plannedDate && t.plannedDate.substring(0, 10) === cellDateStr) {
+        dayTasks.push(t);
+      }
+    }
   });
 
   let taskItemsHtml = '';
