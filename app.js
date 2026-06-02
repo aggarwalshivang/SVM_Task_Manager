@@ -634,6 +634,7 @@ function handleUserSignedOut() {
   $('task-view-container').style.display = 'none';
   $('admin-dashboard-container').style.display = 'none';
   if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+  if ($('student-container')) $('student-container').style.display = 'none';
 }
 
 function handleUserSignedIn(userData) {
@@ -675,6 +676,7 @@ function handleUserSignedIn(userData) {
   if ($('admin-dashboard-container')) $('admin-dashboard-container').style.display = 'none';
   if ($('test-tracker-container')) $('test-tracker-container').style.display = 'none';
   if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+  if ($('student-container')) $('student-container').style.display = 'none';
   if ($('task-view-container')) $('task-view-container').style.display = 'block';
 
   renderHeader(state.currentUser);
@@ -688,6 +690,15 @@ function handleUserSignedIn(userData) {
   // Bind tab events dynamically
   renderNavigationTabs();
 
+  // Bind student webhook buttons
+  const sendSubmittedBtn = $('btn-send-submitted');
+  if (sendSubmittedBtn) {
+    sendSubmittedBtn.onclick = () => triggerStudentWebhook('submitted');
+  }
+  const sendUnsubmittedBtn = $('btn-send-unsubmitted');
+  if (sendUnsubmittedBtn) {
+    sendUnsubmittedBtn.onclick = () => triggerStudentWebhook('unsubmitted');
+  }
 
   const builderClose = $('custom-fms-builder-close-btn');
   if (builderClose) builderClose.onclick = closeCustomFmsBuilderModal;
@@ -742,10 +753,11 @@ function renderNavigationTabs() {
     <button class="nav-tab ${state.currentView === 'dashboard' ? 'active' : ''}" id="tab-team" style="position:relative; display:${isPrivileged ? 'block' : 'none'};">Team <span id="team-badge" style="display:none; position:absolute; top:-5px; right:-5px; background:var(--accent-red); color:white; font-size:0.6rem; padding:2px 5px; border-radius:10px; border:2px solid var(--bg-primary);">!</span></button>
   `;
 
-  // Append FMS Builder tab beside the team tab, visible to ADMIN ONLY
+  // Append FMS Builder and Student tab beside the team tab, visible to ADMIN ONLY
   if (state.userRole === 'admin') {
     html += `
       <button class="nav-tab ${state.currentView === 'fms-builder' ? 'active' : ''}" id="tab-fms-builder">🛠️ FMS Builder</button>
+      <button class="nav-tab ${state.currentView === 'student' ? 'active' : ''}" id="tab-student">🎓 Student</button>
     `;
   }
 
@@ -796,6 +808,7 @@ function bindTabClickListeners() {
     $('admin-dashboard-container').style.display = 'none';
     $('test-tracker-container').style.display = 'none';
     if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+    if ($('student-container')) $('student-container').style.display = 'none';
     $('stats-section').style.display = 'block';
     $('briefing-section').style.display = 'block';
     initForUser(state.currentUser);
@@ -809,6 +822,7 @@ function bindTabClickListeners() {
     $('task-view-container').style.display = 'none';
     $('test-tracker-container').style.display = 'none';
     if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+    if ($('student-container')) $('student-container').style.display = 'none';
   };
 
   const staticFms = [
@@ -828,6 +842,7 @@ function bindTabClickListeners() {
       $('task-view-container').style.display = 'none';
       $('admin-dashboard-container').style.display = 'none';
       if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+      if ($('student-container')) $('student-container').style.display = 'none';
       $('test-tracker-container').style.display = 'block';
     };
   });
@@ -845,6 +860,7 @@ function bindTabClickListeners() {
         $('task-view-container').style.display = 'none';
         $('admin-dashboard-container').style.display = 'none';
         if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+        if ($('student-container')) $('student-container').style.display = 'none';
         $('test-tracker-container').style.display = 'block';
       };
     }
@@ -868,8 +884,24 @@ function bindTabClickListeners() {
       $('admin-dashboard-container').style.display = 'none';
       $('test-tracker-container').style.display = 'none';
       if ($('fms-builder-container')) $('fms-builder-container').style.display = 'block';
+      if ($('student-container')) $('student-container').style.display = 'none';
       renderCustomFmsBlueprintsList();
       closeCustomFmsCreatorSection();
+    };
+  }
+
+  // Bind Student tab (visible to admin only)
+  const studentTab = $('tab-student');
+  if (studentTab) {
+    studentTab.onclick = () => {
+      setActiveTab('tab-student');
+      state.currentView = 'student';
+      $('task-view-container').style.display = 'none';
+      $('admin-dashboard-container').style.display = 'none';
+      $('test-tracker-container').style.display = 'none';
+      if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+      if ($('student-container')) $('student-container').style.display = 'block';
+      renderStudentWebhookHistory();
     };
   }
 
@@ -883,6 +915,7 @@ function openCustomFmsBuilderModal() {
   } else {
     // Fallback if elements not ready
     if ($('fms-builder-container')) $('fms-builder-container').style.display = 'block';
+    if ($('student-container')) $('student-container').style.display = 'none';
     renderCustomFmsBlueprintsList();
     closeCustomFmsCreatorSection();
   }
@@ -890,6 +923,7 @@ function openCustomFmsBuilderModal() {
 
 function closeCustomFmsBuilderModal() {
   if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+  if ($('student-container')) $('student-container').style.display = 'none';
 }
 
 // Tracks the list of custom field definitions for the blueprint being created
@@ -1117,6 +1151,7 @@ async function deleteCustomFmsBlueprint(blueprintId) {
     state.currentView = 'tasks';
     if ($('task-view-container')) $('task-view-container').style.display = 'block';
     if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+    if ($('student-container')) $('student-container').style.display = 'none';
     if ($('test-tracker-container')) $('test-tracker-container').style.display = 'none';
     const myTasksTab = $('tab-my-tasks');
     if (myTasksTab) {
@@ -2655,6 +2690,7 @@ function matchesTab(t, tab, monday, sunday) {
       return false;
     }
     case 'week': {
+      if (t.taskType !== 'weekly') return false;
       if (!t.plannedDate) return false;
       const d = new Date(t.plannedDate.substring(0, 10) + 'T00:00:00');
       return d >= monday && d <= sunday;
@@ -5319,6 +5355,7 @@ async function switchView(view) {
     $('task-view-container').style.display = 'block';
     $('admin-dashboard-container').style.display = 'none';
     if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+    if ($('student-container')) $('student-container').style.display = 'none';
     await initForUser(state.currentUser);
   } else {
     myTasksTab?.classList.remove('active');
@@ -5326,6 +5363,7 @@ async function switchView(view) {
     $('task-view-container').style.display = 'none';
     $('admin-dashboard-container').style.display = 'block';
     if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+    if ($('student-container')) $('student-container').style.display = 'none';
     await openDashboard();
   }
 }
@@ -7127,9 +7165,183 @@ document.addEventListener('DOMContentLoaded', () => {
   try {
     init();
     startBackgroundSync();
+
+    // Horizontal scrolling support for PC/desktop
+    const nav = document.getElementById('header-nav');
+    if (nav) {
+      // 1. Wheel translation: Translate vertical wheel scrolling into horizontal scrolling
+      nav.addEventListener('wheel', (e) => {
+        if (e.deltaY !== 0) {
+          nav.scrollLeft += e.deltaY * 0.8;
+          e.preventDefault();
+        }
+      }, { passive: false });
+
+      // 2. Click-and-drag scrolling support
+      let isDown = false;
+      let startX;
+      let scrollLeft;
+      let hasMoved = false;
+
+      nav.addEventListener('mousedown', (e) => {
+        isDown = true;
+        startX = e.pageX - nav.offsetLeft;
+        scrollLeft = nav.scrollLeft;
+        hasMoved = false;
+      });
+
+      nav.addEventListener('mouseleave', () => {
+        isDown = false;
+      });
+
+      nav.addEventListener('mouseup', () => {
+        isDown = false;
+      });
+
+      nav.addEventListener('mousemove', (e) => {
+        if (!isDown) return;
+        const x = e.pageX - nav.offsetLeft;
+        const walk = (x - startX) * 1.5; // Scroll speed multiplier
+        if (Math.abs(walk) > 3) {
+          hasMoved = true;
+        }
+        nav.scrollLeft = scrollLeft - walk;
+      });
+
+      // Prevent triggering click on tabs when dragging
+      nav.addEventListener('click', (e) => {
+        if (hasMoved) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }, true);
+    }
   } catch (err) {
     console.error('Initialization failed:', err);
     const loader = document.getElementById('loading-screen');
     if (loader) loader.classList.add('hidden');
   }
 });
+
+// =============================================
+// STUDENT WEBHOOK MANAGEMENT
+// =============================================
+
+function renderStudentWebhookHistory() {
+  const historyList = document.getElementById('student-webhook-history');
+  if (!historyList) return;
+
+  let history = [];
+  try {
+    history = JSON.parse(localStorage.getItem('svm_student_webhook_history') || '[]');
+  } catch (e) {
+    history = [];
+  }
+
+  if (history.length === 0) {
+    historyList.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 15px; border: 1px dashed var(--border-glass); border-radius: var(--radius-md);">No triggers recorded yet. Click a button to send list.</div>`;
+    return;
+  }
+
+  historyList.innerHTML = history.map(item => {
+    const isSuccess = item.success;
+    const badgeBg = isSuccess ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)';
+    const badgeColor = isSuccess ? 'var(--accent-emerald)' : 'var(--accent-red)';
+    const badgeBorder = isSuccess ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)';
+    const statusText = isSuccess ? 'Success' : 'Failed';
+    const typeLabel = item.type === 'submitted' ? 'Submitted' : 'Unsubmitted';
+    const typeBg = item.type === 'submitted' ? 'rgba(124, 58, 237, 0.15)' : 'rgba(245, 158, 11, 0.15)';
+    const typeColor = item.type === 'submitted' ? 'var(--accent-purple)' : 'var(--accent-amber)';
+    const typeBorder = item.type === 'submitted' ? 'rgba(124, 58, 237, 0.3)' : 'rgba(245, 158, 11, 0.3)';
+
+    return `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: var(--radius-md); gap: 10px;">
+        <div>
+          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+            <span style="font-size: 0.72rem; padding: 2px 7px; background: ${typeBg}; color: ${typeColor}; border: 1px solid ${typeBorder}; border-radius: 99px; font-weight: 700; text-transform: uppercase;">${typeLabel}</span>
+            <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-primary);">Sent by ${item.user}</span>
+          </div>
+          <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">
+            ${new Date(item.timestamp).toLocaleString()}
+          </div>
+        </div>
+        <div style="font-size: 0.7rem; padding: 3px 8px; background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeBorder}; border-radius: 99px; font-weight: 700;">
+          ${statusText}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function triggerStudentWebhook(status) {
+  const btnId = status === 'submitted' ? 'btn-send-submitted' : 'btn-send-unsubmitted';
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+
+  const originalContent = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<div class="loading-spinner" style="width:16px;height:16px;border-width:2px;margin:0 auto;"></div>`;
+
+  const webhookUrl = `https://n8n.saraswatividyamandir.com/webhook/list-student`;
+  let isSuccess = false;
+  let errorMsg = '';
+
+  try {
+    const payload = {
+      status: status,
+      type: status,
+      sender: state.currentUser || 'admin',
+      timestamp: new Date().toISOString()
+    };
+
+    // Send query parameter just in case
+    const fullUrl = `${webhookUrl}?status=${status}&type=${status}`;
+
+    const response = await fetch(fullUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (response.ok) {
+      isSuccess = true;
+      showToast(`Student list (${status}) sent successfully!`);
+    } else {
+      errorMsg = `Server returned ${response.status} ${response.statusText}`;
+      showToast(`Webhook failed: ${errorMsg}`, 'error');
+    }
+  } catch (err) {
+    errorMsg = err.message || 'Network error';
+    showToast(`Webhook error: ${errorMsg}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalContent;
+
+    // Log to history
+    let history = [];
+    try {
+      history = JSON.parse(localStorage.getItem('svm_student_webhook_history') || '[]');
+    } catch (e) {
+      history = [];
+    }
+
+    history.unshift({
+      id: 'webhook_' + Date.now(),
+      type: status,
+      user: state.currentUser || 'admin',
+      timestamp: new Date().toISOString(),
+      success: isSuccess,
+      error: errorMsg
+    });
+
+    if (history.length > 50) history = history.slice(0, 50);
+
+    localStorage.setItem('svm_student_webhook_history', JSON.stringify(history));
+    renderStudentWebhookHistory();
+  }
+}
+
+window.renderStudentWebhookHistory = renderStudentWebhookHistory;
+window.triggerStudentWebhook = triggerStudentWebhook;

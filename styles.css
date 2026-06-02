@@ -3545,8 +3545,34 @@ select option:hover {
   .header-center {
     order: 0;
     flex: 1;
-    justify-content: center;
+    justify-content: safe center;
     margin-top: 0;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+    cursor: grab;
+  }
+
+  .header-center:active {
+    cursor: grabbing;
+  }
+
+  .header-center::-webkit-scrollbar {
+    display: block !important;
+    height: 4px;
+  }
+
+  .header-center::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .header-center::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 99px;
+  }
+
+  .header-center::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.35);
   }
 
   /* Right controls */
@@ -3671,5 +3697,24 @@ select option:hover {
 .segmented-control .segment-btn {
   flex-shrink: 0 !important;
   white-space: nowrap !important;
+}
+
+/* Student Tab Webhook Styles */
+.pulse-indicator {
+  animation: pulseGlow 2s infinite;
+}
+@keyframes pulseGlow {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
 }
 
