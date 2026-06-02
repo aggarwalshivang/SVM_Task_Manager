@@ -6187,6 +6187,7 @@ function openAddTestModal() {
       actualDate: '',
       doneBy: '',
       doneAt: '',
+      link: '',
       hidden: false
     }];
   } else {
@@ -6200,6 +6201,7 @@ function openAddTestModal() {
       actualDate: '',
       doneBy: '',
       doneAt: '',
+      link: s.link || '',
       hidden: s.hidden || false
     }));
   }
@@ -6392,7 +6394,9 @@ $('test-form-type')?.addEventListener('change', (e) => {
     status: 'pending',
     actualDate: '',
     doneBy: '',
-    doneAt: ''
+    doneAt: '',
+    link: s.link || '',
+    hidden: s.hidden || false
   }));
   renderIndividualFormStages();
 });
