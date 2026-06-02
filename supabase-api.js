@@ -8,6 +8,14 @@ function getTodayStr() {
   return localDate.toISOString().substring(0, 10);
 }
 
+function parseNum(val) {
+  if (val === undefined || val === null) return null;
+  const str = String(val).trim();
+  if (str === '') return null;
+  const num = Number(str);
+  return isNaN(num) ? null : num;
+}
+
 function getISOWeekNum(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = d.getUTCDay() || 7;
@@ -580,7 +588,38 @@ async function supabaseApiFetch(action, params = {}) {
     case 'getTests': {
       const { data, error } = await sb.from('tests').select('*');
       if (error) throw new Error(error.message);
-      return { success: true, data: (data || []).map(r => ({ testId: r.test_id, testName: r.test_name, className: r.class_name, maxScore: r.max_score, type: r.type, heldOn: r.held_on, stages: r.stages || [], subject: r.subject || '', chapter: r.chapter || '', sheetLink: r.sheet_link || '', folderLink: r.folder_link || '', minScore: r.min_score ?? '', avgScore: r.avg_score ?? '' })) };
+      return {
+        success: true,
+        data: (data || []).map(r => {
+          const rawStages = r.stages || [];
+          const metadataObj = rawStages.find(s => s && s.id === '_metadata');
+          let customData = {};
+          if (metadataObj && metadataObj.customData) {
+            try {
+              customData = typeof metadataObj.customData === 'string' ? JSON.parse(metadataObj.customData) : metadataObj.customData;
+            } catch (e) {
+              console.error('Error parsing customData in getTests:', e);
+            }
+          }
+          const filteredStages = rawStages.filter(s => s && s.id !== '_metadata');
+          return {
+            testId: r.test_id,
+            testName: r.test_name,
+            className: r.class_name,
+            maxScore: r.max_score ?? '',
+            type: r.type,
+            heldOn: r.held_on,
+            stages: filteredStages,
+            subject: r.subject || '',
+            chapter: r.chapter || '',
+            sheetLink: r.sheet_link || '',
+            folderLink: r.folder_link || '',
+            minScore: r.min_score ?? '',
+            avgScore: r.avg_score ?? '',
+            customData
+          };
+        })
+      };
     }
 
     case 'getTestSettings': {
@@ -608,9 +647,34 @@ async function supabaseApiFetch(action, params = {}) {
     }
 
     case 'addTest': {
-      const { testName, className, maxScore, heldOn, type, stages, subject, chapter, sheetLink, folderLink, minScore, avgScore } = params;
+      const { testName, className, maxScore, heldOn, type, stages, subject, chapter, sheetLink, folderLink, minScore, avgScore, customData } = params;
       const testId = 'TEST' + Date.now();
-      const { error } = await sb.from('tests').insert({ test_id: testId, test_name: testName, class_name: className, max_score: maxScore, type: type || 'Sheet', held_on: heldOn, stages: stages || [], subject: subject || '', chapter: chapter || '', sheet_link: sheetLink || '', folder_link: folderLink || '', min_score: minScore ?? null, avg_score: avgScore ?? null });
+      
+      let enrichedStages = stages || [];
+      if (customData) {
+        try {
+          const cData = typeof customData === 'string' ? JSON.parse(customData) : customData;
+          enrichedStages = [...enrichedStages.filter(s => s && s.id !== '_metadata'), { id: '_metadata', customData: cData }];
+        } catch (e) {
+          console.error('Error parsing customData in addTest:', e);
+        }
+      }
+
+      const { error } = await sb.from('tests').insert({
+        test_id: testId,
+        test_name: testName,
+        class_name: className,
+        max_score: parseNum(maxScore),
+        type: type || 'Sheet',
+        held_on: heldOn || getTodayStr(),
+        stages: enrichedStages,
+        subject: subject || '',
+        chapter: chapter || '',
+        sheet_link: sheetLink || '',
+        folder_link: folderLink || '',
+        min_score: parseNum(minScore),
+        avg_score: parseNum(avgScore)
+      });
       if (error) return { success: false, error: error.message };
       syncToSheet('addTest', { ...params, testId });
       return { success: true, data: { testId } };
@@ -621,7 +685,7 @@ async function supabaseApiFetch(action, params = {}) {
       const { data: t } = await sb.from('tests').select('stages').eq('test_id', testId).maybeSingle();
       if (!t) return { success: false, error: 'Test not found' };
       const stages = [...(t.stages || [])];
-      const idx = stages.findIndex(s => s.id === stageId);
+      const idx = stages.findIndex(s => s && s.id === stageId);
       const upd = { id: stageId, status, actualDate, doneBy: doneBy || '', doneAt: doneAt || '' };
       if (idx !== -1) stages[idx] = { ...stages[idx], ...upd }; else stages.push(upd);
       await sb.from('tests').update({ stages }).eq('test_id', testId);
@@ -630,17 +694,32 @@ async function supabaseApiFetch(action, params = {}) {
     }
 
     case 'editTestDetails': {
-      const { testId, testName, className, maxScore, heldOn, type, subject, chapter, sheetLink, folderLink, minScore, avgScore, stages } = params;
+      const { testId, testName, className, maxScore, heldOn, type, subject, chapter, sheetLink, folderLink, minScore, avgScore, stages, customData } = params;
       const upd = {};
       if (testName) upd.test_name = testName;
       if (className) upd.class_name = className;
-      if (maxScore) upd.max_score = maxScore;
+      if (maxScore !== undefined) upd.max_score = parseNum(maxScore);
       if (heldOn) upd.held_on = heldOn;
       if (type) upd.type = type;
-      if (stages) upd.stages = stages;
+      
+      let enrichedStages = stages;
+      if (enrichedStages) {
+        if (customData) {
+          try {
+            const cData = typeof customData === 'string' ? JSON.parse(customData) : customData;
+            enrichedStages = [...enrichedStages.filter(s => s && s.id !== '_metadata'), { id: '_metadata', customData: cData }];
+          } catch (e) {
+            console.error('Error parsing customData in editTestDetails:', e);
+          }
+        }
+        upd.stages = enrichedStages;
+      }
+
       upd.subject = subject || ''; upd.chapter = chapter || '';
       upd.sheet_link = sheetLink || ''; upd.folder_link = folderLink || '';
-      upd.min_score = minScore ?? null; upd.avg_score = avgScore ?? null;
+      if (minScore !== undefined) upd.min_score = parseNum(minScore);
+      if (avgScore !== undefined) upd.avg_score = parseNum(avgScore);
+
       const { error } = await sb.from('tests').update(upd).eq('test_id', testId);
       if (error) return { success: false, error: error.message };
       syncToSheet('editTestDetails', params);
