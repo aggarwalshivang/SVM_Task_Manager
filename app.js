@@ -287,7 +287,10 @@ const state = {
   testFmsSort: 'held-desc',
   // Pipeline editing unlock (admin approval system)
   pipelineUnlockExpiry: null,  // timestamp when unlock expires
-  pipelineUnlockTimer: null    // setInterval ID for countdown
+  pipelineUnlockTimer: null,    // setInterval ID for countdown
+  taskViewMode: 'list',        // 'list' | 'calendar'
+  calendarYear: new Date().getFullYear(),
+  calendarMonth: new Date().getMonth()
 };
 
 // =============================================
@@ -1050,11 +1053,9 @@ function renderCustomFmsBlueprintsList() {
   }
 
   container.innerHTML = blueprints.map(bp => {
-    const isIndependent = bp.scope === 'independent';
+    const isIndependent = false; // Forced false - everything connected to Supabase
     const fieldCount = (bp.fields || []).length;
-    const scopeBadge = isIndependent
-      ? `<span style="font-size:0.62rem;padding:2px 7px;background:rgba(245,158,11,0.15);color:var(--accent-amber);border-radius:99px;font-weight:700;border:1px solid rgba(245,158,11,0.3);">📱 Independent</span>`
-      : `<span style="font-size:0.62rem;padding:2px 7px;background:rgba(99,102,241,0.15);color:#818cf8;border-radius:99px;font-weight:700;border:1px solid rgba(99,102,241,0.3);">🌐 Dependent</span>`;
+    const scopeBadge = `<span style="font-size:0.62rem;padding:2px 7px;background:rgba(99,102,241,0.15);color:#818cf8;border-radius:99px;font-weight:700;border:1px solid rgba(99,102,241,0.3);">🌐 Dependent</span>`;
     const fieldBadge = fieldCount > 0
       ? `<span style="font-size:0.62rem;padding:2px 7px;background:rgba(16,185,129,0.12);color:var(--accent-emerald);border-radius:99px;font-weight:700;border:1px solid rgba(16,185,129,0.25);">⚡ ${fieldCount} field${fieldCount > 1 ? 's' : ''}</span>`
       : '';
@@ -1381,20 +1382,7 @@ async function openTestTracker(viewType = 'tests', forceRefresh = false) {
   // Check if the current view is an independent-scope custom FMS
   const blueprints = getCustomFmsBlueprints();
   const activeBp = blueprints.find(bp => bp.type.toLowerCase() === viewType.toLowerCase());
-  const isIndependent = activeBp && activeBp.scope === 'independent';
-
-  if (isIndependent) {
-    // Independent FMS — load from localStorage only, no Supabase
-    const entries = getIndependentFmsEntries(activeBp.type);
-    // Merge into state.tests (filter out any previously loaded independent entries of this type)
-    state.tests = [
-      ...(state.tests || []).filter(t => (t.type || '').toLowerCase() !== activeBp.type.toLowerCase()),
-      ...entries
-    ];
-    if (!state.testSettings) state.testSettings = [];
-    renderTests(state.tests);
-    return;
-  }
+  const isIndependent = false; // Forced false - everything connected to Supabase
 
   // SWR Caching: If we already have cached data, render it INSTANTLY without showing a spinner or waiting!
   if (!forceRefresh && state.testSettings && state.testSettings.length > 0 && state.tests && state.tests.length > 0) {
@@ -2054,29 +2042,32 @@ async function handleToggleTestStage(testId, stageId) {
   const doneBy = newStatus === 'done' ? state.currentUser : '';
   const doneAt = newStatus === 'done' ? new Date().toLocaleString() : '';
 
-  // Check if independent FMS
-  const blueprints = getCustomFmsBlueprints();
-  const bp = blueprints.find(b => b.type === test.type);
-  const isIndependent = bp && bp.scope === 'independent';
+  // 1. Back up previous stage state in case we need to revert
+  const prevStageState = stage ? { ...stage } : null;
+  const wasNew = !stage;
 
-  if (isIndependent) {
-    if (!test.stages) test.stages = [];
-    if (stage) {
-      stage.status = newStatus;
-      stage.actualDate = newDate;
-      stage.doneBy = doneBy;
-      stage.doneAt = doneAt;
-    } else {
-      test.stages.push({ id: stageId, status: newStatus, actualDate: newDate, doneBy, doneAt });
-    }
-    updateIndependentFmsStage(test.type, testId, stageId, { status: newStatus, actualDate: newDate, doneBy, doneAt });
-    renderTests(state.tests);
-    showToast(`Stage updated.`);
-    return;
+  // 2. Apply updates locally and instantly render (Optimistic UI)
+  if (!test.stages) test.stages = [];
+  if (stage) {
+    stage.status = newStatus;
+    stage.actualDate = newDate;
+    stage.doneBy = doneBy;
+    stage.doneAt = doneAt;
+  } else {
+    test.stages.push({
+      id: stageId,
+      status: newStatus,
+      actualDate: newDate,
+      doneBy,
+      doneAt
+    });
   }
 
+  renderTests(state.tests);
+  showToast('Updating stage...', 'info');
+
+  // 3. Send API call in background
   try {
-    showToast('Updating stage...', 'info');
     const res = await apiFetch('updateTestStage', {
       testId,
       stageId,
@@ -2087,27 +2078,25 @@ async function handleToggleTestStage(testId, stageId) {
     }, 'POST');
 
     if (res.success) {
-      if (!test.stages) test.stages = [];
-      if (stage) {
-        stage.status = newStatus;
-        stage.actualDate = newDate;
-        stage.doneBy = doneBy;
-        stage.doneAt = doneAt;
-      } else {
-        test.stages.push({
-          id: stageId,
-          status: newStatus,
-          actualDate: newDate,
-          doneBy,
-          doneAt
-        });
-      }
-      renderTests(state.tests);
       showToast(`${test.testName} updated.`);
     } else {
-      throw new Error(res.error);
+      // Revert local state on failure
+      if (prevStageState) {
+        Object.assign(stage, prevStageState);
+      } else if (wasNew) {
+        test.stages = test.stages.filter(s => s.id !== stageId);
+      }
+      renderTests(state.tests);
+      showToast('Failed to update stage: ' + (res.error || 'Unknown error'), 'error');
     }
   } catch (err) {
+    // Revert local state on error
+    if (prevStageState) {
+      Object.assign(stage, prevStageState);
+    } else if (wasNew) {
+      test.stages = test.stages.filter(s => s.id !== stageId);
+    }
+    renderTests(state.tests);
     showToast('Failed to update stage', 'error');
   }
 }
@@ -2118,15 +2107,7 @@ async function handleDeleteTestTracker(testId) {
   const test = state.tests.find(t => t.testId === testId);
   const blueprints = getCustomFmsBlueprints();
   const bp = test ? blueprints.find(b => b.type === test.type) : null;
-  const isIndependent = bp && bp.scope === 'independent';
-
-  if (isIndependent) {
-    deleteIndependentFmsEntry(test.type, testId);
-    state.tests = state.tests.filter(t => t.testId !== testId);
-    renderTests(state.tests);
-    showToast('Entry deleted.');
-    return;
-  }
+  const isIndependent = false; // Forced false - everything connected to Supabase
 
   try {
     const res = await apiFetch('deleteTestTracker', { testId }, 'POST');
@@ -2656,6 +2637,18 @@ function renderTasks(tasks) {
     badge.textContent = count > 0 ? count : '';
     badge.style.display = count > 0 ? 'inline-flex' : 'none';
   });
+
+  // Handle Calendar View Toggle
+  if (state.taskViewMode === 'calendar') {
+    $('task-type-tabs').style.display = 'none';
+    $('recurring-section').style.display = 'none';
+    $('onetime-section').style.display = 'none';
+    $('task-calendar-container').style.display = 'block';
+    renderCalendarView(filteredTasks);
+    return;
+  } else {
+    $('task-calendar-container').style.display = 'none';
+  }
 
   // Show tab bar
   $('task-type-tabs').style.display = 'flex';
@@ -5570,6 +5563,15 @@ $('status-filter')?.addEventListener('change', (e) => {
   renderTasks(state.tasks);
 });
 
+$('btn-toggle-task-view')?.addEventListener('click', () => {
+  state.taskViewMode = state.taskViewMode === 'calendar' ? 'list' : 'calendar';
+  const btn = $('btn-toggle-task-view');
+  if (btn) {
+    btn.innerHTML = state.taskViewMode === 'calendar' ? '📋 List View' : '📅 Calendar View';
+  }
+  renderTasks(state.tasks);
+});
+
 // Approval Logic
 function bindApprovalEvents() {
   document.querySelectorAll('.approve-member-btn').forEach(btn => {
@@ -6465,65 +6467,61 @@ async function handleAddTestSubmit(e) {
     customData[el.dataset.fieldId] = el.value;
   });
 
-  // Determine if this is an independent FMS
-  const blueprints = getCustomFmsBlueprints();
-  const activeBp = blueprints.find(b => b.type === type);
-  const isIndependent = activeBp && activeBp.scope === 'independent';
-
   const submitBtn = e.target.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
   submitBtn.textContent = 'Saving...';
 
   try {
-    if (isIndependent) {
-      // Independent FMS — save to localStorage only
-      const newEntry = {
-        testId: 'ind_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    const res = await apiFetch('addTest', {
+      testName: name,
+      className,
+      maxScore,
+      heldOn,
+      type,
+      subject,
+      chapter,
+      sheetLink,
+      folderLink,
+      minScore,
+      avgScore,
+      customData: JSON.stringify(customData),
+      stages: currentFormStages
+    }, 'POST');
+
+    if (res.success) {
+      showToast('Test Tracking Started!');
+      closeAddTestModal();
+
+      // 1. Construct the new test object locally
+      const newTest = {
+        testId: res.data?.testId || ('TEST' + Date.now()),
         testName: name,
-        type,
-        heldOn,
-        className: className || '',
+        className,
         maxScore: maxScore || '',
-        minScore: minScore || '',
-        avgScore: avgScore || '',
+        type,
+        heldOn: heldOn || getTodayStr(),
+        stages: currentFormStages.map(s => ({ ...s })),
         subject: subject || '',
         chapter: chapter || '',
         sheetLink: sheetLink || '',
         folderLink: folderLink || '',
-        customData,
-        stages: currentFormStages.map(s => ({ ...s })),
-        status: 'pending',
-        createdAt: new Date().toISOString()
+        minScore: minScore || '',
+        avgScore: avgScore || '',
+        customData
       };
-      saveIndependentFmsEntry(type, newEntry);
-      showToast('Entry saved locally! (Independent FMS)');
-      closeAddTestModal();
-      openTestTracker(state.currentView);
-    } else {
-      const res = await apiFetch('addTest', {
-        testName: name,
-        className,
-        maxScore,
-        heldOn,
-        type,
-        subject,
-        chapter,
-        sheetLink,
-        folderLink,
-        minScore,
-        avgScore,
-        customData: JSON.stringify(customData),
-        stages: currentFormStages
-      }, 'POST');
 
-      if (res.success) {
-        showToast('Test Tracking Started!');
-        closeAddTestModal();
-        openTestTracker(state.currentView, true); // Refresh current view
-      }
+      // 2. Add to local state and render instantly
+      if (!state.tests) state.tests = [];
+      state.tests = [newTest, ...state.tests];
+      renderTests(state.tests);
+
+      // 3. Trigger silent background reload
+      openTestTracker(state.currentView, true);
+    } else {
+      throw new Error(res.error || 'Failed to start tracking');
     }
   } catch (err) {
-    showToast('Failed to start tracking', 'error');
+    showToast(err.message || 'Failed to start tracking', 'error');
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Start Tracking';
@@ -6777,27 +6775,27 @@ function handleEditTestDetailsModal(testId) {
     };
 
     try {
-      if (isIndependent) {
-        // Update entry in localStorage
-        const existingEntries = getIndependentFmsEntries(payload.type);
-        const idx = existingEntries.findIndex(e => e.testId === payload.testId);
-        if (idx > -1) {
-          existingEntries[idx] = { ...existingEntries[idx], ...payload };
-          localStorage.setItem(_independentFmsKey(payload.type), JSON.stringify(existingEntries));
-        }
-        // Update in state
-        const stateIdx = state.tests.findIndex(t => t.testId === payload.testId);
-        if (stateIdx > -1) state.tests[stateIdx] = { ...state.tests[stateIdx], ...payload };
-        showToast('Entry updated locally.');
+      const res = await apiFetch('editTestDetails', { ...payload, customData: JSON.stringify(editCustomData) }, 'POST');
+      if (res.success) {
+        showToast('Test details updated.');
         closeAddTestModal();
-        renderTests(state.tests);
-      } else {
-        const res = await apiFetch('editTestDetails', { ...payload, customData: JSON.stringify(editCustomData) }, 'POST');
-        if (res.success) {
-          showToast('Test details updated.');
-          closeAddTestModal();
-          openTestTracker(state.currentView, true); // Refresh current view
+
+        // 1. Update in local state instantly
+        const stateIdx = state.tests.findIndex(t => t.testId === payload.testId);
+        if (stateIdx > -1) {
+          state.tests[stateIdx] = {
+            ...state.tests[stateIdx],
+            ...payload
+          };
         }
+
+        // 2. Render instantly
+        renderTests(state.tests);
+
+        // 3. Silently refresh background cache
+        openTestTracker(state.currentView, true);
+      } else {
+        throw new Error(res.error || 'Update failed');
       }
     } catch (err) {
       showToast('Update failed', 'error');
@@ -6982,16 +6980,34 @@ async function openMemberTasksModal(name) {
 // Synchronization
 function startBackgroundSync() {
   setInterval(async () => {
-    if (state.currentView === 'tests') {
+    const blueprintsList = getCustomFmsBlueprints();
+    const isCustomView = blueprintsList.some(bp => bp.type.toLowerCase() === state.currentView.toLowerCase());
+    const fmsViews = ['tests', 'videos', 'enquiries', 'admissions', 'parents'];
+    const isFmsView = fmsViews.includes(state.currentView) || isCustomView;
+
+    if (isFmsView) {
       const container = $("test-list-content");
-      if (container && !container.querySelector('.loading-spinner')) {
-        const [settingsRes, testsRes] = await Promise.all([
-          apiFetch('getTestSettings'),
-          apiFetch('getTests')
-        ]);
-        if (settingsRes.success) state.testSettings = settingsRes.data;
-        if (testsRes.success) state.tests = testsRes.data;
-        renderTests(state.tests);
+      if (container && !container.querySelector('.premium-loader') && !container.querySelector('.loading-spinner')) {
+        try {
+          const [settingsRes, testsRes] = await Promise.all([
+            apiFetch('getTestSettings'),
+            apiFetch('getTests')
+          ]);
+
+          const oldSettingsStr = JSON.stringify(state.testSettings);
+          const oldTestsStr = JSON.stringify(state.tests);
+          const settingsChanged = settingsRes.success && oldSettingsStr !== JSON.stringify(settingsRes.data);
+          const testsChanged = testsRes.success && oldTestsStr !== JSON.stringify(testsRes.data);
+
+          if (settingsChanged || testsChanged) {
+            if (settingsRes.success) state.testSettings = settingsRes.data;
+            if (testsRes.success) state.tests = testsRes.data;
+            sanitizeTestSettings();
+            renderTests(state.tests);
+          }
+        } catch (e) {
+          console.error('FMS background sync error:', e);
+        }
       }
     } else if (state.currentView === 'tasks' && state.currentUser) {
       // Use silent refresh — does NOT wipe/re-render the DOM unless data actually changed
@@ -7123,39 +7139,39 @@ async function toggleCustomFmsCardStatus(testId) {
 
   test.status = newStatus;
 
-  // Check if independent FMS
-  const blueprints = getCustomFmsBlueprints();
-  const bp = blueprints.find(b => b.type === test.type);
-  const isIndependent = bp && bp.scope === 'independent';
+  // Update locally and render instantly (optimistic UI)
+  renderTests(state.tests);
 
-  if (isIndependent) {
-    saveIndependentFmsEntry(test.type, test);
-    showToast('Status updated!', 'success');
+  try {
+    const res = await apiFetch('editTestDetails', {
+      testId: test.testId,
+      testName: test.testName,
+      className: test.className,
+      maxScore: test.maxScore,
+      type: test.type,
+      heldOn: test.heldOn,
+      stages: test.stages || [],
+      subject: test.subject,
+      chapter: test.chapter,
+      sheetLink: test.sheetLink,
+      folderLink: test.folderLink,
+      minScore: test.minScore,
+      avgScore: test.avgScore
+    });
+
+    if (res.success) {
+      showToast('FMS card status updated!', 'success');
+    } else {
+      // Revert status on failure
+      test.status = newStatus === 'done' ? 'pending' : 'done';
+      renderTests(state.tests);
+      showToast('Failed to update status: ' + (res.error || 'Unknown error'), 'error');
+    }
+  } catch (err) {
+    // Revert status on error
+    test.status = newStatus === 'done' ? 'pending' : 'done';
     renderTests(state.tests);
-    return;
-  }
-
-  const res = await apiFetch('editTestDetails', {
-    testId: test.testId,
-    testName: test.testName,
-    className: test.className,
-    maxScore: test.maxScore,
-    type: test.type,
-    heldOn: test.heldOn,
-    stages: test.stages || [],
-    subject: test.subject,
-    chapter: test.chapter,
-    sheetLink: test.sheetLink,
-    folderLink: test.folderLink,
-    minScore: test.minScore,
-    avgScore: test.avgScore
-  });
-
-  if (res.success) {
-    showToast('FMS card status updated!', 'success');
-    renderTests(state.tests);
-  } else {
-    showToast('Failed to toggle status: ' + res.error, 'error');
+    showToast('Failed to update status', 'error');
   }
 }
 window.toggleCustomFmsCardStatus = toggleCustomFmsCardStatus;
@@ -7345,3 +7361,158 @@ async function triggerStudentWebhook(status) {
 
 window.renderStudentWebhookHistory = renderStudentWebhookHistory;
 window.triggerStudentWebhook = triggerStudentWebhook;
+
+// =============================================
+// TASK CALENDAR VIEW FUNCTIONALITY
+// =============================================
+
+function renderCalendarView(tasks) {
+  const container = document.getElementById('task-calendar-container');
+  if (!container) return;
+
+  const year = state.calendarYear;
+  const month = state.calendarMonth;
+
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const firstDayIndex = new Date(year, month, 1).getDay();
+  const firstDay = firstDayIndex === 0 ? 6 : firstDayIndex - 1; // Mon=0, Sun=6
+
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  const prevMonthTotalDays = new Date(year, month, 0).getDate();
+
+  let html = `
+    <div class="calendar-container">
+      <div class="calendar-header">
+        <div class="calendar-title">
+          🗓 ${monthNames[month]} ${year}
+        </div>
+        <div class="calendar-nav">
+          <button class="calendar-nav-btn" onclick="changeCalendarMonth(-1)">◀</button>
+          <button class="calendar-nav-btn" onclick="changeCalendarMonth(1)">▶</button>
+        </div>
+      </div>
+      <div class="calendar-grid">
+        <div class="calendar-day-label">Mon</div>
+        <div class="calendar-day-label">Tue</div>
+        <div class="calendar-day-label">Wed</div>
+        <div class="calendar-day-label">Thu</div>
+        <div class="calendar-day-label">Fri</div>
+        <div class="calendar-day-label">Sat</div>
+        <div class="calendar-day-label">Sun</div>
+  `;
+
+  const formatYYYYMMDD = (y, m, d) => {
+    return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  };
+
+  const todayStr = getTodayStr();
+  let cellCount = 0;
+  
+  // Render previous month's blank/overflow days
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const d = prevMonthTotalDays - i;
+    const prevMonth = month === 0 ? 11 : month - 1;
+    const prevYear = month === 0 ? year - 1 : year;
+    const cellDateStr = formatYYYYMMDD(prevYear, prevMonth, d);
+    
+    html += renderCalendarCell(d, cellDateStr, true, todayStr, tasks);
+    cellCount++;
+  }
+
+  // Render current month days
+  for (let d = 1; d <= totalDays; d++) {
+    const cellDateStr = formatYYYYMMDD(year, month, d);
+    
+    html += renderCalendarCell(d, cellDateStr, false, todayStr, tasks);
+    cellCount++;
+  }
+
+  // Render next month's blank/overflow days
+  let nextMonthDay = 1;
+  while (cellCount % 7 !== 0) {
+    const nextMonth = month === 11 ? 0 : month + 1;
+    const nextYear = month === 11 ? year + 1 : year;
+    const cellDateStr = formatYYYYMMDD(nextYear, nextMonth, nextMonthDay);
+
+    html += renderCalendarCell(nextMonthDay, cellDateStr, true, todayStr, tasks);
+    nextMonthDay++;
+    cellCount++;
+  }
+
+  html += `
+      </div>
+    </div>
+  `;
+
+  container.innerHTML = html;
+
+  // Bind click handlers to task items
+  container.querySelectorAll('.calendar-task-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const taskId = item.dataset.taskId;
+      openCommentsModal(taskId);
+    });
+  });
+}
+
+function renderCalendarCell(dayNum, cellDateStr, isOtherMonth, todayStr, tasks) {
+  const isToday = cellDateStr === todayStr;
+  
+  // Filter tasks for this specific date
+  const dayTasks = tasks.filter(t => {
+    if (!t.plannedDate) return false;
+    const taskDate = t.plannedDate.substring(0, 10);
+    return taskDate === cellDateStr;
+  });
+
+  let taskItemsHtml = '';
+  if (dayTasks.length > 0) {
+    taskItemsHtml = `<div class="calendar-task-list">`;
+    dayTasks.forEach(t => {
+      let statusClass = `status-${t.status}`;
+      // Check overdue
+      if (t.status !== 'done') {
+        const now = new Date();
+        const planned = new Date(t.plannedDate);
+        if (t.time) {
+          const [h, m] = t.time.split(':');
+          planned.setHours(parseInt(h), parseInt(m), 0, 0);
+        } else planned.setHours(23, 59, 59, 999);
+        const graceMs = (t.taskType === 'daily') ? 0 : (24 * 60 * 60 * 1000);
+        if (now.getTime() > (planned.getTime() + graceMs)) {
+          statusClass = 'status-overdue';
+        }
+      }
+      taskItemsHtml += `
+        <div class="calendar-task-item ${statusClass}" data-task-id="${t.taskId}" title="${t.taskName} (${t.status})">
+          ${t.taskName}
+        </div>
+      `;
+    });
+    taskItemsHtml += `</div>`;
+  }
+
+  return `
+    <div class="calendar-cell ${isOtherMonth ? 'other-month' : ''} ${isToday ? 'today' : ''}">
+      <span class="calendar-day-num">${dayNum}</span>
+      ${taskItemsHtml}
+    </div>
+  `;
+}
+
+window.changeCalendarMonth = function(offset) {
+  state.calendarMonth += offset;
+  if (state.calendarMonth < 0) {
+    state.calendarMonth = 11;
+    state.calendarYear -= 1;
+  } else if (state.calendarMonth > 11) {
+    state.calendarMonth = 0;
+    state.calendarYear += 1;
+  }
+  renderTasks(state.tasks);
+};

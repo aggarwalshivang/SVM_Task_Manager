@@ -235,6 +235,11 @@
             <option value="done">Completed</option>
           </select>
         </div>
+        <div class="view-toggle-box" style="margin-left: auto;">
+          <button id="btn-toggle-task-view" class="btn-sm" style="height: var(--input-height, 36px); display: flex; align-items: center; gap: 6px; padding: 0 12px; border-radius: var(--radius-md); border: 1px solid var(--border-glass); background: rgba(255,255,255,0.05); color: var(--text-primary); cursor: pointer; white-space: nowrap; font-weight: 600; font-size: 0.8rem;">
+            📅 Calendar View
+          </button>
+        </div>
       </div>
 
       <!-- Task Type Tab Bar -->
@@ -266,6 +271,9 @@
 
       <!-- One-Time Tasks Section (kept for legacy compat) -->
       <div id="onetime-section" style="display:none;"></div>
+
+      <!-- Calendar View Container -->
+      <div id="task-calendar-container" style="display:none;"></div>
 
       <!-- Stats Section -->
       <div id="stats-section" style="display:none;"></div>
@@ -450,7 +458,7 @@
             </div>
 
             <!-- ─── Scope Control ─────────────────────────────────────────── -->
-            <div class="form-group" style="margin-bottom: var(--space-lg);">
+            <div class="form-group" style="margin-bottom: var(--space-lg); display: none;">
               <label style="margin-bottom: var(--space-sm); display: block; font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">FMS Scope</label>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <label id="fms-scope-dependent-label" style="display:flex; align-items:flex-start; gap:12px; padding:var(--space-md); background:rgba(99,102,241,0.08); border:2px solid var(--accent-purple); border-radius:var(--radius-md); cursor:pointer; transition:all 0.2s;">
