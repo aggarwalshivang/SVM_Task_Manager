@@ -1332,7 +1332,7 @@ function setActiveTab(id) {
   $(id).classList.add('active');
 }
 
-async function openTestTracker(viewType = 'tests') {
+async function openTestTracker(viewType = 'tests', forceRefresh = false) {
   state.currentView = viewType;
   const container = $('test-list-content');
 
@@ -1362,7 +1362,7 @@ async function openTestTracker(viewType = 'tests') {
   }
 
   // SWR Caching: If we already have cached data, render it INSTANTLY without showing a spinner or waiting!
-  if (state.testSettings && state.testSettings.length > 0 && state.tests && state.tests.length > 0) {
+  if (!forceRefresh && state.testSettings && state.testSettings.length > 0 && state.tests && state.tests.length > 0) {
     sanitizeTestSettings();
     renderTests(state.tests);
 
@@ -1382,8 +1382,10 @@ async function openTestTracker(viewType = 'tests') {
         if (testsRes.success) state.tests = testsRes.data;
         sanitizeTestSettings();
         // Only re-render if we are still on an FMS view and the data actually changed!
+        const blueprintsList = getCustomFmsBlueprints();
+        const isCustomView = blueprintsList.some(bp => bp.type.toLowerCase() === state.currentView.toLowerCase());
         const fmsViews = ['tests', 'videos', 'enquiries', 'admissions', 'parents'];
-        if (fmsViews.includes(state.currentView)) {
+        if (fmsViews.includes(state.currentView) || isCustomView) {
           renderTests(state.tests);
         }
       }
@@ -6475,7 +6477,7 @@ async function handleAddTestSubmit(e) {
       if (res.success) {
         showToast('Test Tracking Started!');
         closeAddTestModal();
-        openTestTracker(state.currentView); // Refresh current view
+        openTestTracker(state.currentView, true); // Refresh current view
       }
     }
   } catch (err) {
@@ -6752,7 +6754,7 @@ function handleEditTestDetailsModal(testId) {
         if (res.success) {
           showToast('Test details updated.');
           closeAddTestModal();
-          openTestTracker(state.currentView); // Refresh current view
+          openTestTracker(state.currentView, true); // Refresh current view
         }
       }
     } catch (err) {
