@@ -4688,6 +4688,22 @@ function setRecurrenceUI(pattern) {
   syncRecurrenceUI();
 }
 
+function addTaskTimeRow(val = '') {
+  const container = $('new-task-times-container');
+  if (!container) return;
+  const row = document.createElement('div');
+  row.className = 'time-input-row';
+  row.style.display = 'flex';
+  row.style.gap = '8px';
+  row.style.alignItems = 'center';
+  row.style.marginTop = '4px';
+  row.innerHTML = `
+    <input type="time" class="task-time-input" value="${val}" style="flex:1;">
+    <button type="button" class="btn-danger" onclick="this.parentElement.remove()" style="width:auto; padding:0 var(--space-sm); margin:0; height:36px; display:flex; align-items:center; justify-content:center;">-</button>
+  `;
+  container.appendChild(row);
+}
+
 function openAddTaskModal(defaultAssignee = null) {
   state.editingTaskId = null; // Clear edit mode
   const modal = $('add-task-modal');
@@ -4698,7 +4714,19 @@ function openAddTaskModal(defaultAssignee = null) {
 
   // Set default date to today
   $('new-task-date').value = getTodayStr();
-  $('new-task-time').value = '';
+  
+  const container = $('new-task-times-container');
+  if (container) {
+    container.innerHTML = `
+      <div class="time-input-row" style="display:flex; gap:8px; align-items:center;">
+        <input type="time" class="task-time-input" style="flex:1;">
+        <button type="button" class="btn-primary" id="btn-add-time-row" style="width:auto; padding:0 var(--space-sm); margin:0; height:36px; display:flex; align-items:center; justify-content:center;">+</button>
+      </div>
+    `;
+    const addBtn = $('btn-add-time-row');
+    if (addBtn) addBtn.onclick = () => addTaskTimeRow();
+  }
+
   $('planned-date-group').style.display = 'none'; // Default is Daily
   $('planned-time-group').style.display = 'block';
 
@@ -4814,7 +4842,15 @@ function openEditTaskModal(taskId) {
   $('new-task-name').value = task.taskName;
   $('new-task-type').value = task.taskType;
   $('new-task-date').value = task.plannedDate;
-  $('new-task-time').value = task.time || '';
+  
+  const container = $('new-task-times-container');
+  if (container) {
+    container.innerHTML = `
+      <div class="time-input-row" style="display:flex; gap:8px; align-items:center;">
+        <input type="time" class="task-time-input" value="${task.time || ''}" style="flex:1;">
+      </div>
+    `;
+  }
   $('new-task-notes').value = task.notes || '';
   $('new-task-priority').value = task.priority || 'Medium';
 
@@ -4853,7 +4889,11 @@ async function handleTaskSubmit(e) {
   const name = $('new-task-name').value.trim();
   const type = $('new-task-type').value;
   const date = $('new-task-date').value || getTodayStr();
-  const time = $('new-task-time').value || '';
+  
+  const timeInputs = Array.from(document.querySelectorAll('#new-task-times-container .task-time-input'));
+  const times = timeInputs.map(input => input.value).filter(val => val !== '');
+  const finalTimes = times.length > 0 ? times : [''];
+
   const notes = $('new-task-notes').value.trim();
   const priority = $('new-task-priority').value;
   const recurrence = $('new-task-recurrence').value.trim() || type;
@@ -4886,7 +4926,6 @@ async function handleTaskSubmit(e) {
       taskName: name,
       taskType: type,
       plannedDate: date,
-      time: time,
       notes: notes,
       priority: priority,
       assignedTo: assignedToUser,
@@ -4904,6 +4943,7 @@ async function handleTaskSubmit(e) {
         return;
       }
 
+      payload.time = finalTimes[0];
       payload.reason = reason; // Include reason in payload for approval
       showToast('Edit request sent for approval');
       await apiFetch('requestTaskChange', {
@@ -4916,23 +4956,27 @@ async function handleTaskSubmit(e) {
       return;
     }
 
-    const res = await apiFetch(action, payload, 'POST');
-
     if (isEdit) {
+      payload.time = finalTimes[0];
+      const res = await apiFetch(action, payload, 'POST');
       const idx = state.tasks.findIndex(t => t.taskId === state.editingTaskId);
       if (idx !== -1) {
         state.tasks[idx] = { ...state.tasks[idx], ...payload };
       }
       showToast('Task updated.');
     } else {
-      const newTask = {
-        taskId: res.data.taskId,
-        ...payload,
-        completedDate: '',
-        status: 'pending'
-      };
-      state.tasks.push(newTask);
-      showToast('Task added.');
+      for (const t of finalTimes) {
+        const singlePayload = { ...payload, time: t };
+        const res = await apiFetch(action, singlePayload, 'POST');
+        const newTask = {
+          taskId: res.data.taskId,
+          ...singlePayload,
+          completedDate: '',
+          status: 'pending'
+        };
+        state.tasks.push(newTask);
+      }
+      showToast(`${finalTimes.length} task(s) added.`);
     }
 
     renderTasks(state.tasks);

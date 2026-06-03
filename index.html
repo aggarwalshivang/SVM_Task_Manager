@@ -687,8 +687,10 @@
             <input type="date" id="new-task-date">
           </div>
           <div class="form-group" id="planned-time-group">
-            <label for="new-task-time">Time (optional)</label>
-            <input type="time" id="new-task-time">
+            <label>Time(s) (optional)</label>
+            <div id="new-task-times-container" style="display:flex; flex-direction:column; gap:6px;">
+              <!-- Dynamic time inputs will be injected here by JS -->
+            </div>
           </div>
         </div>
         <div class="form-group">
