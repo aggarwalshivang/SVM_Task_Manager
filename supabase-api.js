@@ -61,13 +61,21 @@ function calculateNextDate(currentDateStr, pattern) {
 
   if (pattern === 'daily') {
     next.setDate(next.getDate() + 1);
+    if (next.getDay() === 0) {
+      next.setDate(next.getDate() + 1);
+    }
   } else if (pattern === 'weekly') {
     next.setDate(next.getDate() + 7);
   } else if (pattern.startsWith('interval:')) {
     const parts = pattern.split(':');
     const n = parseInt(parts[1]) || 1;
     const unit = parts[2];
-    if (unit === 'days') next.setDate(next.getDate() + n);
+    if (unit === 'days') {
+      next.setDate(next.getDate() + n);
+      if (n === 1 && next.getDay() === 0) {
+        next.setDate(next.getDate() + 1);
+      }
+    }
     else if (unit === 'weeks') next.setDate(next.getDate() + n * 7);
     else if (unit === 'months') next.setMonth(next.getMonth() + n);
   } else if (pattern.startsWith('dayOfWeek:')) {
@@ -460,10 +468,26 @@ async function supabaseApiFetch(action, params = {}) {
       const lastId = existing?.[0]?.task_id || 'T000';
       const num = parseInt((lastId.match(/\d+/) || ['0'])[0]) + 1;
       const taskId = 'T' + String(num).padStart(3, '0');
-      const curWeek = getISOWeekNum(new Date(plannedDate || new Date()));
-      const { error } = await sb.from('tasks').insert({ task_id: taskId, task_name: taskName, assigned_to: assignedTo, task_type: taskType || 'other', planned_date: plannedDate || getTodayStr(), status: 'pending', week_number: curWeek, points: 0, notes: notes || '', priority: priority || 'Medium', comments: [], recurrence: recurrence || 'one-time', time: time || '' });
+      
+      let finalPlannedDate = plannedDate || getTodayStr();
+      if (taskType === 'daily') {
+        const parts = finalPlannedDate.split('-').map(Number);
+        if (parts.length === 3) {
+          const [yr, mo, dy] = parts;
+          const d = new Date(yr, mo - 1, dy);
+          if (d.getDay() === 0) {
+            d.setDate(d.getDate() + 1);
+            const offset = d.getTimezoneOffset();
+            const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+            finalPlannedDate = localDate.toISOString().substring(0, 10);
+          }
+        }
+      }
+
+      const curWeek = getISOWeekNum(new Date(finalPlannedDate));
+      const { error } = await sb.from('tasks').insert({ task_id: taskId, task_name: taskName, assigned_to: assignedTo, task_type: taskType || 'other', planned_date: finalPlannedDate, status: 'pending', week_number: curWeek, points: 0, notes: notes || '', priority: priority || 'Medium', comments: [], recurrence: recurrence || 'one-time', time: time || '' });
       if (error) return { success: false, error: error.message };
-      syncToSheet('addTask', { taskId, taskName, assignedTo, taskType, plannedDate, notes, priority, recurrence, time });
+      syncToSheet('addTask', { taskId, taskName, assignedTo, taskType, plannedDate: finalPlannedDate, notes, priority, recurrence, time });
       return { success: true, data: { taskId } };
     }
 
