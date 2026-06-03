@@ -4884,15 +4884,40 @@ function closeAddTaskModal() {
   $('add-task-modal').style.display = 'none';
 }
 
-function isPastDateTime(dateStr, timeStr) {
+function getKolkataDateParts(dateObj) {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(dateObj);
+  const map = {};
+  parts.forEach(p => { map[p.type] = p.value; });
+  return map;
+}
+
+function isPastDateTimeKolkata(dateStr, timeStr) {
   const now = new Date();
-  if (!timeStr) {
-    const todayStr = getTodayStr();
-    return dateStr < todayStr;
-  }
-  const taskDate = new Date(`${dateStr}T${timeStr}`);
-  if (isNaN(taskDate.getTime())) return false;
-  return taskDate < now;
+  const parts = getKolkataDateParts(now);
+  const nowKolkataStr = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
+  const targetKolkataStr = `${dateStr}T${timeStr || '23:59:59'}`;
+  return targetKolkataStr < nowKolkataStr;
+}
+
+function formatTime12Hr(timeStr) {
+  if (!timeStr) return '';
+  const [hoursStr, minutesStr] = timeStr.split(':');
+  let hours = parseInt(hoursStr, 10);
+  const minutes = minutesStr;
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  return `${hours}:${minutes} ${ampm}`;
 }
 
 async function handleTaskSubmit(e) {
@@ -4914,11 +4939,14 @@ async function handleTaskSubmit(e) {
   const submitBtn = $('add-task-submit');
   const isEdit = !!state.editingTaskId;
   
-  // Past date/time validation for task creation
+  // Past date/time validation for task creation (using Kolkata time zone)
   if (!isEdit) {
     for (const t of finalTimes) {
-      if (isPastDateTime(date, t)) {
-        showToast('Cannot schedule tasks in the past date or time.', 'error');
+      if (isPastDateTimeKolkata(date, t)) {
+        const msg = t 
+          ? `Time '${formatTime12Hr(t)}' on ${date} is in the past, which is not allowed!` 
+          : `Date '${date}' is in the past, which is not allowed!`;
+        showToast(msg, 'error');
         return;
       }
     }
