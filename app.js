@@ -3431,22 +3431,29 @@ function createDashboardCardHTML(s, rank) {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg>
           </button>
         ` : ''}
-        <div class="dashboard-card-score" style="display: flex; flex-direction: column; align-items: flex-end; font-size: 0.9rem;">
-          <div title="This Week's Score" style="display:flex; align-items:baseline;">
-            <span style="font-size:0.6rem; color:var(--text-muted); margin-right:4px;">WEEK</span>
-            <strong style="font-size:1.1rem;">${s.score || 0}</strong>
-            ${s.negativeWeek ? `<span style="color:var(--accent-red); font-size:0.75rem; margin-left:4px;" title="Week Penalties">(${s.negativeWeek})</span>` : ''}
-          </div>
-          <div title="Today's Score" style="display:flex; align-items:baseline; margin-top:2px;">
-            <span style="font-size:0.6rem; color:var(--text-muted); margin-right:4px;">TODAY</span>
-            <span style="color:var(--accent-emerald); font-weight:600;">${s.todayScore || 0}</span>
-            ${s.negativeToday ? `<span style="color:var(--accent-red); font-size:0.75rem; margin-left:4px;" title="Today Penalties">(${s.negativeToday})</span>` : ''}
-          </div>
-          <div title="Overall Score" style="display:flex; align-items:baseline; margin-top:2px;">
-            <span style="font-size:0.6rem; color:var(--text-muted); margin-right:4px;">ALL-TIME</span>
-            <span style="color:var(--accent-purple); font-weight:600;">${s.overallScore || 0}</span>
-            ${s.negativeAllTime ? `<span style="color:var(--accent-red); font-size:0.75rem; margin-left:4px;" title="All-Time Penalties">(${s.negativeAllTime})</span>` : ''}
-          </div>
+      </div>
+
+      <div class="dashboard-scores-summary" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-xs); text-align: center; background: var(--bg-glass); padding: 8px; border-radius: var(--radius-md); border: 1px solid var(--border-glass); margin-bottom: var(--space-xs);">
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <span style="font-size: 0.6rem; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">Week</span>
+          <strong style="font-size: 1rem; color: var(--text-primary); margin-top: 2px;">
+            ${s.score || 0}
+            ${s.negativeWeek ? `<span style="color:var(--accent-red); font-size:0.7rem; font-weight:normal; margin-left:2px;">(-${s.negativeWeek})</span>` : ''}
+          </strong>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; border-left: 1px solid var(--border-glass); border-right: 1px solid var(--border-glass);">
+          <span style="font-size: 0.6rem; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">Today</span>
+          <span style="font-size: 1rem; color: var(--accent-emerald); font-weight: 700; margin-top: 2px;">
+            ${s.todayScore || 0}
+            ${s.negativeToday ? `<span style="color:var(--accent-red); font-size:0.7rem; font-weight:normal; margin-left:2px;">(-${s.negativeToday})</span>` : ''}
+          </span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <span style="font-size: 0.6rem; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">All-Time</span>
+          <span style="font-size: 1rem; color: var(--accent-purple); font-weight: 700; margin-top: 2px;">
+            ${s.overallScore || 0}
+            ${s.negativeAllTime ? `<span style="color:var(--accent-red); font-size:0.7rem; font-weight:normal; margin-left:2px;">(-${s.negativeAllTime})</span>` : ''}
+          </span>
         </div>
       </div>
       
@@ -7091,7 +7098,7 @@ function showBrowserNotification(title, body) {
 function bindModificationEvents() {
   document.querySelectorAll('.approve-mod-btn').forEach(btn => {
     btn.onclick = async () => {
-      const id = parseInt(btn.dataset.id);
+      const id = btn.dataset.id;
       try {
         showToast('Processing approval...');
         await apiFetch('approveTaskChange', { requestId: id, decision: 'approved' }, 'POST');
@@ -7111,7 +7118,7 @@ function bindModificationEvents() {
 
   document.querySelectorAll('.reject-mod-btn').forEach(btn => {
     btn.onclick = async () => {
-      const id = parseInt(btn.dataset.id);
+      const id = btn.dataset.id;
       try {
         showToast('Rejecting request...');
         await apiFetch('approveTaskChange', { requestId: id, decision: 'rejected' }, 'POST');
