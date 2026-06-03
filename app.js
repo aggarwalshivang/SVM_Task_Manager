@@ -630,6 +630,7 @@ function handleUserSignedOut() {
   state.currentUser = null;
   state.userRole = 'member';
   localStorage.removeItem('svm_session');
+  updateSplashUser('SVM');
 
   $('auth-overlay').style.display = 'flex';
   $('app-header').style.display = 'none';
@@ -649,6 +650,7 @@ function handleUserSignedIn(userData) {
 
   state.currentUser = userData.name;
   state.userRole = (userData.role || 'member').toLowerCase();
+  updateSplashUser(userData.name);
 
   // Save session
   localStorage.setItem('svm_session', JSON.stringify(userData));
@@ -4307,6 +4309,77 @@ window.selectChapterOption = function (el) {
   if (window._updateTestFormName) window._updateTestFormName();
 };
 
+function updateSplashUser(name) {
+  if (!name) return;
+  const cleanName = name.trim();
+  const splashShape = document.getElementById('splash-shape');
+  if (splashShape) {
+    if (splashShape.getAttribute('data-user') === cleanName) {
+      return;
+    }
+    splashShape.setAttribute('data-user', cleanName);
+  }
+
+  const firstLetter = cleanName.charAt(0).toUpperCase();
+  const restOfName = cleanName.slice(1);
+
+  let baseSize = '3.8rem';
+  let svgFontSize = '82';
+
+  if (cleanName.length > 12) {
+    baseSize = '2.2rem';
+    svgFontSize = '48';
+  } else if (cleanName.length > 8) {
+    baseSize = '2.8rem';
+    svgFontSize = '60';
+  } else if (cleanName.length > 5) {
+    baseSize = '3.3rem';
+    svgFontSize = '72';
+  }
+
+  // Update the first letter S or any other letter
+  if (splashShape) {
+    if (firstLetter === 'S') {
+      splashShape.innerHTML = `
+        <div class="splash-shape-inner"></div>
+        <svg class="splash-svg-s" viewBox="0 0 100 100">
+          <path class="path-s-top" d="M50,50 C43,47 38,42 38,32 C38,18 62,18 62,32" fill="none" stroke="url(#s-grad)" stroke-width="12" stroke-linecap="round" />
+          <path class="path-s-bottom" d="M50,50 C57,53 62,58 62,68 C62,82 38,82 38,68" fill="none" stroke="url(#s-grad)" stroke-width="12" stroke-linecap="round" />
+          <defs>
+            <linearGradient id="s-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#c084fc" />
+              <stop offset="100%" stop-color="#7c3aed" />
+            </linearGradient>
+          </defs>
+        </svg>
+      `;
+    } else {
+      splashShape.innerHTML = `
+        <div class="splash-shape-inner"></div>
+        <svg class="splash-svg-s" viewBox="0 0 100 100">
+          <text x="50%" y="52%" dominant-baseline="central" text-anchor="middle" font-family="'Outfit', sans-serif" font-size="${svgFontSize}" font-weight="900" fill="url(#s-grad)">${firstLetter}</text>
+          <defs>
+            <linearGradient id="s-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#c084fc" />
+              <stop offset="100%" stop-color="#7c3aed" />
+            </linearGradient>
+          </defs>
+        </svg>
+      `;
+    }
+  }
+
+  // Update the remaining letters
+  const logoText = document.getElementById('splash-logo-text');
+  if (logoText) {
+    const delayStart = 2.1;
+    logoText.innerHTML = restOfName.split('').map((char, index) => {
+      const delay = delayStart + (index * 0.1);
+      return `<span class="letter-hivang" style="font-size: ${baseSize}; animation: spawn-hivang-letter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) ${delay}s forwards;">${char}</span>`;
+    }).join('');
+  }
+}
+
 // =============================================
 // INITIALIZATION
 // =============================================
@@ -4336,6 +4409,7 @@ async function init() {
       const userData = JSON.parse(savedSession);
       state.currentUser = userData.name;
       state.userRole = (userData.role || 'member').toLowerCase();
+      updateSplashUser(userData.name);
 
       networkPromise = Promise.all([
         apiFetch('getTeam').then(res => { state.teamMembers = res.data || []; }).catch(() => { }),
