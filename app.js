@@ -4944,6 +4944,7 @@ async function handleTaskSubmit(e) {
     for (const t of finalTimes) {
       if (isPastDateTimeKolkata(date, t)) {
         showToast("Past date/time task cannot be added.", "error");
+        closeAddTaskModal();
         return;
       }
     }
