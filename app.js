@@ -4884,6 +4884,17 @@ function closeAddTaskModal() {
   $('add-task-modal').style.display = 'none';
 }
 
+function isPastDateTime(dateStr, timeStr) {
+  const now = new Date();
+  if (!timeStr) {
+    const todayStr = getTodayStr();
+    return dateStr < todayStr;
+  }
+  const taskDate = new Date(`${dateStr}T${timeStr}`);
+  if (isNaN(taskDate.getTime())) return false;
+  return taskDate < now;
+}
+
 async function handleTaskSubmit(e) {
   e.preventDefault();
   const name = $('new-task-name').value.trim();
@@ -4902,6 +4913,17 @@ async function handleTaskSubmit(e) {
 
   const submitBtn = $('add-task-submit');
   const isEdit = !!state.editingTaskId;
+  
+  // Past date/time validation for task creation
+  if (!isEdit) {
+    for (const t of finalTimes) {
+      if (isPastDateTime(date, t)) {
+        showToast('Cannot schedule tasks in the past date or time.', 'error');
+        return;
+      }
+    }
+  }
+
   submitBtn.disabled = true;
   submitBtn.textContent = isEdit ? 'Saving...' : 'Adding...';
 
