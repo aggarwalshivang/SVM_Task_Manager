@@ -893,6 +893,19 @@
 
 
 
+  <!-- Today's Pending Tasks Modal -->
+  <div class="modal-overlay" id="today-pending-modal" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Today's Pending Tasks</h3>
+        <button class="modal-close" id="today-pending-close-btn" aria-label="Close" type="button">✕</button>
+      </div>
+      <div id="today-pending-list" class="task-list" style="max-height: 60vh; overflow-y: auto; padding: 10px 0;">
+        <!-- Incomplete tasks for today will be injected here -->
+      </div>
+    </div>
+  </div>
+
   <!-- Leave Request Modal -->
   <div class="modal-overlay" id="leave-modal" style="display:none;">
     <div class="modal-card">

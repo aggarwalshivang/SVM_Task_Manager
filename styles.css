@@ -1468,6 +1468,20 @@ body::before {
   text-align: center;
 }
 
+.stat-item-interactive {
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease;
+}
+
+.stat-item-interactive:hover {
+  transform: translateY(-3px) scale(1.05);
+  filter: brightness(1.2);
+}
+
+.stat-item-interactive:active {
+  transform: translateY(-1px) scale(0.98);
+}
+
 .stat-value {
   font-size: 1.75rem;
   font-weight: 800;

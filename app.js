@@ -415,6 +415,8 @@ async function demoHandler(action, params) {
   await sleep(400 + Math.random() * 400);
 
   switch (action) {
+    case 'login':
+      return { success: true, data: { name: 'Rahul', role: 'Admin', email: params.email } };
     case 'getTeam':
       return { success: true, data: MOCK_TEAM };
     case 'getTasks':
@@ -2996,7 +2998,7 @@ function renderStats(stats) {
           <div class="stat-value emerald">${stats.streak}</div>
           <div class="stat-label">Streak</div>
         </div>
-        <div class="stat-item">
+        <div class="stat-item stat-item-interactive" id="stat-today-item">
           <div class="stat-value amber">${completedToday}/${totalToday}</div>
           <div class="stat-label">Today</div>
         </div>
@@ -3017,6 +3019,9 @@ function renderStats(stats) {
   `;
   section.style.display = 'block';
 
+  // Bind click listener for today's pending tasks modal
+  section.querySelector('#stat-today-item')?.addEventListener('click', openTodayPendingModal);
+
   // Animate progress bar after paint
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
@@ -3024,6 +3029,70 @@ function renderStats(stats) {
       if (fill) fill.style.width = pct + '%';
     });
   });
+}
+
+function openTodayPendingModal() {
+  const pendingTasks = state.tasks.filter(t => t.status !== 'done');
+  const container = $('today-pending-list');
+  const modal = $('today-pending-modal');
+  if (!container || !modal) return;
+
+  if (pendingTasks.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: var(--space-xl) var(--space-lg); color: var(--text-dim);">
+        <div style="font-size: 3rem; margin-bottom: var(--space-md); opacity: 0.5;">🎉</div>
+        <h3 style="font-size: 1.1rem; color: var(--accent-emerald); margin-bottom: var(--space-xs);">All Done!</h3>
+        <p style="font-size: 0.85rem;">You have no pending tasks left for today.</p>
+      </div>
+    `;
+  } else {
+    container.innerHTML = pendingTasks.map(t => renderTaskCard(t)).join('');
+
+    // Bind click handlers for completing tasks
+    container.querySelectorAll('.task-card:not(.done)').forEach(card => {
+      card.addEventListener('click', (e) => {
+        // Don't complete if clicking buttons
+        if (e.target.closest('.task-delete-btn') || e.target.closest('.task-edit-btn') || e.target.closest('.task-shift-btn') || e.target.closest('.task-comment-btn')) return;
+        handleTaskComplete(card.dataset.taskId);
+      });
+    });
+
+    // Bind edit button handlers
+    container.querySelectorAll('.task-edit-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openEditTaskModal(btn.dataset.editId);
+      });
+    });
+
+    // Bind delete button handlers
+    container.querySelectorAll('.task-delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const taskId = btn.dataset.deleteId;
+        const task = state.tasks.find(t => t.taskId === taskId);
+        showDeleteConfirm(taskId, task ? task.taskName : 'this task');
+      });
+    });
+
+    // Bind shift button handlers
+    container.querySelectorAll('.task-shift-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openShiftTaskModal(btn.dataset.shiftId);
+      });
+    });
+
+    // Bind comment button handlers
+    container.querySelectorAll('.task-comment-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openCommentsModal(btn.dataset.commentId);
+      });
+    });
+  }
+
+  modal.style.display = 'flex';
 }
 
 async function openDashboard() {
@@ -3679,17 +3748,21 @@ async function handleTaskComplete(taskId) {
     return;
   }
 
-  const card = document.querySelector(`[data-task-id="${taskId}"]`);
-  if (!card || card.classList.contains('done') || card.classList.contains('completing')) return;
+  const cards = document.querySelectorAll(`[data-task-id="${taskId}"]`);
+  if (cards.length === 0) return;
+  const alreadyDone = Array.from(cards).every(c => c.classList.contains('done') || c.classList.contains('completing'));
+  if (alreadyDone) return;
 
   lastTaskCompleteTime = now;
 
   // Optimistic UI update
-  card.classList.add('completing');
-  const statusIcon = card.querySelector('.check-icon');
-  if (statusIcon) statusIcon.style.opacity = '1';
-  const checkbox = card.querySelector('.task-checkbox');
-  if (checkbox) checkbox.innerHTML = '<span class="check-icon" style="opacity:1;transform:scale(1)">✓</span>';
+  cards.forEach(card => {
+    card.classList.add('completing');
+    const statusIcon = card.querySelector('.check-icon');
+    if (statusIcon) statusIcon.style.opacity = '1';
+    const checkbox = card.querySelector('.task-checkbox');
+    if (checkbox) checkbox.innerHTML = '<span class="check-icon" style="opacity:1;transform:scale(1)">✓</span>';
+  });
 
   // Update local state
   const task = state.tasks.find(t => t.taskId === taskId);
@@ -3700,15 +3773,22 @@ async function handleTaskComplete(taskId) {
 
   // After animation, mark as done
   setTimeout(() => {
-    card.classList.remove('completing');
-    card.classList.add('done');
-    card.querySelector('.task-name').style.textDecoration = 'line-through';
-    card.querySelector('.task-name').style.color = 'var(--text-muted)';
+    cards.forEach(card => {
+      card.classList.remove('completing');
+      card.classList.add('done');
+      const taskName = card.querySelector('.task-name');
+      if (taskName) {
+        taskName.style.textDecoration = 'line-through';
+        taskName.style.color = 'var(--text-muted)';
+      }
 
-    // Remove click listener by cloning
-    const parent = card.parentNode;
-    const clone = card.cloneNode(true);
-    parent.replaceChild(clone, card);
+      // Remove click listener by cloning
+      const parent = card.parentNode;
+      if (parent) {
+        const clone = card.cloneNode(true);
+        parent.replaceChild(clone, card);
+      }
+    });
 
     // Update section counts
     updateSectionCounts();
@@ -5587,6 +5667,16 @@ async function switchView(view) {
     await openDashboard();
   }
 }
+
+// Today Pending modal
+$('today-pending-close-btn')?.addEventListener('click', () => {
+  $('today-pending-modal').style.display = 'none';
+});
+$('today-pending-modal')?.addEventListener('click', (e) => {
+  if (e.target === $('today-pending-modal')) {
+    $('today-pending-modal').style.display = 'none';
+  }
+});
 
 // Add Task modal
 $('modal-close-btn')?.addEventListener('click', closeAddTaskModal);
