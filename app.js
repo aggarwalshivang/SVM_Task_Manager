@@ -4943,10 +4943,7 @@ async function handleTaskSubmit(e) {
   if (!isEdit) {
     for (const t of finalTimes) {
       if (isPastDateTimeKolkata(date, t)) {
-        const msg = t 
-          ? `Time '${formatTime12Hr(t)}' on ${date} is in the past, which is not allowed!` 
-          : `Date '${date}' is in the past, which is not allowed!`;
-        showToast(msg, 'error');
+        showToast("Past date/time task cannot be added.", "error");
         return;
       }
     }
