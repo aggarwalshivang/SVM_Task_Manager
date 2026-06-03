@@ -3941,3 +3941,24 @@ select option:hover {
   }
 }
 
+/* Voice Search Mic Pulse Animation */
+.mic-listening {
+  color: #ef4444 !important; /* var(--accent-red) */
+  animation: mic-pulse 1.2s infinite ease-in-out;
+}
+
+@keyframes mic-pulse {
+  0% {
+    transform: translateY(-50%) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-50%) scale(1.25);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(-50%) scale(1);
+    opacity: 1;
+  }
+}
+

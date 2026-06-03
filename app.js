@@ -283,6 +283,9 @@ const state = {
   tests: [],
   testSettings: [],
   testFmsFilter: 'all',
+  selectedHelperTag: 'all',
+  editingHelperId: null,
+  formSelectedTagIds: [],
   testFmsSearch: '',
   testFmsSort: 'held-desc',
   // Pipeline editing unlock (admin approval system)
@@ -931,6 +934,19 @@ function bindTabClickListeners() {
       if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
       if ($('student-container')) $('student-container').style.display = 'none';
       if ($('helper-container')) $('helper-container').style.display = 'block';
+      const searchInput = document.getElementById('helper-search-input');
+      if (searchInput) searchInput.value = '';
+      state.selectedHelperTag = 'all';
+      state.editingHelperId = null;
+      
+      // Reset form panel state
+      const form = document.getElementById('add-helper-form');
+      if (form) form.reset();
+      const formPanel = document.getElementById('add-helper-form-panel');
+      if (formPanel) formPanel.style.display = 'none';
+      const toggleBtn = document.getElementById('btn-toggle-add-helper');
+      if (toggleBtn) toggleBtn.innerHTML = '<span style="font-size: 1.1rem; line-height: 1;">+</span> Add Helper Link';
+      
       renderHelpers();
     };
   }
@@ -7751,24 +7767,48 @@ function initHelperTab() {
   const cancelBtn = document.getElementById('btn-cancel-add-helper');
   const formPanel = document.getElementById('add-helper-form-panel');
   const form = document.getElementById('add-helper-form');
+  const searchInput = document.getElementById('helper-search-input');
+  const voiceBtn = document.getElementById('btn-helper-voice-search');
+  const createTagBtn = document.getElementById('btn-helper-create-tag');
+  const newTagInput = document.getElementById('helper-new-tag');
+  const tagSelect = document.getElementById('helper-tag-select');
 
   if (toggleBtn) {
     toggleBtn.onclick = () => {
       if (formPanel) {
         const isHidden = formPanel.style.display === 'none';
         formPanel.style.display = isHidden ? 'block' : 'none';
-        toggleBtn.innerHTML = isHidden ? 'Cancel' : '<span style="font-size: 1.1rem; line-height: 1;">+</span> Add Helper Link';
+        if (isHidden) {
+          renderFormTagOptions();
+          renderSelectedTagsList();
+        }
+        if (state.editingHelperId) {
+          toggleBtn.innerHTML = 'Cancel Edit';
+        } else {
+          toggleBtn.innerHTML = isHidden ? 'Cancel' : '<span style="font-size: 1.1rem; line-height: 1;">+</span> Add Helper Link';
+        }
       }
     };
   }
 
   if (cancelBtn) {
     cancelBtn.onclick = () => {
-      if (formPanel) {
-        formPanel.style.display = 'none';
-        if (toggleBtn) toggleBtn.innerHTML = '<span style="font-size: 1.1rem; line-height: 1;">+</span> Add Helper Link';
+      resetHelperForm();
+    };
+  }
+
+  // Handle select dropdown selection change
+  if (tagSelect) {
+    tagSelect.onchange = () => {
+      const val = tagSelect.value;
+      if (val) {
+        const tagId = parseInt(val);
+        if (!state.formSelectedTagIds.includes(tagId)) {
+          state.formSelectedTagIds.push(tagId);
+          renderSelectedTagsList();
+        }
+        tagSelect.value = ''; // Reset select back to "-- Choose Tag --"
       }
-      if (form) form.reset();
     };
   }
 
@@ -7790,37 +7830,56 @@ function initHelperTab() {
       submitBtn.innerHTML = '<div class="loading-spinner" style="width:16px;height:16px;border-width:2px;margin:0 auto;"></div>';
 
       try {
-        const newId = state.testSettings && state.testSettings.length > 0
-          ? Math.max(...state.testSettings.map(s => s.id || 0)) + 1
-          : 1;
-
-        const helperRow = {
-          id: newId,
-          label: JSON.stringify({
-            id: newId,
-            title: title,
-            description: desc,
-            url: url
-          }),
-          offset: 0,
-          doer: 'admin',
-          type: 'helper'
-        };
-
-        if (!state.testSettings) state.testSettings = [];
-        state.testSettings.push(helperRow);
-
-        const res = await apiFetch('updateTestSettings', { settings: state.testSettings }, 'POST');
-        if (res.success) {
-          showToast('Helper link added successfully!', 'success');
-          form.reset();
-          if (formPanel) formPanel.style.display = 'none';
-          if (toggleBtn) toggleBtn.innerHTML = '<span style="font-size: 1.1rem; line-height: 1;">+</span> Add Helper Link';
-          renderHelpers();
+        if (state.editingHelperId) {
+          const index = state.testSettings.findIndex(s => s.type === 'helper' && s.id === state.editingHelperId);
+          if (index !== -1) {
+            state.testSettings[index].label = JSON.stringify({
+              id: state.editingHelperId,
+              title: title,
+              description: desc,
+              url: url,
+              tags: state.formSelectedTagIds
+            });
+            const res = await apiFetch('updateTestSettings', { settings: state.testSettings }, 'POST');
+            if (res.success) {
+              showToast('Helper link updated successfully!', 'success');
+              resetHelperForm();
+              renderHelpers();
+            } else {
+              showToast('Failed to update helper link: ' + (res.error || 'Unknown error'), 'error');
+            }
+          }
         } else {
-          // Revert local changes on failure
-          state.testSettings = state.testSettings.filter(s => s.id !== newId);
-          showToast('Failed to add link: ' + (res.error || 'Unknown error'), 'error');
+          const newId = state.testSettings && state.testSettings.length > 0
+            ? Math.max(...state.testSettings.map(s => s.id || 0)) + 1
+            : 1;
+
+          const helperRow = {
+            id: newId,
+            label: JSON.stringify({
+              id: newId,
+              title: title,
+              description: desc,
+              url: url,
+              tags: state.formSelectedTagIds
+            }),
+            offset: 0,
+            doer: 'admin',
+            type: 'helper'
+          };
+
+          if (!state.testSettings) state.testSettings = [];
+          state.testSettings.push(helperRow);
+
+          const res = await apiFetch('updateTestSettings', { settings: state.testSettings }, 'POST');
+          if (res.success) {
+            showToast('Helper link added successfully!', 'success');
+            resetHelperForm();
+            renderHelpers();
+          } else {
+            state.testSettings = state.testSettings.filter(s => s.id !== newId);
+            showToast('Failed to add link: ' + (res.error || 'Unknown error'), 'error');
+          }
         }
       } catch (err) {
         showToast('Failed to save link', 'error');
@@ -7830,13 +7889,296 @@ function initHelperTab() {
       }
     };
   }
+
+  // Tag creation handler
+  if (createTagBtn && newTagInput) {
+    createTagBtn.onclick = async () => {
+      const tagName = newTagInput.value.trim();
+      if (!tagName) {
+        showToast('Please enter a tag name', 'error');
+        return;
+      }
+
+      const existing = (state.testSettings || []).some(s => s.type === 'helper_tag' && s.label.toLowerCase() === tagName.toLowerCase());
+      if (existing) {
+        showToast('Tag already exists', 'error');
+        return;
+      }
+
+      createTagBtn.disabled = true;
+      const originalText = createTagBtn.innerHTML;
+      createTagBtn.innerHTML = 'Creating...';
+
+      try {
+        const newId = state.testSettings && state.testSettings.length > 0
+          ? Math.max(...state.testSettings.map(s => s.id || 0)) + 1
+          : 1;
+
+        const tagRow = {
+          id: newId,
+          label: tagName,
+          offset: 0,
+          doer: 'admin',
+          type: 'helper_tag'
+        };
+
+        if (!state.testSettings) state.testSettings = [];
+        state.testSettings.push(tagRow);
+
+        const res = await apiFetch('updateTestSettings', { settings: state.testSettings }, 'POST');
+        if (res.success) {
+          showToast(`Tag "${tagName}" created successfully!`, 'success');
+          newTagInput.value = '';
+          renderFormTagOptions();
+          renderTagFilters();
+        } else {
+          state.testSettings = state.testSettings.filter(s => s.id !== newId);
+          showToast('Failed to create tag: ' + (res.error || 'Unknown error'), 'error');
+        }
+      } catch (err) {
+        showToast('Failed to create tag', 'error');
+      } finally {
+        createTagBtn.disabled = false;
+        createTagBtn.innerHTML = originalText;
+      }
+    };
+  }
+
+  // Advanced Search input handler
+  if (searchInput) {
+    searchInput.oninput = () => {
+      renderHelpers(searchInput.value);
+    };
+  }
+
+  // Microphone Voice Recognition Search handler
+  if (voiceBtn) {
+    voiceBtn.onclick = () => {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        showToast('Speech recognition not supported in this browser.', 'error');
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        voiceBtn.classList.add('mic-listening');
+        showToast('Listening for helper search terms...', 'info');
+      };
+
+      recognition.onresult = (event) => {
+        if (event.results && event.results[0] && event.results[0][0]) {
+          const transcript = event.results[0][0].transcript;
+          if (searchInput) {
+            searchInput.value = transcript;
+            renderHelpers(transcript);
+          }
+          showToast(`Voice Search: "${transcript}"`, 'success');
+        }
+      };
+
+      recognition.onerror = (err) => {
+        console.error('Voice search recognition error:', err);
+        showToast('Voice input failed: ' + (err.error || 'unknown'), 'error');
+      };
+
+      recognition.onend = () => {
+        voiceBtn.classList.remove('mic-listening');
+      };
+
+      try {
+        recognition.start();
+      } catch (e) {
+        console.error('Failed to start recognition:', e);
+      }
+    };
+  }
 }
 
-function renderHelpers() {
+function resetHelperForm() {
+  const form = document.getElementById('add-helper-form');
+  const formPanel = document.getElementById('add-helper-form-panel');
+  const toggleBtn = document.getElementById('btn-toggle-add-helper');
+  const titleEl = document.getElementById('add-helper-form-title');
+  const submitBtn = document.getElementById('btn-submit-add-helper');
+
+  state.editingHelperId = null;
+  state.formSelectedTagIds = [];
+  if (form) form.reset();
+  if (formPanel) formPanel.style.display = 'none';
+  if (toggleBtn) toggleBtn.innerHTML = '<span style="font-size: 1.1rem; line-height: 1;">+</span> Add Helper Link';
+  if (titleEl) titleEl.innerHTML = 'Add New Helper Link';
+  if (submitBtn) submitBtn.innerHTML = 'Add Link';
+  renderSelectedTagsList();
+}
+
+function renderFormTagOptions() {
+  const select = document.getElementById('helper-tag-select');
+  const manageContainer = document.getElementById('helper-manage-tags-list');
+  if (!select) return;
+
+  const tags = (state.testSettings || []).filter(s => s.type === 'helper_tag');
+  
+  // 1. Populate Dropdown
+  select.innerHTML = '<option value="">-- Choose Tag --</option>' + tags.map(tag => {
+    return `<option value="${tag.id}">${tag.label}</option>`;
+  }).join('');
+
+  // 2. Populate created tags management list
+  if (manageContainer) {
+    if (tags.length === 0) {
+      manageContainer.innerHTML = `<span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">No tags created yet.</span>`;
+    } else {
+      manageContainer.innerHTML = tags.map(tag => {
+        return `
+          <div class="glass-panel" style="display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--radius-full); font-size: 0.75rem; border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.02);">
+            <span style="font-weight: 500; color: var(--text-secondary);">${tag.label}</span>
+            <button type="button" onclick="deleteHelperTag(${tag.id})" title="Delete Tag" style="background: none; border: none; color: var(--accent-red); cursor: pointer; padding: 0; font-weight: 700; line-height: 1; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; margin-left: 2px;">✕</button>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+}
+
+function renderSelectedTagsList() {
+  const container = document.getElementById('helper-form-selected-tags');
+  if (!container) return;
+
+  if (state.formSelectedTagIds.length === 0) {
+    container.innerHTML = `<span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">No tags selected for this link. Choose from the dropdown above.</span>`;
+    return;
+  }
+
+  container.innerHTML = state.formSelectedTagIds.map(tagId => {
+    const tagObj = (state.testSettings || []).find(s => s.type === 'helper_tag' && s.id === tagId);
+    if (!tagObj) return '';
+    return `
+      <span style="font-size: 0.75rem; padding: 4px 10px; background: rgba(124, 58, 237, 0.12); color: var(--accent-purple); border: 1px solid rgba(124, 58, 237, 0.25); border-radius: 99px; font-weight: 600; display: flex; align-items: center; gap: 6px; user-select: none;">
+        ${tagObj.label}
+        <span onclick="removeFormSelectedTag(${tagId})" style="cursor: pointer; font-weight: 700; color: var(--text-muted); font-size: 0.85rem; line-height: 1;">✕</span>
+      </span>
+    `;
+  }).filter(Boolean).join('');
+}
+
+window.removeFormSelectedTag = function(tagId) {
+  state.formSelectedTagIds = state.formSelectedTagIds.filter(id => id !== tagId);
+  renderSelectedTagsList();
+};
+
+function renderTagFilters() {
+  const filterContainer = document.getElementById('helper-tag-filters');
+  if (!filterContainer) return;
+
+  const tags = (state.testSettings || []).filter(s => s.type === 'helper_tag');
+
+  let html = `
+    <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); margin-right: var(--space-xs);">Filter by Tag:</span>
+    <button class="nav-tab ${state.selectedHelperTag === 'all' ? 'active' : ''}" onclick="setHelperTagFilter('all')" style="padding: 4px 12px; font-size: 0.75rem; border-radius: var(--radius-full);">All</button>
+  `;
+
+  tags.forEach(tag => {
+    const isActive = state.selectedHelperTag === String(tag.id);
+    html += `
+      <button class="nav-tab ${isActive ? 'active' : ''}" onclick="setHelperTagFilter('${tag.id}')" style="padding: 4px 12px; font-size: 0.75rem; border-radius: var(--radius-full);">
+        ${tag.label}
+      </button>
+    `;
+  });
+
+  filterContainer.innerHTML = html;
+}
+
+window.setHelperTagFilter = function(tagId) {
+  state.selectedHelperTag = tagId;
+  renderTagFilters();
+  renderHelpers(document.getElementById('helper-search-input')?.value || '');
+};
+
+async function deleteHelperTag(tagId) {
+  if (!confirm('Are you sure you want to delete this tag? It will be removed from all associated links.')) return;
+
+  const oldSettings = [...state.testSettings];
+
+  state.testSettings = state.testSettings.filter(s => !(s.type === 'helper_tag' && s.id === tagId));
+
+  state.testSettings = state.testSettings.map(s => {
+    if (s.type === 'helper') {
+      try {
+        const parsed = JSON.parse(s.label);
+        if (parsed.tags && parsed.tags.includes(tagId)) {
+          parsed.tags = parsed.tags.filter(t => t !== tagId);
+          s.label = JSON.stringify(parsed);
+        }
+      } catch (e) {
+        console.error('Failed to clean tag from helper link:', e);
+      }
+    }
+    return s;
+  });
+
+  state.formSelectedTagIds = state.formSelectedTagIds.filter(id => id !== tagId);
+
+  try {
+    const res = await apiFetch('updateTestSettings', { settings: state.testSettings }, 'POST');
+    if (res.success) {
+      showToast('Tag deleted successfully!', 'success');
+      renderFormTagOptions();
+      renderSelectedTagsList();
+      renderTagFilters();
+      renderHelpers();
+    } else {
+      state.testSettings = oldSettings;
+      showToast('Failed to delete tag: ' + (res.error || 'Unknown error'), 'error');
+    }
+  } catch (err) {
+    state.testSettings = oldSettings;
+    showToast('Failed to delete tag', 'error');
+  }
+}
+
+// Levenshtein Distance for typo matching
+function helperLevenshteinDistance(s1, s2) {
+  const m = s1.length;
+  const n = s2.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (s1[i - 1] === s2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + 1);
+      }
+    }
+  }
+  return dp[m][n];
+}
+
+function helperWordSimilarity(queryWord, targetWord) {
+  if (targetWord.includes(queryWord)) return 1.0;
+  const dist = helperLevenshteinDistance(queryWord, targetWord);
+  const maxLen = Math.max(queryWord.length, targetWord.length);
+  if (maxLen === 0) return 0;
+  const similarity = 1 - dist / maxLen;
+  return similarity > 0.6 ? similarity : 0;
+}
+
+function renderHelpers(queryText = '') {
   const grid = document.getElementById('helpers-grid');
   if (!grid) return;
 
-  const helpers = (state.testSettings || [])
+  renderTagFilters();
+
+  let helpers = (state.testSettings || [])
     .filter(s => s.type === 'helper')
     .map(s => {
       try {
@@ -7845,7 +8187,8 @@ function renderHelpers() {
           id: s.id,
           title: parsed.title || '',
           description: parsed.description || '',
-          url: parsed.url || ''
+          url: parsed.url || '',
+          tags: parsed.tags || []
         };
       } catch (e) {
         return null;
@@ -7853,23 +8196,91 @@ function renderHelpers() {
     })
     .filter(Boolean);
 
+  if (state.selectedHelperTag !== 'all') {
+    const targetTagId = parseInt(state.selectedHelperTag);
+    helpers = helpers.filter(h => h.tags.includes(targetTagId));
+  }
+
+  const q = queryText.trim().toLowerCase();
+  if (q) {
+    const queryWords = q.split(/\s+/).filter(Boolean);
+    helpers = helpers.map(h => {
+      let score = 0;
+      const titleLower = h.title.toLowerCase();
+      const descLower = h.description.toLowerCase();
+      const urlLower = h.url.toLowerCase();
+
+      if (titleLower.includes(q)) score += 100;
+      if (descLower.includes(q)) score += 50;
+
+      queryWords.forEach(qw => {
+        if (titleLower.includes(qw)) score += 30;
+        if (descLower.includes(qw)) score += 15;
+        if (urlLower.includes(qw)) score += 5;
+
+        titleLower.split(/[\s_\-\.\/\?\#\&\=\:\@\+]+/).forEach(tw => {
+          if (!tw) return;
+          const sim = helperWordSimilarity(qw, tw);
+          if (sim > 0) score += sim * 40;
+        });
+
+        descLower.split(/[\s_\-\.\/\?\#\&\=\:\@\+]+/).forEach(dw => {
+          if (!dw) return;
+          const sim = helperWordSimilarity(qw, dw);
+          if (sim > 0) score += sim * 20;
+        });
+      });
+
+      h.tags.forEach(tagId => {
+        const tagObj = (state.testSettings || []).find(s => s.type === 'helper_tag' && s.id === tagId);
+        if (tagObj) {
+          const tagLabelLower = tagObj.label.toLowerCase();
+          if (tagLabelLower.includes(q)) score += 40;
+          queryWords.forEach(qw => {
+            if (tagLabelLower.includes(qw)) score += 15;
+            const sim = helperWordSimilarity(qw, tagLabelLower);
+            if (sim > 0) score += sim * 25;
+          });
+        }
+      });
+
+      return { helper: h, score };
+    })
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map(item => item.helper);
+  }
+
   if (helpers.length === 0) {
     grid.innerHTML = `
       <div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 0.9rem; padding: var(--space-xl); border: 1px dashed var(--border-glass); border-radius: var(--radius-lg);">
-        No helper links configured. Click the button above to add one.
+        ${q || state.selectedHelperTag !== 'all' ? 'No matching helper links found.' : 'No helper links configured. Click the button above to add one.'}
       </div>
     `;
     return;
   }
 
   grid.innerHTML = helpers.map(h => {
+    const tagBadges = h.tags.map(tagId => {
+      const tagObj = (state.testSettings || []).find(s => s.type === 'helper_tag' && s.id === tagId);
+      if (!tagObj) return '';
+      return `<span style="font-size: 0.65rem; padding: 2px 8px; background: rgba(124, 58, 237, 0.12); color: var(--accent-purple); border: 1px solid rgba(124, 58, 237, 0.25); border-radius: 99px; font-weight: 700; text-transform: uppercase;">${tagObj.label}</span>`;
+    }).filter(Boolean).join(' ');
+
     return `
       <div class="glass-panel" style="position: relative; padding: var(--space-xl); display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-md); transition: transform 0.2s, box-shadow 0.2s; border: 1px solid var(--border-glass);">
-        <!-- Delete Button -->
-        <button class="nav-tab-delete-btn" onclick="deleteHelper(${h.id})" title="Delete Helper Link" style="position: absolute; top: 12px; right: 12px; font-size: 0.9rem; padding: 4px 8px; border-radius: var(--radius-md); line-height: 1;">✕</button>
+        <div style="position: absolute; top: 12px; right: 12px; display: flex; gap: 4px; z-index: 10;">
+          <button class="nav-tab-delete-btn" onclick="editHelper(${h.id})" title="Edit Helper Link" style="font-size: 0.8rem; padding: 4px 8px; border-radius: var(--radius-md); background: rgba(255,255,255,0.05); color: var(--text-secondary); line-height: 1; border: 1px solid var(--border-glass);">✏️</button>
+          <button class="nav-tab-delete-btn" onclick="deleteHelper(${h.id})" title="Delete Helper Link" style="font-size: 0.9rem; padding: 4px 8px; border-radius: var(--radius-md); line-height: 1;">✕</button>
+        </div>
         
         <div>
-          <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 700; margin: 0 0 6px 0; color: var(--text-primary); padding-right: 20px; line-height: 1.3;">${h.title}</h3>
+          <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 700; margin: 0 0 6px 0; color: var(--text-primary); padding-right: 48px; line-height: 1.3;">${h.title}</h3>
+          
+          <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;">
+            ${tagBadges}
+          </div>
+
           <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; min-height: 40px;">${h.description}</p>
         </div>
         
@@ -7879,6 +8290,43 @@ function renderHelpers() {
       </div>
     `;
   }).join('');
+}
+
+function editHelper(id) {
+  const helperRow = (state.testSettings || []).find(s => s.type === 'helper' && s.id === id);
+  if (!helperRow) return;
+
+  try {
+    const parsed = JSON.parse(helperRow.label);
+    state.editingHelperId = id;
+    state.formSelectedTagIds = parsed.tags || [];
+
+    const formPanel = document.getElementById('add-helper-form-panel');
+    if (formPanel) formPanel.style.display = 'block';
+
+    const toggleBtn = document.getElementById('btn-toggle-add-helper');
+    if (toggleBtn) toggleBtn.innerHTML = 'Cancel Edit';
+
+    const titleEl = document.getElementById('add-helper-form-title');
+    if (titleEl) titleEl.innerHTML = 'Edit Helper Link';
+
+    const submitBtn = document.getElementById('btn-submit-add-helper');
+    if (submitBtn) submitBtn.innerHTML = 'Save Changes';
+
+    document.getElementById('helper-title').value = parsed.title || '';
+    document.getElementById('helper-desc').value = parsed.description || '';
+    document.getElementById('helper-url').value = parsed.url || '';
+
+    renderFormTagOptions();
+    renderSelectedTagsList();
+
+    if (formPanel) {
+      formPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  } catch (e) {
+    console.error('Failed to parse helper link details for editing:', e);
+    showToast('Failed to load helper link for editing', 'error');
+  }
 }
 
 async function deleteHelper(id) {
@@ -7891,6 +8339,9 @@ async function deleteHelper(id) {
     const res = await apiFetch('updateTestSettings', { settings: state.testSettings }, 'POST');
     if (res.success) {
       showToast('Helper link deleted successfully!', 'success');
+      if (state.editingHelperId === id) {
+        resetHelperForm();
+      }
       renderHelpers();
     } else {
       state.testSettings = oldSettings;
@@ -7903,5 +8354,10 @@ async function deleteHelper(id) {
 }
 
 window.deleteHelper = deleteHelper;
+window.editHelper = editHelper;
+window.deleteHelperTag = deleteHelperTag;
 window.renderHelpers = renderHelpers;
 window.initHelperTab = initHelperTab;
+window.renderFormTagOptions = renderFormTagOptions;
+window.renderTagFilters = renderTagFilters;
+window.renderSelectedTagsList = renderSelectedTagsList;

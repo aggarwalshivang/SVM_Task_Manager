@@ -591,7 +591,7 @@
 
         <!-- Add Helper Form (Hidden by default) -->
         <div id="add-helper-form-panel" class="glass-panel" style="display: none; padding: var(--space-lg); margin-bottom: var(--space-xl); border: 1px dashed var(--accent-purple);">
-          <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700; margin-bottom: var(--space-lg); color: var(--text-primary);">Add New Helper Link</h3>
+          <h3 id="add-helper-form-title" style="font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700; margin-bottom: var(--space-lg); color: var(--text-primary);">Add New Helper Link</h3>
           <form id="add-helper-form" style="display: flex; flex-direction: column; gap: var(--space-md);">
             <div class="form-group">
               <label for="helper-title" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Header / Title</label>
@@ -605,11 +605,57 @@
               <label for="helper-url" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Link / URL</label>
               <input type="url" id="helper-url" placeholder="e.g. https://n8n.saraswatividyamandir.com" required style="width: 100%; padding: var(--space-sm) var(--space-md); border-radius: var(--radius-md); border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.05); color: var(--text-primary);">
             </div>
+
+            <!-- Custom Tag Selector Dropdown -->
+            <div class="form-group">
+              <label for="helper-tag-select" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px;">Select Tags</label>
+              <select id="helper-tag-select" style="width: 100%; padding: var(--space-sm) var(--space-md); border-radius: var(--radius-md); border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.05); color: var(--text-primary); outline: none; cursor: pointer;">
+                <option value="">-- Choose Tag --</option>
+              </select>
+              <!-- Selected Tag Badges list -->
+              <div id="helper-form-selected-tags" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+
+            <!-- Create Custom Tag & Management -->
+            <div class="form-group" style="border-top: 1px dashed var(--border-glass); padding-top: var(--space-md); margin-top: var(--space-xs);">
+              <label for="helper-new-tag" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">+ Create Custom Tag</label>
+              <div style="display: flex; gap: var(--space-sm); margin-top: 4px;">
+                <input type="text" id="helper-new-tag" placeholder="e.g. Admission" style="flex-grow: 1; padding: var(--space-sm) var(--space-md); border-radius: var(--radius-md); border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.05); color: var(--text-primary); font-size: 0.8rem;">
+                <button type="button" id="btn-helper-create-tag" class="btn-secondary" style="padding: var(--space-sm) var(--space-md); font-size: 0.8rem; font-weight: 600;">Create</button>
+              </div>
+              <!-- Created Tags Manager List -->
+              <div id="helper-manage-tags-list" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: var(--space-sm);">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+
             <div style="display: flex; justify-content: flex-end; gap: var(--space-md); margin-top: var(--space-sm);">
               <button type="button" class="btn-secondary" id="btn-cancel-add-helper">Cancel</button>
-              <button type="submit" class="btn-primary">Add Link</button>
+              <button type="submit" id="btn-submit-add-helper" class="btn-primary">Add Link</button>
             </div>
           </form>
+        </div>
+
+        <!-- Advanced Search and Voice Command Bar -->
+        <div style="display: flex; gap: var(--space-md); margin-bottom: var(--space-xl); position: relative;">
+          <div style="position: relative; flex-grow: 1;">
+            <input type="text" id="helper-search-input" placeholder="🔍 Search helper links (fuzzy match title, description, or url)..." style="width: 100%; padding: var(--space-sm) 45px var(--space-sm) var(--space-md); border-radius: var(--radius-md); border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.05); color: var(--text-primary); font-size: 0.9rem; outline: none; transition: border-color 0.2s;">
+            <!-- Microphone Button -->
+            <button id="btn-helper-voice-search" type="button" title="Voice Search" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 5px; display: flex; align-items: center; justify-content: center; transition: color 0.2s;">
+              <svg id="mic-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                <path d="M19 10v1a7 7 0 0 1-14 0v-1"></path>
+                <line x1="12" y1="19" x2="12" y2="22"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Horizontal Tag Filter bar -->
+        <div id="helper-tag-filters" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: var(--space-xl); align-items: center;">
+          <!-- Dynamically rendered filter pills -->
         </div>
 
         <!-- Helpers Grid/List -->
