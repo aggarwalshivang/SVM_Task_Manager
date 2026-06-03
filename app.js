@@ -639,6 +639,7 @@ function handleUserSignedOut() {
   $('admin-dashboard-container').style.display = 'none';
   if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
   if ($('student-container')) $('student-container').style.display = 'none';
+  if ($('helper-container')) $('helper-container').style.display = 'none';
 }
 
 function handleUserSignedIn(userData) {
@@ -682,6 +683,7 @@ function handleUserSignedIn(userData) {
   if ($('test-tracker-container')) $('test-tracker-container').style.display = 'none';
   if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
   if ($('student-container')) $('student-container').style.display = 'none';
+  if ($('helper-container')) $('helper-container').style.display = 'none';
   if ($('task-view-container')) $('task-view-container').style.display = 'block';
 
   renderHeader(state.currentUser);
@@ -758,11 +760,12 @@ function renderNavigationTabs() {
     <button class="nav-tab ${state.currentView === 'dashboard' ? 'active' : ''}" id="tab-team" style="position:relative; display:${isPrivileged ? 'block' : 'none'};">Team <span id="team-badge" style="display:none; position:absolute; top:-5px; right:-5px; background:var(--accent-red); color:white; font-size:0.6rem; padding:2px 5px; border-radius:10px; border:2px solid var(--bg-primary);">!</span></button>
   `;
 
-  // Append FMS Builder and Student tab beside the team tab, visible to ADMIN ONLY
+  // Append FMS Builder, Student, and Helper tabs beside the team tab, visible to ADMIN ONLY
   if (state.userRole === 'admin') {
     html += `
       <button class="nav-tab ${state.currentView === 'fms-builder' ? 'active' : ''}" id="tab-fms-builder">🛠️ FMS Builder</button>
       <button class="nav-tab ${state.currentView === 'student' ? 'active' : ''}" id="tab-student">🎓 Student</button>
+      <button class="nav-tab ${state.currentView === 'helper' ? 'active' : ''}" id="tab-helper">📋 Helper</button>
     `;
   }
 
@@ -814,6 +817,7 @@ function bindTabClickListeners() {
     $('test-tracker-container').style.display = 'none';
     if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
     if ($('student-container')) $('student-container').style.display = 'none';
+    if ($('helper-container')) $('helper-container').style.display = 'none';
     $('stats-section').style.display = 'block';
     $('briefing-section').style.display = 'block';
     initForUser(state.currentUser);
@@ -828,6 +832,7 @@ function bindTabClickListeners() {
     $('test-tracker-container').style.display = 'none';
     if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
     if ($('student-container')) $('student-container').style.display = 'none';
+    if ($('helper-container')) $('helper-container').style.display = 'none';
   };
 
   const staticFms = [
@@ -848,6 +853,7 @@ function bindTabClickListeners() {
       $('admin-dashboard-container').style.display = 'none';
       if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
       if ($('student-container')) $('student-container').style.display = 'none';
+      if ($('helper-container')) $('helper-container').style.display = 'none';
       $('test-tracker-container').style.display = 'block';
     };
   });
@@ -866,6 +872,7 @@ function bindTabClickListeners() {
         $('admin-dashboard-container').style.display = 'none';
         if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
         if ($('student-container')) $('student-container').style.display = 'none';
+        if ($('helper-container')) $('helper-container').style.display = 'none';
         $('test-tracker-container').style.display = 'block';
       };
     }
@@ -890,6 +897,7 @@ function bindTabClickListeners() {
       $('test-tracker-container').style.display = 'none';
       if ($('fms-builder-container')) $('fms-builder-container').style.display = 'block';
       if ($('student-container')) $('student-container').style.display = 'none';
+      if ($('helper-container')) $('helper-container').style.display = 'none';
       renderCustomFmsBlueprintsList();
       closeCustomFmsCreatorSection();
     };
@@ -906,7 +914,24 @@ function bindTabClickListeners() {
       $('test-tracker-container').style.display = 'none';
       if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
       if ($('student-container')) $('student-container').style.display = 'block';
+      if ($('helper-container')) $('helper-container').style.display = 'none';
       renderStudentWebhookHistory();
+    };
+  }
+
+  // Bind Helper tab (visible to admin only)
+  const helperTab = $('tab-helper');
+  if (helperTab) {
+    helperTab.onclick = () => {
+      setActiveTab('tab-helper');
+      state.currentView = 'helper';
+      $('task-view-container').style.display = 'none';
+      $('admin-dashboard-container').style.display = 'none';
+      $('test-tracker-container').style.display = 'none';
+      if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+      if ($('student-container')) $('student-container').style.display = 'none';
+      if ($('helper-container')) $('helper-container').style.display = 'block';
+      renderHelpers();
     };
   }
 
@@ -921,6 +946,7 @@ function openCustomFmsBuilderModal() {
     // Fallback if elements not ready
     if ($('fms-builder-container')) $('fms-builder-container').style.display = 'block';
     if ($('student-container')) $('student-container').style.display = 'none';
+    if ($('helper-container')) $('helper-container').style.display = 'none';
     renderCustomFmsBlueprintsList();
     closeCustomFmsCreatorSection();
   }
@@ -929,6 +955,7 @@ function openCustomFmsBuilderModal() {
 function closeCustomFmsBuilderModal() {
   if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
   if ($('student-container')) $('student-container').style.display = 'none';
+  if ($('helper-container')) $('helper-container').style.display = 'none';
 }
 
 // Tracks the list of custom field definitions for the blueprint being created
@@ -7365,6 +7392,7 @@ document.addEventListener('DOMContentLoaded', () => {
   try {
     init();
     startBackgroundSync();
+    initHelperTab();
 
     // Horizontal scrolling support for PC/desktop
     const nav = document.getElementById('header-nav');
@@ -7713,3 +7741,167 @@ window.changeCalendarMonth = function(offset) {
   }
   renderTasks(state.tasks);
 };
+
+// =============================================
+// ADMIN HELPER MANAGEMENT
+// =============================================
+
+function initHelperTab() {
+  const toggleBtn = document.getElementById('btn-toggle-add-helper');
+  const cancelBtn = document.getElementById('btn-cancel-add-helper');
+  const formPanel = document.getElementById('add-helper-form-panel');
+  const form = document.getElementById('add-helper-form');
+
+  if (toggleBtn) {
+    toggleBtn.onclick = () => {
+      if (formPanel) {
+        const isHidden = formPanel.style.display === 'none';
+        formPanel.style.display = isHidden ? 'block' : 'none';
+        toggleBtn.innerHTML = isHidden ? 'Cancel' : '<span style="font-size: 1.1rem; line-height: 1;">+</span> Add Helper Link';
+      }
+    };
+  }
+
+  if (cancelBtn) {
+    cancelBtn.onclick = () => {
+      if (formPanel) {
+        formPanel.style.display = 'none';
+        if (toggleBtn) toggleBtn.innerHTML = '<span style="font-size: 1.1rem; line-height: 1;">+</span> Add Helper Link';
+      }
+      if (form) form.reset();
+    };
+  }
+
+  if (form) {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const title = document.getElementById('helper-title').value.trim();
+      const desc = document.getElementById('helper-desc').value.trim();
+      const url = document.getElementById('helper-url').value.trim();
+
+      if (!title || !desc || !url) {
+        showToast('Please fill all fields', 'error');
+        return;
+      }
+
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const originalText = submitBtn.innerHTML;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<div class="loading-spinner" style="width:16px;height:16px;border-width:2px;margin:0 auto;"></div>';
+
+      try {
+        const newId = state.testSettings && state.testSettings.length > 0
+          ? Math.max(...state.testSettings.map(s => s.id || 0)) + 1
+          : 1;
+
+        const helperRow = {
+          id: newId,
+          label: JSON.stringify({
+            id: newId,
+            title: title,
+            description: desc,
+            url: url
+          }),
+          offset: 0,
+          doer: 'admin',
+          type: 'helper'
+        };
+
+        if (!state.testSettings) state.testSettings = [];
+        state.testSettings.push(helperRow);
+
+        const res = await apiFetch('updateTestSettings', { settings: state.testSettings }, 'POST');
+        if (res.success) {
+          showToast('Helper link added successfully!', 'success');
+          form.reset();
+          if (formPanel) formPanel.style.display = 'none';
+          if (toggleBtn) toggleBtn.innerHTML = '<span style="font-size: 1.1rem; line-height: 1;">+</span> Add Helper Link';
+          renderHelpers();
+        } else {
+          // Revert local changes on failure
+          state.testSettings = state.testSettings.filter(s => s.id !== newId);
+          showToast('Failed to add link: ' + (res.error || 'Unknown error'), 'error');
+        }
+      } catch (err) {
+        showToast('Failed to save link', 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+      }
+    };
+  }
+}
+
+function renderHelpers() {
+  const grid = document.getElementById('helpers-grid');
+  if (!grid) return;
+
+  const helpers = (state.testSettings || [])
+    .filter(s => s.type === 'helper')
+    .map(s => {
+      try {
+        const parsed = JSON.parse(s.label);
+        return {
+          id: s.id,
+          title: parsed.title || '',
+          description: parsed.description || '',
+          url: parsed.url || ''
+        };
+      } catch (e) {
+        return null;
+      }
+    })
+    .filter(Boolean);
+
+  if (helpers.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 0.9rem; padding: var(--space-xl); border: 1px dashed var(--border-glass); border-radius: var(--radius-lg);">
+        No helper links configured. Click the button above to add one.
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = helpers.map(h => {
+    return `
+      <div class="glass-panel" style="position: relative; padding: var(--space-xl); display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-md); transition: transform 0.2s, box-shadow 0.2s; border: 1px solid var(--border-glass);">
+        <!-- Delete Button -->
+        <button class="nav-tab-delete-btn" onclick="deleteHelper(${h.id})" title="Delete Helper Link" style="position: absolute; top: 12px; right: 12px; font-size: 0.9rem; padding: 4px 8px; border-radius: var(--radius-md); line-height: 1;">✕</button>
+        
+        <div>
+          <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 700; margin: 0 0 6px 0; color: var(--text-primary); padding-right: 20px; line-height: 1.3;">${h.title}</h3>
+          <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; min-height: 40px;">${h.description}</p>
+        </div>
+        
+        <button class="btn-primary" onclick="window.open('${h.url}', '_blank')" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.8rem; font-weight: 600; padding: var(--space-sm) var(--space-md); margin-top: var(--space-sm);">
+          Open Link ↗
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function deleteHelper(id) {
+  if (!confirm('Are you sure you want to delete this helper link?')) return;
+
+  const oldSettings = [...state.testSettings];
+  state.testSettings = state.testSettings.filter(s => s.id !== id);
+
+  try {
+    const res = await apiFetch('updateTestSettings', { settings: state.testSettings }, 'POST');
+    if (res.success) {
+      showToast('Helper link deleted successfully!', 'success');
+      renderHelpers();
+    } else {
+      state.testSettings = oldSettings;
+      showToast('Failed to delete: ' + (res.error || 'Unknown error'), 'error');
+    }
+  } catch (err) {
+    state.testSettings = oldSettings;
+    showToast('Failed to delete helper link', 'error');
+  }
+}
+
+window.deleteHelper = deleteHelper;
+window.renderHelpers = renderHelpers;
+window.initHelperTab = initHelperTab;
