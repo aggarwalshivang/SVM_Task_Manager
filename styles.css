@@ -1067,6 +1067,7 @@ body::before {
   overflow: hidden;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
+  flex-shrink: 0;
 }
 
 .task-card:hover {

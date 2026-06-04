@@ -8,6 +8,22 @@ function getTodayStr() {
   return localDate.toISOString().substring(0, 10);
 }
 
+async function getLeaveBuddyForDate(sb, user, dateStr) {
+  if (!user || !dateStr) return null;
+  const { data, error } = await sb.from('leaves')
+    .select('task_buddy')
+    .eq('user_name', user)
+    .eq('status', 'approved')
+    .lte('start_date', dateStr)
+    .gte('end_date', dateStr)
+    .limit(1);
+  
+  if (data && data.length > 0 && data[0].task_buddy) {
+    return data[0].task_buddy;
+  }
+  return null;
+}
+
 function parseNum(val) {
   if (val === undefined || val === null) return null;
   const str = String(val).trim();
@@ -181,13 +197,59 @@ async function supabaseApiFetch(action, params = {}) {
 
             if (nextDate) {
               const curWeek = getISOWeekNum(new Date(nextDate));
-              await sb.from('tasks').update({ planned_date: nextDate, completed_date: null, status: 'pending', week_number: curWeek, points: 0 }).eq('task_id', t.taskId);
+              let newAssignee = t.assignedTo;
+              let newNotes = t.notes || '';
+
+              let originalOwner = null;
+              const ownerMatch = newNotes.match(/\[OriginalOwner:\s*([^\]]+)\]/);
+              if (ownerMatch) {
+                originalOwner = ownerMatch[1].trim();
+              }
+
+              if (originalOwner) {
+                const buddyOnNextDate = await getLeaveBuddyForDate(sb, originalOwner, nextDate);
+                if (buddyOnNextDate) {
+                  newAssignee = buddyOnNextDate;
+                } else {
+                  newAssignee = originalOwner;
+                  newNotes = newNotes.replace(/\[OriginalOwner:\s*[^\]]+\]\s*\n?/, '').trim();
+                }
+              } else {
+                const buddyOnNextDate = await getLeaveBuddyForDate(sb, t.assignedTo, nextDate);
+                if (buddyOnNextDate) {
+                  newAssignee = buddyOnNextDate;
+                  newNotes = (newNotes + `\n[OriginalOwner: ${t.assignedTo}]`).trim();
+                }
+              }
+
+              await sb.from('tasks').update({ 
+                planned_date: nextDate, 
+                completed_date: null, 
+                status: 'pending', 
+                week_number: curWeek, 
+                points: 0,
+                assigned_to: newAssignee,
+                notes: newNotes
+              }).eq('task_id', t.taskId);
+
               t.plannedDate = nextDate;
               t.completedDate = '';
               t.status = 'pending';
               t.weekNumber = curWeek;
               t.points = 0;
-              syncToSheet('editTask', { taskId: t.taskId, plannedDate: nextDate, completedDate: '', status: 'pending', points: 0, weekNumber: curWeek });
+              t.assignedTo = newAssignee;
+              t.notes = newNotes;
+
+              syncToSheet('editTask', { 
+                taskId: t.taskId, 
+                plannedDate: nextDate, 
+                completedDate: '', 
+                status: 'pending', 
+                points: 0, 
+                weekNumber: curWeek,
+                assignedTo: newAssignee,
+                notes: newNotes
+              });
             }
           }
         }
@@ -485,9 +547,41 @@ async function supabaseApiFetch(action, params = {}) {
       }
 
       const curWeek = getISOWeekNum(new Date(finalPlannedDate));
-      const { error } = await sb.from('tasks').insert({ task_id: taskId, task_name: taskName, assigned_to: assignedTo, task_type: taskType || 'other', planned_date: finalPlannedDate, status: 'pending', week_number: curWeek, points: 0, notes: notes || '', priority: priority || 'Medium', comments: [], recurrence: recurrence || 'one-time', time: time || '' });
+      let finalAssignedTo = assignedTo;
+      let finalNotes = notes || '';
+      const buddyOnDate = await getLeaveBuddyForDate(sb, assignedTo, finalPlannedDate);
+      if (buddyOnDate) {
+        finalAssignedTo = buddyOnDate;
+        finalNotes = (finalNotes + `\n[OriginalOwner: ${assignedTo}]`).trim();
+      }
+
+      const { error } = await sb.from('tasks').insert({ 
+        task_id: taskId, 
+        task_name: taskName, 
+        assigned_to: finalAssignedTo, 
+        task_type: taskType || 'other', 
+        planned_date: finalPlannedDate, 
+        status: 'pending', 
+        week_number: curWeek, 
+        points: 0, 
+        notes: finalNotes, 
+        priority: priority || 'Medium', 
+        comments: [], 
+        recurrence: recurrence || 'one-time', 
+        time: time || '' 
+      });
       if (error) return { success: false, error: error.message };
-      syncToSheet('addTask', { taskId, taskName, assignedTo, taskType, plannedDate: finalPlannedDate, notes, priority, recurrence, time });
+      syncToSheet('addTask', { 
+        taskId, 
+        taskName, 
+        assignedTo: finalAssignedTo, 
+        taskType, 
+        plannedDate: finalPlannedDate, 
+        notes: finalNotes, 
+        priority, 
+        recurrence, 
+        time 
+      });
       return { success: true, data: { taskId } };
     }
 
@@ -591,7 +685,52 @@ async function supabaseApiFetch(action, params = {}) {
 
     case 'approveLeave': {
       const { user, createdAt, status } = params;
-      await sb.from('leaves').update({ status }).eq('user_name', user).eq('created_at', createdAt);
+      const { error } = await sb.from('leaves').update({ status }).eq('user_name', user).eq('created_at', createdAt);
+      if (error) throw new Error(error.message);
+
+      if (status === 'approved') {
+        const { data: leave } = await sb.from('leaves')
+          .select('start_date, end_date, task_buddy')
+          .eq('user_name', user)
+          .eq('created_at', createdAt)
+          .maybeSingle();
+
+        if (leave && leave.task_buddy) {
+          const startDate = leave.start_date;
+          const endDate = leave.end_date;
+          const buddy = leave.task_buddy;
+
+          const { data: tasksToShift } = await sb.from('tasks')
+            .select('*')
+            .eq('assigned_to', user)
+            .gte('planned_date', startDate)
+            .lte('planned_date', endDate)
+            .neq('status', 'done');
+
+          if (tasksToShift && tasksToShift.length > 0) {
+            for (const task of tasksToShift) {
+              const baseNotes = task.notes || '';
+              let newNotes = baseNotes;
+              if (!baseNotes.includes(`[OriginalOwner: ${user}]`)) {
+                newNotes = (baseNotes + `\n[OriginalOwner: ${user}]`).trim();
+              }
+              await sb.from('tasks')
+                .update({ 
+                  assigned_to: buddy,
+                  notes: newNotes
+                })
+                .eq('task_id', task.task_id);
+              
+              syncToSheet('editTask', { 
+                taskId: task.task_id, 
+                assignedTo: buddy, 
+                notes: newNotes 
+              });
+            }
+          }
+        }
+      }
+
       syncToSheet('approveLeave', params);
       return { success: true };
     }

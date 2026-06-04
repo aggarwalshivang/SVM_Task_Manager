@@ -2982,8 +2982,10 @@ function renderStats(stats) {
     return;
   }
 
-  const completedToday = state.tasks.filter(t => t.status === 'done').length;
-  const totalToday = state.tasks.length;
+  const todayStr = getTodayStr();
+  const todayTasks = state.tasks.filter(t => t.plannedDate && t.plannedDate.substring(0, 10) === todayStr);
+  const completedToday = todayTasks.filter(t => t.status === 'done').length;
+  const totalToday = todayTasks.length;
   const pct = totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : 0;
 
   section.innerHTML = `
@@ -3032,7 +3034,8 @@ function renderStats(stats) {
 }
 
 function openTodayPendingModal() {
-  const pendingTasks = state.tasks.filter(t => t.status !== 'done');
+  const todayStr = getTodayStr();
+  const pendingTasks = state.tasks.filter(t => t.status !== 'done' && t.plannedDate && t.plannedDate.substring(0, 10) === todayStr);
   const container = $('today-pending-list');
   const modal = $('today-pending-modal');
   if (!container || !modal) return;
@@ -6019,8 +6022,10 @@ function openLeaveModal() {
   const buddySelect = $('leave-buddy');
   if (buddySelect) {
     buddySelect.innerHTML = '<option value="" disabled selected>Select Buddy</option>';
-    if (state.team) {
-      state.team
+
+    const populateBuddyOptions = (members) => {
+      buddySelect.innerHTML = '<option value="" disabled selected>Select Buddy</option>';
+      (members || [])
         .filter(m => m.name !== state.currentUser && m.active)
         .forEach(m => {
           const opt = document.createElement('option');
@@ -6028,6 +6033,19 @@ function openLeaveModal() {
           opt.textContent = m.name;
           buddySelect.appendChild(opt);
         });
+    };
+
+    if (state.teamMembers && state.teamMembers.length > 0) {
+      populateBuddyOptions(state.teamMembers);
+    } else {
+      apiFetch('getTeam').then(res => {
+        if (res.success && res.data) {
+          state.teamMembers = res.data;
+          populateBuddyOptions(res.data);
+        }
+      }).catch(err => {
+        console.error('Failed to load team members for leave buddy select:', err);
+      });
     }
   }
 
