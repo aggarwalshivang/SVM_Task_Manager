@@ -439,6 +439,11 @@ async function demoHandler(action, params) {
       return { success: true, data: { name: params.name } };
     case 'removeMember':
       return { success: true, data: { name: params.name } };
+    case 'getTestSettings':
+      return { success: true, data: JSON.parse(localStorage.getItem('svm_demo_test_settings') || '[]') };
+    case 'updateTestSettings':
+      localStorage.setItem('svm_demo_test_settings', JSON.stringify(params.settings));
+      return { success: true };
     default:
       return { success: false, error: 'Unknown action' };
   }
@@ -978,10 +983,15 @@ function closeCustomFmsBuilderModal() {
 
 // Tracks the list of custom field definitions for the blueprint being created
 let _fmsBlueprintFields = [];
+let _editingBlueprintId = null;
 
 function openCustomFmsCreatorSection() {
   $('fms-blueprint-form-section').style.display = 'block';
   $('fms-blueprint-form').reset();
+  _editingBlueprintId = null;
+  $('fms-bp-type').disabled = false;
+  const formTitle = $('fms-blueprint-form-title');
+  if (formTitle) formTitle.textContent = 'Create Custom Pipeline';
   $('fms-bp-stages').checked = true;
   $('fms-bp-links').checked = true;
   $('fms-bp-offsets').checked = true;
@@ -1087,6 +1097,62 @@ window.removeBlueprintField = function (idx) {
 
 function closeCustomFmsCreatorSection() {
   $('fms-blueprint-form-section').style.display = 'none';
+  _editingBlueprintId = null;
+  $('fms-bp-type').disabled = false;
+  const formTitle = $('fms-blueprint-form-title');
+  if (formTitle) formTitle.textContent = 'Create Custom Pipeline';
+}
+
+function editCustomFmsBlueprint(blueprintId) {
+  const blueprints = getCustomFmsBlueprints();
+  const bp = blueprints.find(b => String(b.id) === String(blueprintId));
+  if (!bp) return;
+
+  _editingBlueprintId = blueprintId;
+
+  // Change heading title
+  const formTitle = $('fms-blueprint-form-title');
+  if (formTitle) formTitle.textContent = 'Edit Custom Pipeline';
+
+  // Populating standard fields
+  $('fms-bp-name').value = bp.name || '';
+  $('fms-bp-type').value = bp.type || '';
+  $('fms-bp-type').disabled = true; // Disable editing slug
+
+  $('fms-bp-stages').checked = !!bp.stagesNeeded;
+  $('fms-bp-links').checked = !!bp.linksNeeded;
+  $('fms-bp-offsets').checked = !!bp.offsetsNeeded;
+  $('fms-bp-marks').checked = !!bp.marksNeeded;
+  $('fms-bp-scoring').checked = !!bp.scoringSystem;
+
+  // Set scope
+  const scope = bp.scope || 'dependent';
+  const depRadio = $('fms-bp-scope-dependent');
+  const indRadio = $('fms-bp-scope-independent');
+  if (scope === 'independent') {
+    if (indRadio) indRadio.checked = true;
+  } else {
+    if (depRadio) depRadio.checked = true;
+  }
+  updateScopeLabels();
+
+  // Populate roles
+  const roles = bp.roles || ['admin'];
+  document.querySelectorAll('input[name="fms-bp-roles"]').forEach(cb => {
+    if (cb.value !== 'admin') {
+      cb.checked = roles.includes(cb.value);
+    }
+  });
+
+  // Populate custom fields list
+  _fmsBlueprintFields = JSON.parse(JSON.stringify(bp.fields || []));
+  renderBlueprintFieldRows();
+
+  // Show the form section
+  $('fms-blueprint-form-section').style.display = 'block';
+
+  // Scroll form section into view
+  $('fms-blueprint-form-section').scrollIntoView({ behavior: 'smooth' });
 }
 
 function renderCustomFmsBlueprintsList() {
@@ -1127,12 +1193,20 @@ function renderCustomFmsBlueprintsList() {
       }
         </div>
       </div>
-      <button onclick="confirmDeleteFmsBlueprint('${bp.id}','${bp.name.replace(/'/g, "\\'")}')" 
-        style="flex-shrink:0;display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:99px;border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.08);color:#f87171;font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.2s;white-space:nowrap;"
-        onmouseover="this.style.background='rgba(239,68,68,0.18)';this.style.borderColor='rgba(239,68,68,0.7)'"
-        onmouseout="this.style.background='rgba(239,68,68,0.08)';this.style.borderColor='rgba(239,68,68,0.4)'">
-        🗑️ Delete
-      </button>
+      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
+        <button onclick="editCustomFmsBlueprint('${bp.id}')" 
+          style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:99px;border:1px solid rgba(124,58,237,0.4);background:rgba(124,58,237,0.08);color:var(--accent-purple);font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.2s;white-space:nowrap;"
+          onmouseover="this.style.background='rgba(124,58,237,0.18)';this.style.borderColor='rgba(124,58,237,0.7)'"
+          onmouseout="this.style.background='rgba(124,58,237,0.08)';this.style.borderColor='rgba(124,58,237,0.4)'">
+          ✏️ Edit
+        </button>
+        <button onclick="confirmDeleteFmsBlueprint('${bp.id}','${bp.name.replace(/'/g, "\\'")}')" 
+          style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:99px;border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.08);color:#f87171;font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.2s;white-space:nowrap;"
+          onmouseover="this.style.background='rgba(239,68,68,0.18)';this.style.borderColor='rgba(239,68,68,0.7)'"
+          onmouseout="this.style.background='rgba(239,68,68,0.08)';this.style.borderColor='rgba(239,68,68,0.4)'">
+          🗑️ Delete
+        </button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -1297,7 +1371,7 @@ async function handleFmsBlueprintSubmit() {
   }
 
   const blueprints = getCustomFmsBlueprints();
-  if (blueprints.some(bp => bp.type.toLowerCase() === slug.toLowerCase())) {
+  if (blueprints.some(bp => bp.type.toLowerCase() === slug.toLowerCase() && bp.id !== _editingBlueprintId)) {
     showToast(`An FMS with slug "${slug}" already exists!`, 'error');
     return;
   }
@@ -1333,7 +1407,7 @@ async function handleFmsBlueprintSubmit() {
     roles.push(cb.value);
   });
 
-  const blueprintId = 'fms_' + slug.toLowerCase() + '_' + Date.now();
+  const blueprintId = _editingBlueprintId || ('fms_' + slug.toLowerCase() + '_' + Date.now());
   const newBlueprint = {
     id: blueprintId,
     name,
@@ -1355,6 +1429,7 @@ async function handleFmsBlueprintSubmit() {
 
 window.deleteCustomFmsBlueprint = deleteCustomFmsBlueprint;
 window.confirmDeleteFmsBlueprint = confirmDeleteFmsBlueprint;
+window.editCustomFmsBlueprint = editCustomFmsBlueprint;
 
 // =============================================
 // INDEPENDENT FMS — localStorage helpers
