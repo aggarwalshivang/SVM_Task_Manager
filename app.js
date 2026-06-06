@@ -2717,6 +2717,51 @@ function renderBriefingSkeleton() {
   section.style.display = 'block';
 }
 
+function isStageAssignedToUser(stage, userName) {
+  if (!stage || !stage.doer || !userName) return false;
+  const doerLower = stage.doer.toLowerCase();
+  const userNameLower = userName.toLowerCase();
+  if (doerLower === 'all') return true;
+  
+  // Split by /, &, comma, or whitespace and filter empty items
+  const parts = doerLower.split(/[\/,&\s,]+/).map(p => p.trim()).filter(Boolean);
+  return parts.includes(userNameLower);
+}
+
+function getFmsTasksForUser(userName) {
+  if (!userName) return [];
+  const fmsTasks = [];
+  
+  (state.tests || []).forEach(test => {
+    const stages = getTestStages(test);
+    stages.forEach(stage => {
+      if (stage.hidden) return;
+      if (!isStageAssignedToUser(stage, userName)) return;
+      
+      const heldOnDate = new Date(test.heldOn);
+      const plannedDate = new Date(heldOnDate);
+      plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
+      
+      fmsTasks.push({
+        taskId: `fms-stage-${test.testId}-${stage.id}`,
+        taskName: `${test.testName} — ${stage.label}`,
+        taskType: 'fms',
+        priority: 'Medium',
+        status: stage.status || 'pending',
+        plannedDate: plannedDate.toISOString(),
+        assignedTo: userName,
+        testId: test.testId,
+        stageId: stage.id,
+        testType: test.type,
+        time: '',
+        link: stage.link || ''
+      });
+    });
+  });
+  
+  return fmsTasks;
+}
+
 function renderTasks(tasks) {
   let displayedTasks = tasks;
 
@@ -2788,6 +2833,22 @@ function renderTasks(tasks) {
     badge.style.display = count > 0 ? 'inline-flex' : 'none';
   });
 
+  const activeUser = state.tasksFilterUser || state.currentUser;
+  const fmsTasks = getFmsTasksForUser(activeUser);
+  const pendingFmsCount = fmsTasks.filter(t => t.status !== 'done').length;
+  const dueFmsCount = fmsTasks.filter(t => t.status !== 'done' && t.plannedDate.substring(0, 10) <= todayStr).length;
+
+  const pendingFmsBadge = $('ttab-badge-pending-fms');
+  if (pendingFmsBadge) {
+    pendingFmsBadge.textContent = pendingFmsCount > 0 ? pendingFmsCount : '';
+    pendingFmsBadge.style.display = pendingFmsCount > 0 ? 'inline-flex' : 'none';
+  }
+  const dueFmsBadge = $('ttab-badge-due-fms');
+  if (dueFmsBadge) {
+    dueFmsBadge.textContent = dueFmsCount > 0 ? dueFmsCount : '';
+    dueFmsBadge.style.display = dueFmsCount > 0 ? 'inline-flex' : 'none';
+  }
+
   // Handle Calendar View Toggle
   if (state.taskViewMode === 'calendar') {
     $('task-type-tabs').style.display = 'none';
@@ -2804,17 +2865,55 @@ function renderTasks(tasks) {
   $('task-type-tabs').style.display = 'flex';
 
   // Filter by active tab
-  const tabTasks = filteredTasks.filter(t => matchesTab(t, state.taskTab, monday, sunday));
+  let tabTasks;
+  if (state.taskTab === 'pending-fms' || state.taskTab === 'due-fms') {
+    const query = state.filters.search.toLowerCase();
+    const statusFilter = state.filters.status;
+    
+    let baseFms = fmsTasks;
+    if (state.taskTab === 'pending-fms') {
+      baseFms = fmsTasks.filter(t => t.status !== 'done' || t.plannedDate.substring(0, 10) === todayStr);
+    } else {
+      baseFms = fmsTasks.filter(t => (t.status !== 'done' && t.plannedDate.substring(0, 10) <= todayStr) || (t.status === 'done' && t.plannedDate.substring(0, 10) === todayStr));
+    }
+    
+    tabTasks = baseFms.filter(t => {
+      const matchesSearch = t.taskName.toLowerCase().includes(query);
+      const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+    
+    tabTasks.sort((a, b) => {
+      const dateA = a.plannedDate ? a.plannedDate.substring(0, 10) : '9999-12-31';
+      const dateB = b.plannedDate ? b.plannedDate.substring(0, 10) : '9999-12-31';
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      const statusOrder = { 'in-progress': 0, 'stuck': 1, 'pending': 2, 'overdue': 3, 'missed': 4, 'done': 5 };
+      return (statusOrder[a.status] ?? 2) - (statusOrder[b.status] ?? 2);
+    });
+  } else {
+    tabTasks = filteredTasks.filter(t => matchesTab(t, state.taskTab, monday, sunday));
+  }
 
   // Determine nice tab label
-  const tabLabels = { all: 'All Tasks', daily: 'Daily Tasks', recurring: 'Recurring Tasks', week: 'This Week', onetime: 'One-Time Tasks', future: 'Future Tasks' };
+  const tabLabels = {
+    all: 'All Tasks',
+    daily: 'Daily Tasks',
+    recurring: 'Recurring Tasks',
+    week: 'This Week',
+    onetime: 'One-Time Tasks',
+    future: 'Future Tasks',
+    'pending-fms': 'Pending FMS Tasks',
+    'due-fms': 'Due FMS Tasks'
+  };
   const tabLabel = tabLabels[state.taskTab] || 'Tasks';
 
   renderTaskSection('recurring-section', '📋', tabLabel, tabTasks);
   $('onetime-section').style.display = 'none';
 
   // Check if all done for active tab
-  const allDone = tasks.length > 0 && tasks.every(t => t.status === 'done');
+  const allDone = state.taskTab.includes('fms')
+    ? (tabTasks.length > 0 && tabTasks.every(t => t.status === 'done'))
+    : (tasks.length > 0 && tasks.every(t => t.status === 'done'));
   if (allDone) showAllDoneCelebration();
 }
 
@@ -2862,14 +2961,12 @@ function matchesTab(t, tab, monday, sunday) {
 function setTaskTab(tab) {
   state.taskTab = tab;
   // Update active class on tab buttons
-  ['all', 'daily', 'recurring', 'week', 'onetime', 'future'].forEach(t => {
+  ['all', 'daily', 'recurring', 'week', 'onetime', 'future', 'pending-fms', 'due-fms'].forEach(t => {
     const btn = $(`ttab-${t}`);
     if (btn) btn.classList.toggle('active', t === tab);
   });
   // Re-render with the new tab filter
-  if (state.tasks && state.tasks.length > 0) {
-    renderTasks(state.tasks);
-  }
+  renderTasks(state.tasks || []);
 }
 
 function renderTaskSection(sectionId, icon, title, tasks) {
@@ -2973,6 +3070,7 @@ function renderTaskCard(task) {
   const isMissed = task.status === 'missed';
   const isInProgress = task.status === 'in-progress';
   const isStuck = task.status === 'stuck';
+  const isFms = task.taskType === 'fms';
 
   // Check for overdue status
   let isOverdue = task.status === 'overdue' || isMissed;
@@ -2991,7 +3089,10 @@ function renderTaskCard(task) {
     if (now.getTime() > (planned.getTime() + graceMs)) isOverdue = true;
   }
 
-  const badgeClass = task.taskType === 'daily' ? 'badge-daily' : task.taskType === 'weekly' ? 'badge-weekly' : 'badge-one-time';
+  const badgeClass = task.taskType === 'daily' ? 'badge-daily' :
+                     task.taskType === 'weekly' ? 'badge-weekly' :
+                     task.taskType === 'fms' ? 'badge-fms' : 'badge-one-time';
+  const badgeText = task.taskType === 'fms' ? `FMS: ${task.testType}` : task.taskType;
   const prioClass = `priority-${(task.priority || 'Medium').toLowerCase()}`;
   let displayPriority = task.priority || 'Medium';
   if (displayPriority.includes('-') || displayPriority.includes(':')) displayPriority = 'Medium';
@@ -3009,7 +3110,7 @@ function renderTaskCard(task) {
       <div class="task-info">
         <div class="task-name">${task.taskName}</div>
         <div class="task-meta">
-          <span class="task-badge ${badgeClass}">${task.taskType}</span>
+          <span class="task-badge ${badgeClass}">${badgeText}</span>
           <span class="priority-badge ${prioClass}">${displayPriority}</span>
           ${task.assignedTo && (isAdminOrCoord || state.currentView === 'tasks') ? `
             <span style="color:var(--accent-purple); font-weight:600;">
@@ -3030,15 +3131,22 @@ function renderTaskCard(task) {
         </div>
       </div>
       <div class="task-actions">
-        ${isProcessCoord ? `
+        ${isFms && task.link ? `
+          <a href="${task.link}" target="_blank" onclick="event.stopPropagation();" class="task-link-btn" title="Open Link" style="color:var(--accent-purple); display:inline-flex; align-items:center; padding:4px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+          </a>
+        ` : ''}
+        ${!isFms && isProcessCoord ? `
           <button class="task-nudge-btn" onclick="handleNudgeMember('${task.taskId}', '${task.assignedTo}', event)" title="Nudge Member" style="background:none; border:none; color:var(--accent-purple); cursor:pointer; padding:4px;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
           </button>
         ` : ''}
-        <button class="task-comment-btn" data-comment-id="${task.taskId}" title="Comments" aria-label="Task comments">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 1 1-7.6-13.5 8.38 8.38 0 0 1 3.8.9L21 3z"></path></svg>
-        </button>
-        ${(!isDone) ? `
+        ${!isFms ? `
+          <button class="task-comment-btn" data-comment-id="${task.taskId}" title="Comments" aria-label="Task comments">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 1 1-7.6-13.5 8.38 8.38 0 0 1 3.8.9L21 3z"></path></svg>
+          </button>
+        ` : ''}
+        ${(!isDone && !isFms) ? `
           <button onclick="handleUpdateTaskStatus('${task.taskId}', 'in-progress', event)" title="Mark In Progress" style="background:none; border:none; color:var(--accent-blue); cursor:pointer; padding:4px; display:flex; align-items:center;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
           </button>
@@ -3046,14 +3154,14 @@ function renderTaskCard(task) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
           </button>
         ` : ''}
-        ${(!isDone) ? `<button class="task-shift-btn" data-shift-id="${task.taskId}" title="Shift task" aria-label="Shift task">
+        ${(!isDone && !isFms) ? `<button class="task-shift-btn" data-shift-id="${task.taskId}" title="Shift task" aria-label="Shift task">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </button>` : ''}
-        ${(isAdminOrCoord || task.assignedTo === state.currentUser) ? `
+        ${(isAdminOrCoord || task.assignedTo === state.currentUser) && !isFms ? `
         <button class="task-edit-btn" data-edit-id="${task.taskId}" title="Edit task" aria-label="Edit task">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>` : ''}
-        ${(isAdminOrCoord || task.assignedTo === state.currentUser) ? `
+        ${(isAdminOrCoord || task.assignedTo === state.currentUser) && !isFms ? `
         <button class="task-delete-btn" data-delete-id="${task.taskId}" title="Delete task" aria-label="Delete task">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
@@ -3862,6 +3970,32 @@ async function handleTaskComplete(taskId) {
   if (alreadyDone) return;
 
   lastTaskCompleteTime = now;
+
+  // Intercept FMS task stage completion
+  if (taskId.startsWith('fms-stage-')) {
+    // Optimistic UI update
+    cards.forEach(card => {
+      card.classList.add('completing');
+      const statusIcon = card.querySelector('.check-icon');
+      if (statusIcon) statusIcon.style.opacity = '1';
+      const checkbox = card.querySelector('.task-checkbox');
+      if (checkbox) checkbox.innerHTML = '<span class="check-icon" style="opacity:1;transform:scale(1)">✓</span>';
+    });
+
+    const parts = taskId.split('-');
+    const testId = parts[2];
+    const stageId = parseInt(parts[3]);
+
+    setTimeout(async () => {
+      try {
+        await handleToggleTestStage(testId, stageId);
+      } catch (err) {
+        showToast('Failed to update FMS stage', 'error');
+      }
+      renderTasks(state.tasks || []);
+    }, 600);
+    return;
+  }
 
   // Optimistic UI update
   cards.forEach(card => {

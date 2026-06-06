@@ -1231,6 +1231,11 @@ body::before {
   color: var(--accent-amber);
 }
 
+.badge-fms {
+  background: rgba(167, 139, 250, 0.15);
+  color: #c084fc;
+}
+
 .badge-overdue {
   background: rgba(239, 68, 68, 0.15);
   color: var(--accent-red);
