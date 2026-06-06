@@ -315,6 +315,16 @@ function getTodayStr() {
 
 function getMockTasks(user) {
   const today = getTodayStr();
+
+  // Generate tomorrow and next week dates dynamically for testing
+  const tom = new Date();
+  tom.setDate(tom.getDate() + 1);
+  const tomorrowStr = tom.getFullYear() + '-' + String(tom.getMonth() + 1).padStart(2, '0') + '-' + String(tom.getDate()).padStart(2, '0');
+
+  const nextWk = new Date();
+  nextWk.setDate(nextWk.getDate() + 8);
+  const nextWeekStr = nextWk.getFullYear() + '-' + String(nextWk.getMonth() + 1).padStart(2, '0') + '-' + String(nextWk.getDate()).padStart(2, '0');
+
   const allTasks = [
     // Daily tasks
     { taskId: 'T001', taskName: 'Check student attendance register', assignedTo: user, taskType: 'daily', plannedDate: today, completedDate: '', status: 'pending', notes: '' },
@@ -328,6 +338,10 @@ function getMockTasks(user) {
     { taskId: 'T007', taskName: 'Update notice board for exam schedule', assignedTo: user, taskType: 'one-time', plannedDate: today, completedDate: '', status: 'pending', notes: '' },
     // Overdue task
     { taskId: 'T008', taskName: 'Submit lab equipment inventory list', assignedTo: user, taskType: 'one-time', plannedDate: '2026-04-27', completedDate: '', status: 'overdue', notes: 'Due yesterday' },
+    // Future tasks for verification
+    { taskId: 'T009', taskName: 'Submit monthly syllabus coverage report', assignedTo: user, taskType: 'one-time', plannedDate: tomorrowStr, completedDate: '', status: 'pending', notes: 'Planned for tomorrow' },
+    { taskId: 'T010', taskName: 'Plan next month class curriculum', assignedTo: user, taskType: 'recurring', recurrence: 'interval:1:months', plannedDate: nextWeekStr, completedDate: '', status: 'pending', notes: 'Planned for next week (monthly recurrence)' },
+    { taskId: 'T011', taskName: 'Future Weekly (should be filtered out)', assignedTo: user, taskType: 'weekly', plannedDate: nextWeekStr, completedDate: '', status: 'pending', notes: 'Should not show in Future Tasks' }
   ];
   return allTasks;
 }
@@ -2711,7 +2725,12 @@ function renderTasks(tasks) {
     const todayDate = getTodayStr();
     displayedTasks = tasks.filter(t => {
       const d = (t.plannedDate || '').substring(0, 10);
-      return d === todayDate || ['overdue', 'stuck', 'in-progress', 'missed'].includes(t.status);
+      
+      const isDaily = t.taskType === 'daily' || t.recurrence === 'daily' || t.recurrence === 'interval:1:days';
+      const isWeekly = t.taskType === 'weekly' || t.recurrence === 'weekly' || t.recurrence === 'interval:1:weeks' || (t.recurrence && t.recurrence.startsWith('dayOfWeek:'));
+      const isFutureNonDailyWeekly = d > todayDate && !isDaily && !isWeekly;
+
+      return d === todayDate || ['overdue', 'stuck', 'in-progress', 'missed'].includes(t.status) || isFutureNonDailyWeekly;
     });
   }
 
@@ -2761,12 +2780,10 @@ function renderTasks(tasks) {
   const allForTab = (tab) => filteredTasks.filter(t => matchesTab(t, tab, monday, sunday));
   const pendingCountForTab = (tab) => allForTab(tab).filter(t => t.status !== 'done').length;
 
-  ['all', 'daily', 'recurring', 'week', 'onetime'].forEach(tab => {
+  ['all', 'daily', 'recurring', 'week', 'onetime', 'future'].forEach(tab => {
     const badge = $(`ttab-badge-${tab}`);
     if (!badge) return;
-    const count = tab === 'all'
-      ? filteredTasks.filter(t => t.status !== 'done').length
-      : pendingCountForTab(tab);
+    const count = pendingCountForTab(tab);
     badge.textContent = count > 0 ? count : '';
     badge.style.display = count > 0 ? 'inline-flex' : 'none';
   });
@@ -2790,7 +2807,7 @@ function renderTasks(tasks) {
   const tabTasks = filteredTasks.filter(t => matchesTab(t, state.taskTab, monday, sunday));
 
   // Determine nice tab label
-  const tabLabels = { all: 'All Tasks', daily: 'Daily Tasks', recurring: 'Recurring Tasks', week: 'This Week', onetime: 'One-Time Tasks' };
+  const tabLabels = { all: 'All Tasks', daily: 'Daily Tasks', recurring: 'Recurring Tasks', week: 'This Week', onetime: 'One-Time Tasks', future: 'Future Tasks' };
   const tabLabel = tabLabels[state.taskTab] || 'Tasks';
 
   renderTaskSection('recurring-section', '📋', tabLabel, tabTasks);
@@ -2803,6 +2820,19 @@ function renderTasks(tasks) {
 
 /** Returns true if a task belongs to the given tab */
 function matchesTab(t, tab, monday, sunday) {
+  const todayDate = getTodayStr();
+  const d = (t.plannedDate || '').substring(0, 10);
+  const isFuture = d > todayDate;
+
+  if (isFuture) {
+    if (tab !== 'future') return false;
+    const isDaily = t.taskType === 'daily' || t.recurrence === 'daily' || t.recurrence === 'interval:1:days';
+    const isWeekly = t.taskType === 'weekly' || t.recurrence === 'weekly' || t.recurrence === 'interval:1:weeks' || (t.recurrence && t.recurrence.startsWith('dayOfWeek:'));
+    return !isDaily && !isWeekly;
+  }
+
+  if (tab === 'future') return false;
+
   switch (tab) {
     case 'all':
       return true; // show everything
@@ -2818,8 +2848,8 @@ function matchesTab(t, tab, monday, sunday) {
     case 'week': {
       if (t.taskType !== 'weekly') return false;
       if (!t.plannedDate) return false;
-      const d = new Date(t.plannedDate.substring(0, 10) + 'T00:00:00');
-      return d >= monday && d <= sunday;
+      const dDate = new Date(t.plannedDate.substring(0, 10) + 'T00:00:00');
+      return dDate >= monday && dDate <= sunday;
     }
     case 'onetime':
       return t.taskType === 'one-time';
@@ -2832,7 +2862,7 @@ function matchesTab(t, tab, monday, sunday) {
 function setTaskTab(tab) {
   state.taskTab = tab;
   // Update active class on tab buttons
-  ['all', 'daily', 'recurring', 'week', 'onetime'].forEach(t => {
+  ['all', 'daily', 'recurring', 'week', 'onetime', 'future'].forEach(t => {
     const btn = $(`ttab-${t}`);
     if (btn) btn.classList.toggle('active', t === tab);
   });
@@ -3925,7 +3955,7 @@ async function handleNudgeMember(taskId, memberName, event) {
     showToast(`Nudge sent to ${memberName}`);
     // Refresh tasks
     if (state.currentView === 'tasks') {
-      const res = await apiFetch('getTasks', { user: state.tasksFilterUser, all: !state.tasksFilterUser ? 'true' : 'false' });
+      const res = await apiFetch('getTasks', { user: state.tasksFilterUser, all: !state.tasksFilterUser ? 'true' : 'false', allDates: true });
       if (res.success) {
         state.tasks = res.data;
         renderTasks(state.tasks);
@@ -3999,7 +4029,7 @@ async function handleViewMemberTasks(userName) {
 
   try {
     showToast(`Loading tasks for ${userName}...`);
-    const res = await apiFetch('getTasks', { user: userName });
+    const res = await apiFetch('getTasks', { user: userName, allDates: true });
     if (res.success) {
       state.tasks = res.data;
       renderTasks(state.tasks);
@@ -7351,7 +7381,7 @@ async function openMemberTasksModal(name) {
   $('member-tasks-modal').style.display = 'flex';
 
   try {
-    const res = await apiFetch('getTasks', { user: name });
+    const res = await apiFetch('getTasks', { user: name, allDates: true });
     const tasks = res.data || [];
 
     // Filter to show pending/overdue
