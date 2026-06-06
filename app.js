@@ -8166,8 +8166,8 @@ function initHelperTab() {
       const desc = document.getElementById('helper-desc').value.trim();
       const url = document.getElementById('helper-url').value.trim();
 
-      if (!title || !desc || !url) {
-        showToast('Please fill all fields', 'error');
+      if (!title || !desc) {
+        showToast('Please fill Title and Description fields', 'error');
         return;
       }
 
@@ -8631,9 +8631,11 @@ function renderHelpers(queryText = '') {
           <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; min-height: 40px;">${h.description}</p>
         </div>
         
+        ${h.url ? `
         <button class="btn-primary" onclick="window.open('${h.url}', '_blank')" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.8rem; font-weight: 600; padding: var(--space-sm) var(--space-md); margin-top: var(--space-sm);">
           Open Link ↗
         </button>
+        ` : ''}
       </div>
     `;
   }).join('');
