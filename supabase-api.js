@@ -962,15 +962,77 @@ async function supabaseApiFetch(action, params = {}) {
 
     case 'approveTaskChange': {
       const { requestId, decision } = params;
-      await sb.from('modifications').update({ status: decision === 'approved' ? 'approved' : 'rejected' }).eq('id', requestId);
-      if (decision === 'approved') {
-        const { data: mod } = await sb.from('modifications').select('*').eq('id', requestId).maybeSingle();
-        if (mod) {
-          if (mod.type === 'delete') await supabaseApiFetch('deleteTask', { taskId: mod.task_id });
-          else if (mod.type === 'edit') await supabaseApiFetch('editTask', { taskId: mod.task_id, ...mod.new_data });
-          else if (mod.type === 'shift') await supabaseApiFetch('shiftTask', { taskId: mod.task_id, ...mod.new_data });
-        }
+      const { data: mod } = await sb.from('modifications').select('*').eq('id', requestId).maybeSingle();
+      if (!mod) return { success: false, error: 'Request not found' };
+
+      const newStatus = decision === 'approved' ? 'approved' : 'rejected';
+      const newData = mod.new_data || {};
+      if (decision === 'approved' && mod.type === 'pipeline_unlock') {
+        newData.approved_at = new Date().toISOString();
       }
+
+      const { error } = await sb.from('modifications')
+        .update({ status: newStatus, new_data: newData })
+        .eq('id', requestId);
+
+      if (error) return { success: false, error: error.message };
+
+      if (decision === 'approved') {
+        if (mod.type === 'delete') await supabaseApiFetch('deleteTask', { taskId: mod.task_id });
+        else if (mod.type === 'edit') await supabaseApiFetch('editTask', { taskId: mod.task_id, ...mod.new_data });
+        else if (mod.type === 'shift') await supabaseApiFetch('shiftTask', { taskId: mod.task_id, ...mod.new_data });
+      }
+      return { success: true };
+    }
+
+    case 'requestPipelineUnlock': {
+      const { requestedBy } = params;
+      // First delete any older requests by the same user to avoid clutter
+      await sb.from('modifications')
+        .delete()
+        .eq('requested_by', requestedBy)
+        .eq('type', 'pipeline_unlock');
+
+      const { data, error } = await sb.from('modifications').insert({
+        task_id: 'pipeline_unlock',
+        type: 'pipeline_unlock',
+        new_data: { requested_at: new Date().toISOString() },
+        requested_by: requestedBy,
+        status: 'pending'
+      }).select().maybeSingle();
+
+      if (error) return { success: false, error: error.message };
+      return { success: true, requestId: data ? data.id : null };
+    }
+
+    case 'checkPipelineUnlock': {
+      const { requestedBy } = params;
+      const { data, error } = await sb.from('modifications')
+        .select('*')
+        .eq('requested_by', requestedBy)
+        .eq('type', 'pipeline_unlock')
+        .order('id', { ascending: false })
+        .limit(1);
+
+      if (error) return { success: false, error: error.message };
+      if (!data || data.length === 0) return { success: true, status: 'none' };
+
+      const req = data[0];
+      return {
+        success: true,
+        status: req.status,
+        requestId: req.id,
+        newData: req.new_data || {}
+      };
+    }
+
+    case 'cancelPipelineUnlock': {
+      const { requestedBy } = params;
+      await sb.from('modifications')
+        .delete()
+        .eq('requested_by', requestedBy)
+        .eq('type', 'pipeline_unlock')
+        .eq('status', 'pending');
       return { success: true };
     }
 

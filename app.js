@@ -82,85 +82,157 @@ function isPipelineEditUnlocked() {
 }
 
 /** Open the Admin Approval modal */
-window.requestPipelineApproval = function () {
+window.requestPipelineApproval = async function () {
   const modal = document.getElementById('pipeline-approval-modal');
   if (!modal) return;
-  document.getElementById('pipeline-approval-email').value = '';
-  document.getElementById('pipeline-approval-password').value = '';
-  document.getElementById('pipeline-approval-error').textContent = '';
+  
+  // Show initial state, hide others
+  document.getElementById('pipeline-request-initial').style.display = 'block';
+  document.getElementById('pipeline-request-pending').style.display = 'none';
+  document.getElementById('pipeline-request-rejected').style.display = 'none';
+  
   modal.style.display = 'flex';
-  setTimeout(() => document.getElementById('pipeline-approval-email').focus(), 120);
-};
-
-/** Toggle password visibility in approval modal */
-window.toggleApprovalPasswordVisibility = function () {
-  const inp = document.getElementById('pipeline-approval-password');
-  const isHidden = inp.type === 'password';
-  inp.type = isHidden ? 'text' : 'password';
-  document.getElementById('approval-eye-icon').innerHTML = isHidden
-    ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
-    : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
-};
-
-/** Verify admin credentials and start the 10-minute unlock window */
-window.submitPipelineApproval = async function () {
-  const email = document.getElementById('pipeline-approval-email').value.trim();
-  const password = document.getElementById('pipeline-approval-password').value.trim();
-  const errorEl = document.getElementById('pipeline-approval-error');
-  const btn = document.getElementById('pipeline-approval-submit');
-
-  errorEl.textContent = '';
-  if (!email || !password) {
-    errorEl.textContent = 'Please enter admin email and password.';
-    return;
-  }
-
-  btn.disabled = true;
-  btn.innerHTML = '<div class="loading-spinner" style="width:16px;height:16px;border-width:2px;margin:0 auto;"></div>';
-
+  
+  // Check if there is already an active request or if it's already approved
   try {
-    const res = await apiFetch('login', { email, password }, 'POST');
-    if (res.success && res.data && String(res.data.role).toLowerCase() === 'admin') {
-      // ✅ Valid admin — grant 10-minute unlock
-      const TEN_MINUTES = 10 * 60 * 1000;
-      state.pipelineUnlockExpiry = Date.now() + TEN_MINUTES;
-
-      // Clear any existing countdown
-      if (state.pipelineUnlockTimer) clearInterval(state.pipelineUnlockTimer);
-
-      state.pipelineUnlockTimer = setInterval(() => {
-        if (!isPipelineEditUnlocked()) {
-          // Time expired — lock up
-          clearInterval(state.pipelineUnlockTimer);
-          state.pipelineUnlockTimer = null;
-          state.pipelineUnlockExpiry = null;
-          renderIndividualFormStages();
-          showToast('Admin approval expired. Pipeline is locked again.', 'error');
-        } else {
-          // Refresh countdown display
-          const remaining = state.pipelineUnlockExpiry - Date.now();
-          const mins = Math.floor(remaining / 60000);
-          const secs = Math.floor((remaining % 60000) / 1000);
-          const el = document.getElementById('pipeline-unlock-countdown');
-          if (el) el.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+    const res = await apiFetch('checkPipelineUnlock', { requestedBy: state.currentUser });
+    if (res.success) {
+      if (res.status === 'pending') {
+        showPipelinePendingState();
+      } else if (res.status === 'approved') {
+        const approvedAt = new Date(res.newData.approved_at).getTime();
+        const TEN_MINUTES = 10 * 60 * 1000;
+        if (Date.now() < approvedAt + TEN_MINUTES) {
+          modal.style.display = 'none';
+          unlockPipelineForTenMins(approvedAt);
         }
-      }, 1000);
-
-      document.getElementById('pipeline-approval-modal').style.display = 'none';
-      renderIndividualFormStages();
-      showToast(`Pipeline unlocked for 10 minutes. Approved by ${res.data.name}.`);
-    } else {
-      errorEl.textContent = res.error || 'Not an admin account. Access denied.';
+      }
     }
   } catch (err) {
-    errorEl.textContent = 'Verification failed. Check your connection.';
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Approve Access';
+    console.error('Error checking pipeline approval on open:', err);
   }
 };
 
-/** Immediately re-lock pipeline (manual lock button in unlock mode) */
+window.closePipelineApprovalModal = function () {
+  const modal = document.getElementById('pipeline-approval-modal');
+  if (modal) modal.style.display = 'none';
+  if (state.pipelineApprovalPollTimer) {
+    clearInterval(state.pipelineApprovalPollTimer);
+    state.pipelineApprovalPollTimer = null;
+  }
+};
+
+function showPipelinePendingState() {
+  document.getElementById('pipeline-request-initial').style.display = 'none';
+  document.getElementById('pipeline-request-pending').style.display = 'block';
+  document.getElementById('pipeline-request-rejected').style.display = 'none';
+  
+  startPipelineApprovalPolling();
+}
+
+function startPipelineApprovalPolling() {
+  if (state.pipelineApprovalPollTimer) clearInterval(state.pipelineApprovalPollTimer);
+  
+  state.pipelineApprovalPollTimer = setInterval(async () => {
+    try {
+      const res = await apiFetch('checkPipelineUnlock', { requestedBy: state.currentUser });
+      if (res.success) {
+        if (res.status === 'approved') {
+          clearInterval(state.pipelineApprovalPollTimer);
+          state.pipelineApprovalPollTimer = null;
+          
+          const approvedAt = new Date(res.newData.approved_at).getTime();
+          const TEN_MINUTES = 10 * 60 * 1000;
+          if (Date.now() < approvedAt + TEN_MINUTES) {
+            document.getElementById('pipeline-approval-modal').style.display = 'none';
+            unlockPipelineForTenMins(approvedAt);
+          } else {
+            document.getElementById('pipeline-request-initial').style.display = 'block';
+            document.getElementById('pipeline-request-pending').style.display = 'none';
+            document.getElementById('pipeline-request-rejected').style.display = 'none';
+          }
+        } else if (res.status === 'rejected') {
+          clearInterval(state.pipelineApprovalPollTimer);
+          state.pipelineApprovalPollTimer = null;
+          
+          document.getElementById('pipeline-request-initial').style.display = 'none';
+          document.getElementById('pipeline-request-pending').style.display = 'none';
+          document.getElementById('pipeline-request-rejected').style.display = 'block';
+        }
+      }
+    } catch (err) {
+      console.error('Error polling pipeline approval:', err);
+    }
+  }, 3000);
+}
+
+window.sendPipelineApprovalRequest = async function () {
+  const btn = document.getElementById('pipeline-request-btn');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+  
+  try {
+    const res = await apiFetch('requestPipelineUnlock', { requestedBy: state.currentUser }, 'POST');
+    if (res.success) {
+      showToast('Approval request sent to Admin!');
+      showPipelinePendingState();
+    } else {
+      showToast('Failed to send request: ' + (res.error || 'Unknown error'), 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Send Approval Request';
+    }
+  } catch (err) {
+    showToast('Failed to send request. Check connection.', 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Send Approval Request';
+  }
+};
+
+window.cancelPipelineApprovalRequest = async function () {
+  try {
+    await apiFetch('cancelPipelineUnlock', { requestedBy: state.currentUser }, 'POST');
+    showToast('Request cancelled.');
+    
+    if (state.pipelineApprovalPollTimer) {
+      clearInterval(state.pipelineApprovalPollTimer);
+      state.pipelineApprovalPollTimer = null;
+    }
+    
+    document.getElementById('pipeline-request-initial').style.display = 'block';
+    document.getElementById('pipeline-request-pending').style.display = 'none';
+    document.getElementById('pipeline-request-rejected').style.display = 'none';
+  } catch (err) {
+    showToast('Failed to cancel request.', 'error');
+  }
+};
+
+function unlockPipelineForTenMins(approvedAt) {
+  const TEN_MINUTES = 10 * 60 * 1000;
+  state.pipelineUnlockExpiry = approvedAt + TEN_MINUTES;
+  
+  if (state.pipelineUnlockTimer) clearInterval(state.pipelineUnlockTimer);
+  
+  state.pipelineUnlockTimer = setInterval(() => {
+    if (!isPipelineEditUnlocked()) {
+      clearInterval(state.pipelineUnlockTimer);
+      state.pipelineUnlockTimer = null;
+      state.pipelineUnlockExpiry = null;
+      renderIndividualFormStages();
+      showToast('Admin approval expired. Pipeline is locked again.', 'error');
+    } else {
+      const remaining = state.pipelineUnlockExpiry - Date.now();
+      const mins = Math.floor(remaining / 60000);
+      const secs = Math.floor((remaining % 60000) / 1000);
+      const el = document.getElementById('pipeline-unlock-countdown');
+      if (el) el.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+  }, 1000);
+  
+  renderIndividualFormStages();
+  showToast('Pipeline unlocked for 10 minutes.');
+}
+
 window.lockPipelineNow = function () {
   if (state.pipelineUnlockTimer) clearInterval(state.pipelineUnlockTimer);
   state.pipelineUnlockTimer = null;
@@ -291,6 +363,7 @@ const state = {
   // Pipeline editing unlock (admin approval system)
   pipelineUnlockExpiry: null,  // timestamp when unlock expires
   pipelineUnlockTimer: null,    // setInterval ID for countdown
+  pipelineApprovalPollTimer: null, // setInterval ID for member polling approvals
   taskViewMode: 'list',        // 'list' | 'calendar'
   calendarYear: new Date().getFullYear(),
   calendarMonth: new Date().getMonth()
@@ -3450,10 +3523,10 @@ function renderDashboard(scores, pendingMembers = [], leaves = [], perfData = []
           <div class="kpi-card" style="padding:15px; border-top:3px solid var(--accent-purple); box-shadow: 0 4px 20px rgba(168, 85, 247, 0.1);">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
               <div>
-                <div style="font-weight:700; color:var(--text-primary); font-size:0.95rem;">${m.taskName}</div>
+                <div style="font-weight:700; color:var(--text-primary); font-size:0.95rem;">${m.type === 'pipeline_unlock' ? '🔑 Pipeline Editing Unlock' : m.taskName}</div>
                 <div style="font-size:0.75rem; color:var(--text-muted);">From: <span style="color:var(--accent-purple); font-weight:600;">${m.requestedBy}</span></div>
               </div>
-              <span class="task-badge ${m.type === 'delete' ? 'badge-overdue' : 'badge-in-progress'}" style="padding:2px 8px; font-size:0.6rem; border-radius:12px; letter-spacing:0.05em;">${m.type.toUpperCase()}</span>
+              <span class="task-badge ${m.type === 'pipeline_unlock' ? 'badge-in-progress' : (m.type === 'delete' ? 'badge-overdue' : 'badge-in-progress')}" style="padding:2px 8px; font-size:0.6rem; border-radius:12px; letter-spacing:0.05em;">${m.type === 'pipeline_unlock' ? 'UNLOCK' : m.type.toUpperCase()}</span>
             </div>
             ${m.type === 'edit' ? `
               <div style="font-size:0.75rem; color:var(--text-muted); background:rgba(168,85,247,0.05); padding:10px; border-radius:6px; border:1px solid rgba(168,85,247,0.1);">
@@ -3471,6 +3544,11 @@ function renderDashboard(scores, pendingMembers = [], leaves = [], perfData = []
                   <span>Assign To:</span> <span style="color:var(--text-primary); font-weight:600;">${m.newData.newAssignee}</span>
                   <span>Type:</span> <span style="color:var(--text-primary);">${m.newData.shiftMode} ${m.newData.shiftMode === 'temporary' ? `(${m.newData.shiftDays} days)` : ''}</span>
                 </div>
+              </div>
+            ` : m.type === 'pipeline_unlock' ? `
+              <div style="font-size:0.75rem; color:var(--text-muted); background:rgba(124,58,237,0.05); padding:10px; border-radius:6px; border:1px solid rgba(124,58,237,0.1); display:flex; align-items:center; gap:8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--accent-purple);"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                <span>Requesting <strong>10 minutes</strong> of pipeline editing access.</span>
               </div>
             ` : `
               <div style="font-size:0.75rem; color:var(--accent-red); padding:10px; background:rgba(239,68,68,0.05); border-radius:6px; border:1px solid rgba(239,68,68,0.1); display:flex; align-items:center; gap:8px;">
@@ -4899,6 +4977,21 @@ async function initForUser(user) {
 
     // Pre-load FMS pipelines and Team Dashboard in the background immediately!
     preloadAllTabsData();
+
+    // Check if pipeline is unlocked for this member
+    if (state.userRole !== 'admin') {
+      apiFetch('checkPipelineUnlock', { requestedBy: user })
+        .then(unlockRes => {
+          if (unlockRes.success && unlockRes.status === 'approved' && unlockRes.newData && unlockRes.newData.approved_at) {
+            const approvedAt = new Date(unlockRes.newData.approved_at).getTime();
+            const TEN_MINUTES = 10 * 60 * 1000;
+            if (Date.now() < approvedAt + TEN_MINUTES) {
+              unlockPipelineForTenMins(approvedAt);
+            }
+          }
+        })
+        .catch(err => console.error('Failed to check active pipeline unlock:', err));
+    }
 
   } catch (err) {
     console.error('Fetch error:', err);

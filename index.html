@@ -1233,35 +1233,40 @@
           <h3 style="margin:0;">🔐 Admin Approval</h3>
           <p style="font-size:0.75rem; color:var(--text-muted); margin:4px 0 0 0;">Request pipeline editing access</p>
         </div>
-        <button class="modal-close" onclick="document.getElementById('pipeline-approval-modal').style.display='none'">✕</button>
+        <button class="modal-close" onclick="closePipelineApprovalModal()">✕</button>
       </div>
 
-      <!-- Info strip -->
-      <div style="background: rgba(124,58,237,0.1); border: 1px solid rgba(124,58,237,0.25); border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: var(--space-md); display:flex; align-items:flex-start; gap:10px;">
-        <svg width="16" height="16" style="flex-shrink:0; margin-top:1px; color:var(--accent-purple);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-        <p style="margin:0; font-size:0.78rem; color:var(--text-secondary); line-height:1.5;">An admin must enter their credentials to grant <strong style="color:var(--text-primary);">10 minutes</strong> of pipeline editing access. This window closes automatically.</p>
-      </div>
-
-      <div class="form-group">
-        <label for="pipeline-approval-email">Admin Email</label>
-        <input type="email" id="pipeline-approval-email" placeholder="admin@example.com" autocomplete="off">
-      </div>
-      <div class="form-group" style="margin-top: var(--space-sm);">
-        <label for="pipeline-approval-password">Admin Password</label>
-        <div style="position:relative;">
-          <input type="password" id="pipeline-approval-password" placeholder="••••••••" autocomplete="off" style="padding-right: 40px;">
-          <button type="button" onclick="toggleApprovalPasswordVisibility()" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text-muted); cursor:pointer; padding:0; display:flex; align-items:center;">
-            <svg id="approval-eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          </button>
+      <!-- Request Flow States -->
+      <div id="pipeline-request-initial">
+        <div style="background: rgba(124,58,237,0.1); border: 1px solid rgba(124,58,237,0.25); border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: var(--space-md); display:flex; align-items:flex-start; gap:10px;">
+          <svg width="16" height="16" style="flex-shrink:0; margin-top:1px; color:var(--accent-purple);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <p style="margin:0; font-size:0.78rem; color:var(--text-secondary); line-height:1.5;">Request <strong style="color:var(--text-primary);">10 minutes</strong> of pipeline editing access. An admin will need to approve your request from the dashboard.</p>
         </div>
+        <button id="pipeline-request-btn" class="btn-primary" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="sendPipelineApprovalRequest()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          Send Approval Request
+        </button>
       </div>
 
-      <p id="pipeline-approval-error" style="color: var(--accent-red); font-size: 0.78rem; min-height: 18px; margin: 6px 0 0 0; font-weight: 500;"></p>
+      <div id="pipeline-request-pending" style="display:none; text-align:center; padding:10px 0;">
+        <div class="premium-loader" style="margin: 0 auto 15px auto;">
+          <div class="premium-loader-bar"></div>
+          <div class="premium-loader-bar mid"></div>
+          <div class="premium-loader-bar short"></div>
+        </div>
+        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:var(--space-md);">Approval request sent. Waiting for Admin to approve...</p>
+        <button class="btn-ghost" style="width:100%; border:1px solid var(--border-glass); color:var(--accent-red);" onclick="cancelPipelineApprovalRequest()">
+          Cancel Request
+        </button>
+      </div>
 
-      <button id="pipeline-approval-submit" class="btn-primary" style="margin-top: var(--space-md); width:100%; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="submitPipelineApproval()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        Approve Access
-      </button>
+      <div id="pipeline-request-rejected" style="display:none; text-align:center; padding:10px 0;">
+        <div style="font-size:2.5rem; margin-bottom:10px;">❌</div>
+        <p style="font-size:0.85rem; color:var(--accent-red); font-weight:600; margin-bottom:var(--space-md);">Request was rejected by Admin.</p>
+        <button class="btn-primary" style="width:100%;" onclick="sendPipelineApprovalRequest()">
+          Request Again
+        </button>
+      </div>
     </div>
   </div>
 
