@@ -3982,3 +3982,53 @@ select option:hover {
   }
 }
 
+/* ============================================
+   Weekly Review Ritual & Task Completion Styles
+   ============================================ */
+.leaderboard-table th {
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border-glass);
+}
+.leaderboard-table td {
+  padding: 16px var(--space-md);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-glass);
+  vertical-align: middle;
+}
+.leaderboard-table tr:hover {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+/* Light theme overrides */
+.light-theme .leaderboard-table th {
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+.light-theme .leaderboard-table td {
+  color: var(--text-primary);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+.light-theme .leaderboard-table tr:hover {
+  background: rgba(0, 0, 0, 0.01);
+}
+.light-theme #weekly-review-container .kpi-card {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+.light-theme #task-completion-modal .modal-card {
+  background: #ffffff;
+}
+.light-theme #task-completion-modal textarea {
+  background: #f1f5f9;
+  color: #1e293b;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+.light-theme #task-completion-modal div {
+  background: #f8fafc;
+  border-color: rgba(0, 0, 0, 0.05);
+}
+

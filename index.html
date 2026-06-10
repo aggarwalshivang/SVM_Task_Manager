@@ -677,6 +677,46 @@
       </div>
     </div>
 
+    <!-- Weekly Review Container -->
+    <div id="weekly-review-container" style="display:none; padding: var(--space-lg); max-width: 1000px; margin: 0 auto;">
+      <div class="kpi-card" style="padding: var(--space-xl); background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: var(--radius-lg); box-shadow: var(--shadow-premium); backdrop-filter: blur(20px);">
+        <!-- Header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--space-md); margin-bottom: var(--space-lg);">
+          <div>
+            <h2 style="font-size: 1.4rem; font-weight: 700; background: var(--gradient-purple); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
+              🔄 Weekly Review Ritual
+            </h2>
+            <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">Self-set target setting & commitment checklist for next week.</p>
+          </div>
+          <div style="font-size: 0.85rem; font-weight: 700; padding: 4px 12px; background: rgba(124, 58, 237, 0.15); color: var(--accent-purple); border-radius: 99px;" id="weekly-review-week-label">
+            Week
+          </div>
+        </div>
+
+        <!-- Weekly Targets/Scores Table -->
+        <div style="overflow-x: auto;">
+          <table class="leaderboard-table" style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase;">
+                <th style="padding: 12px var(--space-md);">Member</th>
+                <th style="padding: 12px var(--space-md); text-align: center;">Total Tasks</th>
+                <th style="padding: 12px var(--space-md); text-align: center;">%WND</th>
+                <th style="padding: 12px var(--space-md); text-align: center;">%WND-on-time</th>
+                <th style="padding: 12px var(--space-md); text-align: center;">Target Set</th>
+                <th style="padding: 12px var(--space-md); text-align: center;">Actual %Red</th>
+                <th style="padding: 12px var(--space-md); text-align: center;">Ritual Check</th>
+                <th style="padding: 12px var(--space-md); text-align: center;">Next Target</th>
+                <th style="padding: 12px var(--space-md); text-align: center;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="weekly-review-tbody" style="font-size: 0.9rem;">
+              <!-- Populated via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- Footer -->
     <footer class="app-footer" id="app-footer" style="display:none;">
       SVM Task Tracker · Powered by AI
@@ -949,6 +989,41 @@
         <button class="btn-secondary" id="leave-cancel-btn">Cancel</button>
         <button class="btn-primary" id="leave-submit-btn">Submit Request</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Task Completion Modal (Proof & Quality Checklist) -->
+  <div class="modal-overlay" id="task-completion-modal" style="display:none;">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <h3>Complete Task</h3>
+        <button class="modal-close" onclick="document.getElementById('task-completion-modal').style.display='none'">✕</button>
+      </div>
+      <form id="task-completion-form">
+        <input type="hidden" id="completion-task-id">
+        
+        <div class="form-group" style="margin-bottom:var(--space-md);">
+          <label for="completion-reason" style="font-weight:700; font-size:0.85rem; color:var(--text-secondary);">Proof / Action Taken (Required)</label>
+          <textarea id="completion-reason" placeholder="What exactly did you do? Provide links or detailed description..." required rows="3" style="width:100%; margin-top:5px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:var(--radius-md); color:var(--text-primary); padding:var(--space-sm); font-size:0.85rem; outline:none; resize:none;"></textarea>
+        </div>
+
+        <div class="form-group" style="margin-bottom:var(--space-lg);">
+          <label style="font-weight:700; font-size:0.85rem; color:var(--text-secondary); display:block; margin-bottom:8px;">Compliance Checklist (Self-Check)</label>
+          <div style="display:flex; flex-direction:column; gap:10px; background:rgba(255,255,255,0.02); padding:12px; border-radius:var(--radius-md); border:1px solid var(--border-glass);">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; color:var(--text-primary);">
+              <input type="checkbox" id="completion-qty" checked style="accent-color:var(--accent-purple); cursor:pointer;"> 📦 Quantity (All parts completed)
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; color:var(--text-primary);">
+              <input type="checkbox" id="completion-cost" checked style="accent-color:var(--accent-purple); cursor:pointer;"> 💰 Cost (Budget/Resources checked)
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; color:var(--text-primary);">
+              <input type="checkbox" id="completion-quality" checked style="accent-color:var(--accent-purple); cursor:pointer;"> ✨ Quality (Standards met)
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary" style="width:100%;">Submit & Complete</button>
+      </form>
     </div>
   </div>
 

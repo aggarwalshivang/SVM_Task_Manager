@@ -854,6 +854,7 @@ function renderNavigationTabs() {
 
   let html = `
     <button class="nav-tab ${state.currentView === 'tasks' ? 'active' : ''}" id="tab-my-tasks">My Tasks</button>
+    <button class="nav-tab ${state.currentView === 'weekly-review' ? 'active' : ''}" id="tab-weekly-review">🔄 Weekly Review</button>
     <button class="nav-tab ${state.currentView === 'dashboard' ? 'active' : ''}" id="tab-team" style="position:relative; display:${isPrivileged ? 'block' : 'none'};">Team <span id="team-badge" style="display:none; position:absolute; top:-5px; right:-5px; background:var(--accent-red); color:white; font-size:0.6rem; padding:2px 5px; border-radius:10px; border:2px solid var(--bg-primary);">!</span></button>
   `;
 
@@ -915,9 +916,24 @@ function bindTabClickListeners() {
     if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
     if ($('student-container')) $('student-container').style.display = 'none';
     if ($('helper-container')) $('helper-container').style.display = 'none';
+    if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
     $('stats-section').style.display = 'block';
     $('briefing-section').style.display = 'block';
     initForUser(state.currentUser);
+  };
+
+  const weeklyReviewTab = $('tab-weekly-review');
+  if (weeklyReviewTab) weeklyReviewTab.onclick = () => {
+    setActiveTab('tab-weekly-review');
+    state.currentView = 'weekly-review';
+    $('task-view-container').style.display = 'none';
+    $('admin-dashboard-container').style.display = 'none';
+    $('test-tracker-container').style.display = 'none';
+    if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+    if ($('student-container')) $('student-container').style.display = 'none';
+    if ($('helper-container')) $('helper-container').style.display = 'none';
+    if ($('weekly-review-container')) $('weekly-review-container').style.display = 'block';
+    openWeeklyReview();
   };
 
   const teamTab = $('tab-team');
@@ -930,6 +946,7 @@ function bindTabClickListeners() {
     if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
     if ($('student-container')) $('student-container').style.display = 'none';
     if ($('helper-container')) $('helper-container').style.display = 'none';
+    if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
   };
 
   const staticFms = [
@@ -951,6 +968,7 @@ function bindTabClickListeners() {
       if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
       if ($('student-container')) $('student-container').style.display = 'none';
       if ($('helper-container')) $('helper-container').style.display = 'none';
+      if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
       $('test-tracker-container').style.display = 'block';
     };
   });
@@ -970,6 +988,7 @@ function bindTabClickListeners() {
         if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
         if ($('student-container')) $('student-container').style.display = 'none';
         if ($('helper-container')) $('helper-container').style.display = 'none';
+        if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
         $('test-tracker-container').style.display = 'block';
       };
     }
@@ -995,6 +1014,7 @@ function bindTabClickListeners() {
       if ($('fms-builder-container')) $('fms-builder-container').style.display = 'block';
       if ($('student-container')) $('student-container').style.display = 'none';
       if ($('helper-container')) $('helper-container').style.display = 'none';
+      if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
       renderCustomFmsBlueprintsList();
       closeCustomFmsCreatorSection();
     };
@@ -1012,6 +1032,7 @@ function bindTabClickListeners() {
       if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
       if ($('student-container')) $('student-container').style.display = 'block';
       if ($('helper-container')) $('helper-container').style.display = 'none';
+      if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
       renderStudentWebhookHistory();
     };
   }
@@ -1028,6 +1049,7 @@ function bindTabClickListeners() {
       if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
       if ($('student-container')) $('student-container').style.display = 'none';
       if ($('helper-container')) $('helper-container').style.display = 'block';
+      if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
       const searchInput = document.getElementById('helper-search-input');
       if (searchInput) searchInput.value = '';
       state.selectedHelperTag = 'all';
@@ -3936,6 +3958,148 @@ function handleExportCSV(scores) {
   showToast('Exported successfully!');
 }
 
+async function openWeeklyReview() {
+  const container = $('weekly-review-container');
+  const tbody = $('weekly-review-tbody');
+  if (!container || !tbody) return;
+
+  const curWeek = getISOWeekNum(new Date());
+  const curYear = new Date().getFullYear();
+  const label = $('weekly-review-week-label');
+  if (label) label.textContent = `Week ${curWeek}, ${curYear}`;
+
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="9" style="text-align: center; padding: var(--space-xl);">
+        <div class="premium-loader" style="margin:0 auto;"><div class="premium-loader-bar"></div><div class="premium-loader-bar mid"></div><div class="premium-loader-bar short"></div></div>
+      </td>
+    </tr>
+  `;
+
+  try {
+    const res = await apiFetch('getScores', { week: curWeek, year: curYear });
+    if (!res || !res.success || !res.data) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:var(--space-lg); color:var(--accent-red);">Failed to load scores: ${res ? res.error : 'Unknown error'}</td></tr>`;
+      return;
+    }
+
+    const scores = res.data;
+    if (scores.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:var(--space-lg); color:var(--text-muted);">No scores recorded for this week.</td></tr>`;
+      return;
+    }
+
+    const isPrivileged = ['admin', 'coordinator', 'process_coordinator'].includes(state.userRole);
+
+    let html = '';
+    scores.forEach(s => {
+      const isSelf = s.name.toLowerCase() === state.currentUser.toLowerCase();
+      const canEdit = isPrivileged || isSelf;
+
+      // commitment check
+      const checked = s.aiSummary && s.aiSummary.commitment_checked ? 'checked' : '';
+      const checkboxDisabled = isPrivileged ? '' : 'disabled';
+
+      // Next Week's Target
+      const nextTargetVal = s.next_target !== undefined ? s.next_target : '';
+      const inputDisabled = canEdit ? '' : 'disabled';
+
+      // target set last week
+      const targetSetLastWeek = s.target !== undefined ? `${s.target}%` : 'Not Set';
+      // actual %red (Score B, or score_b)
+      const actualRed = s.score_b !== undefined ? `${s.score_b}%` : '0%';
+
+      // styling for positive/negative highlights
+      const scoreAColor = s.score_a < 0 ? 'var(--accent-red)' : 'var(--text-primary)';
+      const scoreBColor = s.score_b < 0 ? 'var(--accent-red)' : 'var(--text-primary)';
+
+      html += `
+        <tr style="border-bottom:1px solid var(--border-glass); transition: background 0.2s;">
+          <td style="padding:16px var(--space-md); font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+            👤 ${s.name} ${isSelf ? '<span style="font-size:0.75rem; font-weight:normal; color:var(--accent-purple); border:1px solid rgba(124,58,237,0.3); padding:1px 6px; border-radius:99px; background:rgba(124,58,237,0.08);">You</span>' : ''}
+          </td>
+          <td style="padding:16px var(--space-md); text-align:center;">${s.tasksAssigned || 0}</td>
+          <td style="padding:16px var(--space-md); text-align:center; font-weight:600; color:${scoreAColor};">${s.score_a || 0}%</td>
+          <td style="padding:16px var(--space-md); text-align:center; font-weight:600; color:${scoreBColor};">${s.score_b || 0}%</td>
+          <td style="padding:16px var(--space-md); text-align:center; color:var(--text-secondary); font-weight:600;">${targetSetLastWeek}</td>
+          <td style="padding:16px var(--space-md); text-align:center; font-weight:600; color:${scoreBColor};">${actualRed}</td>
+          <td style="padding:16px var(--space-md); text-align:center;">
+            <input type="checkbox" id="weekly-review-check-${s.name}" ${checked} ${checkboxDisabled} style="width:16px; height:16px; accent-color:var(--accent-purple); cursor:${isPrivileged ? 'pointer' : 'default'};">
+          </td>
+          <td style="padding:16px var(--space-md); text-align:center;">
+            <div style="display:inline-flex; align-items:center; gap:4px;">
+              <input type="number" id="weekly-review-target-${s.name}" min="-100" max="0" value="${nextTargetVal}" ${inputDisabled} placeholder="e.g. -15" style="width:70px; padding:4px 8px; border-radius:var(--radius-sm); border:1px solid var(--border-glass); background:rgba(255,255,255,0.05); color:var(--text-primary); text-align:center;">
+              <span style="font-size:0.85rem; color:var(--text-muted);">%</span>
+            </div>
+          </td>
+          <td style="padding:16px var(--space-md); text-align:right;">
+            <button class="btn-primary" onclick="saveWeeklyReviewRow('${s.name}')" ${canEdit ? '' : 'disabled'} style="font-size:0.75rem; padding:4px 12px; margin-top:0; width:auto; border-radius:var(--radius-sm);">Save</button>
+          </td>
+        </tr>
+      `;
+    });
+
+    tbody.innerHTML = html;
+  } catch (err) {
+    console.error('Failed to open weekly review:', err);
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:var(--space-lg); color:var(--accent-red);">Exception: ${err.message}</td></tr>`;
+  }
+}
+
+window.saveWeeklyReviewRow = async function (userName) {
+  const isPrivileged = ['admin', 'coordinator', 'process_coordinator'].includes(state.userRole);
+  const isSelf = userName.toLowerCase() === state.currentUser.toLowerCase();
+  
+  if (!isPrivileged && !isSelf) {
+    showToast('Permission denied', 'error');
+    return;
+  }
+
+  const curWeek = getISOWeekNum(new Date());
+  const curYear = new Date().getFullYear();
+
+  const nextTargetInput = $(`weekly-review-target-${userName}`);
+  const nextTarget = nextTargetInput ? nextTargetInput.value : '';
+
+  if (nextTarget === '') {
+    showToast('Please set a next week target percentage.', 'error');
+    return;
+  }
+
+  const targetNum = Number(nextTarget);
+  if (isNaN(targetNum) || targetNum < -100 || targetNum > 0) {
+    showToast('Target must be between -100% and 0%.', 'error');
+    return;
+  }
+
+  // Admin/Privileged only: commitment check status
+  const checkInput = $(`weekly-review-check-${userName}`);
+  const commitmentChecked = checkInput ? checkInput.checked : false;
+
+  showToast('Saving target...');
+
+  try {
+    const res = await apiFetch('saveWeeklyTarget', {
+      user: userName,
+      week: curWeek,
+      year: curYear,
+      nextTarget: targetNum,
+      commitmentChecked: commitmentChecked
+    }, 'POST');
+
+    if (!res || !res.success) {
+      showToast('Failed to save target: ' + (res ? res.error : 'Unknown error'), 'error');
+      return;
+    }
+
+    showToast('Weekly review saved successfully!');
+    openWeeklyReview();
+  } catch (err) {
+    console.error('Failed to save weekly review row:', err);
+    showToast('Failed to save target', 'error');
+  }
+};
+
 async function handleAdminPenalty(memberName, e) {
   e.stopPropagation();
 
@@ -4047,10 +4211,9 @@ async function handleTaskComplete(taskId) {
   const alreadyDone = Array.from(cards).every(c => c.classList.contains('done') || c.classList.contains('completing'));
   if (alreadyDone) return;
 
-  lastTaskCompleteTime = now;
-
   // Intercept FMS task stage completion
   if (taskId.startsWith('fms-stage-')) {
+    lastTaskCompleteTime = now;
     // Optimistic UI update
     cards.forEach(card => {
       card.classList.add('completing');
@@ -4075,6 +4238,23 @@ async function handleTaskComplete(taskId) {
     return;
   }
 
+  // Regular task completion -> open checklist/proof modal
+  const completionModal = $('task-completion-modal');
+  if (completionModal) {
+    $('completion-task-id').value = taskId;
+    $('completion-reason').value = '';
+    $('completion-qty').checked = true;
+    $('completion-cost').checked = true;
+    $('completion-quality').checked = true;
+    completionModal.style.display = 'flex';
+  }
+}
+
+async function submitTaskCompletion(taskId, reason, quantity_ok, cost_ok, quality_ok) {
+  lastTaskCompleteTime = Date.now();
+  const cards = document.querySelectorAll(`[data-task-id="${taskId}"]`);
+  if (cards.length === 0) return;
+
   // Optimistic UI update
   cards.forEach(card => {
     card.classList.add('completing');
@@ -4089,6 +4269,10 @@ async function handleTaskComplete(taskId) {
   if (task) {
     task.status = 'done';
     task.completedDate = new Date().toISOString();
+    task.reason = reason;
+    task.quantity_ok = quantity_ok;
+    task.cost_ok = cost_ok;
+    task.quality_ok = quality_ok;
   }
 
   // After animation, mark as done
@@ -4128,7 +4312,20 @@ async function handleTaskComplete(taskId) {
 
   // Background API call
   try {
-    await apiFetch('completeTask', { taskId, user: state.currentUser, completedDate: new Date().toISOString() }, 'POST');
+    const res = await apiFetch('completeTask', { 
+      taskId, 
+      user: state.currentUser, 
+      completedDate: new Date().toISOString(),
+      reason,
+      quantity_ok,
+      cost_ok,
+      quality_ok
+    }, 'POST');
+    if (res && res.success && res.data && res.data.notes) {
+      if (task) {
+        task.notes = res.data.notes;
+      }
+    }
   } catch (err) {
     console.error('Failed to sync completion:', err);
     showToast('Synced locally, will retry', 'error');
@@ -6016,6 +6213,17 @@ $('today-pending-modal')?.addEventListener('click', (e) => {
 // Add Task modal
 $('modal-close-btn')?.addEventListener('click', closeAddTaskModal);
 $('add-task-form')?.addEventListener('submit', handleTaskSubmit);
+$('task-completion-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const taskId = $('completion-task-id').value;
+  const reason = $('completion-reason').value.trim();
+  const quantity_ok = $('completion-qty').checked;
+  const cost_ok = $('completion-cost').checked;
+  const quality_ok = $('completion-quality').checked;
+  
+  $('task-completion-modal').style.display = 'none';
+  await submitTaskCompletion(taskId, reason, quantity_ok, cost_ok, quality_ok);
+});
 $('add-task-modal')?.addEventListener('click', (e) => {
   if (e.target === $('add-task-modal')) closeAddTaskModal();
 });

@@ -8,6 +8,54 @@ function getTodayStr() {
   return localDate.toISOString().substring(0, 10);
 }
 
+function parseTaskMetadata(notes) {
+  const defaultMeta = {
+    dueDate: null,
+    slips: 0,
+    quantity_ok: true,
+    cost_ok: true,
+    quality_ok: true,
+    reason: ''
+  };
+  if (!notes) return defaultMeta;
+  const match = notes.match(/\[Metadata:\s*({.*?})\]/);
+  if (match) {
+    try {
+      return { ...defaultMeta, ...JSON.parse(match[1]) };
+    } catch (e) {
+      console.error('Failed to parse task metadata:', e);
+    }
+  }
+  return defaultMeta;
+}
+
+function updateTaskMetadataInNotes(notes, metaUpdates) {
+  const currentMeta = parseTaskMetadata(notes);
+  const updatedMeta = { ...currentMeta, ...metaUpdates };
+  const cleanNotes = notes ? notes.replace(/\[Metadata:\s*({.*?})\]\s*\n?/, '').trim() : '';
+  const metaStr = `[Metadata: ${JSON.stringify(updatedMeta)}]`;
+  return cleanNotes ? `${cleanNotes}\n${metaStr}` : metaStr;
+}
+
+function parseWeeklyScoresSummary(aiSummary) {
+  const defaultData = {
+    target: 0,
+    next_target: 0,
+    summary: '',
+    commitment_checked: false
+  };
+  if (!aiSummary) return defaultData;
+  const trimmed = aiSummary.trim();
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      return { ...defaultData, ...JSON.parse(trimmed) };
+    } catch (e) {
+      console.error('Failed to parse weekly scores summary JSON:', e);
+    }
+  }
+  return { ...defaultData, summary: aiSummary };
+}
+
 async function getLeaveBuddyForDate(sb, user, dateStr) {
   if (!user || !dateStr) return null;
   const { data, error } = await sb.from('leaves')
@@ -153,14 +201,23 @@ async function supabaseApiFetch(action, params = {}) {
       const { data, error } = await q;
       if (error) throw new Error(error.message);
       const todayDate = getTodayStr();
-      const rows = (data || []).map(r => ({
-        taskId: r.task_id, taskName: r.task_name, assignedTo: r.assigned_to,
-        taskType: (r.task_type || '').toLowerCase(), plannedDate: r.planned_date || '',
-        completedDate: r.completed_date || '', status: (r.status || 'pending').toLowerCase(),
-        weekNumber: r.week_number, points: r.points || 0, notes: r.notes || '',
-        priority: r.priority || 'Medium', comments: r.comments || [],
-        recurrence: r.recurrence || 'one-time', time: r.time || ''
-      }));
+      const rows = (data || []).map(r => {
+        const meta = parseTaskMetadata(r.notes);
+        return {
+          taskId: r.task_id, taskName: r.task_name, assignedTo: r.assigned_to,
+          taskType: (r.task_type || '').toLowerCase(), plannedDate: r.planned_date || '',
+          completedDate: r.completed_date || '', status: (r.status || 'pending').toLowerCase(),
+          weekNumber: r.week_number, points: r.points || 0, notes: r.notes || '',
+          priority: r.priority || 'Medium', comments: r.comments || [],
+          recurrence: r.recurrence || 'one-time', time: r.time || '',
+          dueDate: meta.dueDate || r.planned_date || '',
+          slips: meta.slips || 0,
+          quantity_ok: meta.quantity_ok !== false,
+          cost_ok: meta.cost_ok !== false,
+          quality_ok: meta.quality_ok !== false,
+          reason: meta.reason || ''
+        };
+      });
 
       // Find task buddies
       let buddyFor = [];
@@ -222,6 +279,15 @@ async function supabaseApiFetch(action, params = {}) {
                 }
               }
 
+              const rolloverNotes = updateTaskMetadataInNotes(newNotes, {
+                dueDate: nextDate,
+                slips: 0,
+                quantity_ok: true,
+                cost_ok: true,
+                quality_ok: true,
+                reason: ''
+              });
+
               await sb.from('tasks').update({ 
                 planned_date: nextDate, 
                 completed_date: null, 
@@ -229,7 +295,7 @@ async function supabaseApiFetch(action, params = {}) {
                 week_number: curWeek, 
                 points: 0,
                 assigned_to: newAssignee,
-                notes: newNotes
+                notes: rolloverNotes
               }).eq('task_id', t.taskId);
 
               t.plannedDate = nextDate;
@@ -238,7 +304,7 @@ async function supabaseApiFetch(action, params = {}) {
               t.weekNumber = curWeek;
               t.points = 0;
               t.assignedTo = newAssignee;
-              t.notes = newNotes;
+              t.notes = rolloverNotes;
 
               syncToSheet('editTask', { 
                 taskId: t.taskId, 
@@ -248,7 +314,7 @@ async function supabaseApiFetch(action, params = {}) {
                 points: 0, 
                 weekNumber: curWeek,
                 assignedTo: newAssignee,
-                notes: newNotes
+                notes: rolloverNotes
               });
             }
           }
@@ -291,40 +357,71 @@ async function supabaseApiFetch(action, params = {}) {
         const { data: userWeekTasks } = await sb.from('tasks').select('*').eq('assigned_to', user).eq('week_number', curWeek);
         const todayStr = getTodayStr();
 
-        let weekScore = 0;
-        let tasksAssigned = 0;
-        let tasksCompleted = 0;
-        let tasksLate = 0;
-        let tasksMissed = 0;
+        let total_tasks = 0;
+        let not_done_count = 0;
+        let late_count = 0;
+        let on_time_count = 0;
 
         (userWeekTasks || []).forEach(t => {
-          weekScore += (t.points || 0);
           if (t.task_type !== 'penalty') {
-            tasksAssigned++;
+            total_tasks++;
+            const meta = parseTaskMetadata(t.notes);
             if (t.status === 'done') {
-              tasksCompleted++;
-              const compDateStr = t.completed_date ? t.completed_date.substring(0, 10) : '';
-              const plannedDateStr = t.planned_date ? t.planned_date.substring(0, 10) : '';
-              if (compDateStr && plannedDateStr && compDateStr > plannedDateStr) {
-                tasksLate++;
+              if ((meta.slips || 0) > 0) {
+                late_count++;
+              } else {
+                on_time_count++;
               }
-            } else if (t.status === 'missed') {
-              tasksMissed++;
+            } else {
+              not_done_count++;
             }
           }
         });
 
+        const wnd = total_tasks > 0 ? Math.round((not_done_count / total_tasks) * -100) : 0;
+        const wnd_on_time = total_tasks > 0 ? Math.round(((not_done_count + late_count) / total_tasks) * -100) : 0;
+
         // Fallback or merge with database row if present
+        let target = 0;
+        let next_target = 0;
+        let summaryText = '';
+
         const { data: dbRow } = await sb.from('weekly_scores').select('*').eq('name', user).eq('week', curWeek).eq('year', curYear).maybeSingle();
         if (dbRow) {
-          weekScore = dbRow.score || weekScore;
-          tasksAssigned = dbRow.assigned || tasksAssigned;
-          tasksCompleted = dbRow.completed || tasksCompleted;
-          tasksLate = dbRow.late || tasksLate;
-          tasksMissed = dbRow.missed || tasksMissed;
+          const parsed = parseWeeklyScoresSummary(dbRow.ai_summary);
+          target = parsed.target || 0;
+          next_target = parsed.next_target || 0;
+          summaryText = parsed.summary || '';
+        } else {
+          // Look up previous week for target
+          const prevWeek = curWeek === 1 ? 52 : curWeek - 1;
+          const prevYear = curWeek === 1 ? curYear - 1 : curYear;
+          const { data: prevRow } = await sb.from('weekly_scores').select('*').eq('name', user).eq('week', prevWeek).eq('year', prevYear).maybeSingle();
+          if (prevRow) {
+            const parsedPrev = parseWeeklyScoresSummary(prevRow.ai_summary);
+            target = parsedPrev.next_target || 0;
+          }
         }
 
-        return { success: true, data: { weekScore, streak: 0, tasksAssigned, tasksCompleted, tasksLate, tasksMissed } };
+        return {
+          success: true,
+          data: {
+            weekScore: wnd_on_time, // Score B (default)
+            score_a: wnd,
+            score_b: wnd_on_time,
+            streak: 0,
+            tasksAssigned: total_tasks,
+            tasksCompleted: on_time_count + late_count,
+            tasksLate: late_count,
+            tasksMissed: not_done_count,
+            target,
+            next_target,
+            aiSummary: {
+              summary: summaryText,
+              commitment_checked: dbRow ? (parseWeeklyScoresSummary(dbRow.ai_summary).commitment_checked || false) : false
+            }
+          }
+        };
       }
 
       const { data: teamData } = await sb.from('team').select('name,role');
@@ -338,94 +435,119 @@ async function supabaseApiFetch(action, params = {}) {
 
       // Fetch all historical scores to calculate all-time scores
       const { data: allScores } = await sb.from('weekly_scores').select('name,score');
-      const overall = {};
-      (allScores || []).forEach(r => { overall[r.name] = (overall[r.name] || 0) + (r.score || 0); });
+      const allScoresMap = {};
+      (allScores || []).forEach(r => {
+        if (!allScoresMap[r.name]) allScoresMap[r.name] = [];
+        allScoresMap[r.name].push(r.score || 0);
+      });
 
-      // Fetch all tasks with negative points to calculate penalties
-      const { data: allNegativeTasks } = await sb.from('tasks').select('assigned_to,points').lt('points', 0);
+      // Fetch all weekly scores for current week in batch
+      const { data: currentWeekScores } = await sb.from('weekly_scores')
+        .select('*')
+        .eq('week', curWeek)
+        .eq('year', curYear);
+      const curScoresMap = Object.fromEntries((currentWeekScores || []).map(r => [r.name, r]));
+
+      // Fetch all weekly scores for previous week in batch
+      const prevWeek = curWeek === 1 ? 52 : curWeek - 1;
+      const prevYear = curWeek === 1 ? curYear - 1 : curYear;
+      const { data: prevWeekScores } = await sb.from('weekly_scores')
+        .select('*')
+        .eq('week', prevWeek)
+        .eq('year', prevYear);
+      const prevScoresMap = Object.fromEntries((prevWeekScores || []).map(r => [r.name, r]));
 
       const todayStr = getTodayStr();
 
       const scores = activeMembers.map(member => {
         const name = member.name;
         
-        let weekScore = 0;
-        let tasksAssigned = 0;
-        let tasksCompleted = 0;
-        let tasksLate = 0;
-        let tasksMissed = 0;
+        let total_tasks = 0;
+        let not_done_count = 0;
+        let late_count = 0;
+        let on_time_count = 0;
 
         // Dynamic current week aggregates
         (weekTasks || []).forEach(t => {
           if (t.assigned_to === name) {
-            weekScore += (t.points || 0);
             if (t.task_type !== 'penalty') {
-              tasksAssigned++;
+              total_tasks++;
+              const meta = parseTaskMetadata(t.notes);
               if (t.status === 'done') {
-                tasksCompleted++;
-                const compDateStr = t.completed_date ? t.completed_date.substring(0, 10) : '';
-                const plannedDateStr = t.planned_date ? t.planned_date.substring(0, 10) : '';
-                if (compDateStr && plannedDateStr && compDateStr > plannedDateStr) {
-                  tasksLate++;
+                if ((meta.slips || 0) > 0) {
+                  late_count++;
+                } else {
+                  on_time_count++;
                 }
-              } else if (t.status === 'missed') {
-                tasksMissed++;
+              } else {
+                not_done_count++;
               }
             }
           }
         });
 
-        // Compute today's scores and penalties
-        let todayScore = 0;
-        let negativeToday = 0;
-        let negativeWeek = 0;
-        let negativeAllTime = 0;
+        const wnd = total_tasks > 0 ? Math.round((not_done_count / total_tasks) * -100) : 0;
+        const wnd_on_time = total_tasks > 0 ? Math.round(((not_done_count + late_count) / total_tasks) * -100) : 0;
 
+        // Today's not done tasks
+        let todayNotDone = 0;
         (weekTasks || []).forEach(t => {
-          if (t.assigned_to === name) {
-            const compDateStr = t.completed_date ? t.completed_date.substring(0, 10) : '';
+          if (t.assigned_to === name && t.task_type !== 'penalty') {
             const plannedDateStr = t.planned_date ? t.planned_date.substring(0, 10) : '';
-            
-            // Today's score: points earned today
-            if (compDateStr === todayStr || (t.status === 'missed' && plannedDateStr === todayStr)) {
-              todayScore += (t.points || 0);
-            }
-
-            // Negative week
-            if (t.points < 0) {
-              negativeWeek += Math.abs(t.points);
-              if (compDateStr === todayStr || (t.status === 'missed' && plannedDateStr === todayStr)) {
-                negativeToday += Math.abs(t.points);
-              }
+            if (plannedDateStr === todayStr && t.status !== 'done') {
+              todayNotDone++;
             }
           }
         });
 
-        // Negative all time (from all negative tasks in tasks table)
-        (allNegativeTasks || []).forEach(t => {
-          if (t.assigned_to === name) {
-            negativeAllTime += Math.abs(t.points);
-          }
-        });
+        // Resolve target and next_target
+        let target = 0;
+        let next_target = 0;
+        let summaryText = '';
 
-        // Dynamic overall score = past weeks + current week's dynamic points
-        const overallScore = (overall[name] || 0) + weekScore;
+        const dbRow = curScoresMap[name];
+        if (dbRow) {
+          const parsed = parseWeeklyScoresSummary(dbRow.ai_summary);
+          target = parsed.target || 0;
+          next_target = parsed.next_target || 0;
+          summaryText = parsed.summary || '';
+        } else {
+          const prevRow = prevScoresMap[name];
+          if (prevRow) {
+            const parsedPrev = parseWeeklyScoresSummary(prevRow.ai_summary);
+            target = parsedPrev.next_target || 0;
+          }
+        }
+
+        // Cumulative overall score (average of weekly scores)
+        const memberPastScores = allScoresMap[name] || [];
+        const allMemberScores = [...memberPastScores, wnd_on_time];
+        const overallScore = allMemberScores.length > 0
+          ? Math.round(allMemberScores.reduce((sum, val) => sum + val, 0) / allMemberScores.length)
+          : 0;
 
         return {
           name,
           weekNumber: curWeek,
           year: curYear,
-          tasksAssigned,
-          tasksCompleted,
-          tasksLate,
-          tasksMissed,
-          score: weekScore,
-          aiSummary: '',
+          tasksAssigned: total_tasks,
+          tasksCompleted: on_time_count + late_count,
+          tasksLate: late_count,
+          tasksMissed: not_done_count,
+          score: wnd_on_time, // default to Score B
+          score_a: wnd,
+          score_b: wnd_on_time,
+          target,
+          next_target,
+          aiSummary: {
+            summary: summaryText,
+            commitment_checked: dbRow ? (parseWeeklyScoresSummary(dbRow.ai_summary).commitment_checked || false) : false
+          },
           overallScore,
-          todayScore,
-          negativeToday,
-          negativeWeek,
-          negativeAllTime
+          todayScore: todayNotDone > 0 ? -todayNotDone : 0,
+          negativeToday: todayNotDone,
+          negativeWeek: not_done_count + late_count,
+          negativeAllTime: 0 // Not used under new percentage averages
         };
       });
 
@@ -495,32 +617,48 @@ async function supabaseApiFetch(action, params = {}) {
     }
 
     case 'completeTask': {
-      const { taskId, user, completedDate } = params;
+      const { taskId, user, completedDate, reason, quantity_ok, cost_ok, quality_ok } = params;
       const now = completedDate || new Date().toISOString();
       const { data: taskRows } = await sb.from('tasks').select('*').eq('task_id', taskId).maybeSingle();
       if (!taskRows) return { success: false, error: 'Task not found: ' + taskId };
-      const plannedDate = (taskRows.planned_date || '').substring(0, 10);
-      const today = getTodayStr();
-      const taskType = (taskRows.task_type || '').toLowerCase();
-      let basePoints = taskType === 'weekly' ? 30 : taskType === 'one-time' ? 15 : 10;
-      const isShifted = (taskRows.notes || '').includes('[Shifted');
-      const bonus = isShifted ? 5 : 0;
-      let points = 0;
-      if (plannedDate >= today) { points = basePoints + bonus; }
-      else {
-        const diff = Math.round((new Date(today) - new Date(plannedDate)) / 86400000);
-        const f = basePoints / 10;
-        points = (diff === 1 ? Math.round(5*f) : diff === 2 ? Math.round(2*f) : Math.round(f)) + bonus;
-      }
-      const finalPoints = (taskRows.points || 0) + points;
-      const { error } = await sb.from('tasks').update({ status: 'done', completed_date: now, points: finalPoints }).eq('task_id', taskId);
+      
+      const currentNotes = taskRows.notes || '';
+      const meta = parseTaskMetadata(currentNotes);
+      const updatedNotes = updateTaskMetadataInNotes(currentNotes, {
+        dueDate: meta.dueDate || taskRows.planned_date || '',
+        slips: meta.slips || 0,
+        quantity_ok: quantity_ok !== false,
+        cost_ok: cost_ok !== false,
+        quality_ok: quality_ok !== false,
+        reason: reason || ''
+      });
+
+      const { error } = await sb.from('tasks').update({ 
+        status: 'done', 
+        completed_date: now, 
+        points: 0,
+        notes: updatedNotes
+      }).eq('task_id', taskId);
       if (error) return { success: false, error: error.message };
+
+      const taskType = (taskRows.task_type || '').toLowerCase();
       if (taskType === 'daily' || taskType === 'weekly') {
         const curWeek = getISOWeekNum(new Date());
-        await sb.from('task_log').insert({ log_id: 'L' + Date.now(), task_id: taskId, task_name: taskRows.task_name, user_name: user, status: 'done', points, planned_date: plannedDate, completed_date: now, week_number: curWeek, year: new Date().getFullYear() });
+        await sb.from('task_log').insert({ 
+          log_id: 'L' + Date.now(), 
+          task_id: taskId, 
+          task_name: taskRows.task_name, 
+          user_name: user, 
+          status: 'done', 
+          points: 0, 
+          planned_date: taskRows.planned_date, 
+          completed_date: now, 
+          week_number: curWeek, 
+          year: new Date().getFullYear() 
+        });
       }
-      syncToSheet('completeTask', { taskId, user, completedDate: now, points: finalPoints });
-      return { success: true, data: { taskId, status: 'done', completedDate: now, points: finalPoints } };
+      syncToSheet('editTask', { taskId, notes: updatedNotes, status: 'done', completedDate: now, points: 0 });
+      return { success: true, data: { taskId, status: 'done', completedDate: now, points: 0, notes: updatedNotes } };
     }
 
     case 'addTask': {
@@ -555,6 +693,15 @@ async function supabaseApiFetch(action, params = {}) {
         finalNotes = (finalNotes + `\n[OriginalOwner: ${assignedTo}]`).trim();
       }
 
+      const notesWithMeta = updateTaskMetadataInNotes(finalNotes, {
+        dueDate: finalPlannedDate,
+        slips: 0,
+        quantity_ok: true,
+        cost_ok: true,
+        quality_ok: true,
+        reason: ''
+      });
+
       const { error } = await sb.from('tasks').insert({ 
         task_id: taskId, 
         task_name: taskName, 
@@ -564,7 +711,7 @@ async function supabaseApiFetch(action, params = {}) {
         status: 'pending', 
         week_number: curWeek, 
         points: 0, 
-        notes: finalNotes, 
+        notes: notesWithMeta, 
         priority: priority || 'Medium', 
         comments: [], 
         recurrence: recurrence || 'one-time', 
@@ -577,7 +724,7 @@ async function supabaseApiFetch(action, params = {}) {
         assignedTo: finalAssignedTo, 
         taskType, 
         plannedDate: finalPlannedDate, 
-        notes: finalNotes, 
+        notes: notesWithMeta, 
         priority, 
         recurrence, 
         time 
@@ -595,17 +742,46 @@ async function supabaseApiFetch(action, params = {}) {
 
     case 'editTask': {
       const { taskId, taskName, taskType, plannedDate, notes, priority, time, recurrence } = params;
+      const { data: currentTask } = await sb.from('tasks').select('*').eq('task_id', taskId).maybeSingle();
+      if (!currentTask) return { success: false, error: 'Task not found: ' + taskId };
+
+      const currentNotes = currentTask.notes || '';
+      const meta = parseTaskMetadata(currentNotes);
+      let newNotes = notes !== undefined ? notes : currentNotes;
+      let slips = meta.slips || 0;
+      let dueDate = meta.dueDate || currentTask.planned_date || '';
+
+      if (plannedDate && plannedDate !== currentTask.planned_date) {
+        if (plannedDate > currentTask.planned_date) {
+          slips += 1;
+        }
+      }
+
+      const updatedNotes = updateTaskMetadataInNotes(newNotes, {
+        dueDate,
+        slips,
+        quantity_ok: meta.quantity_ok !== false,
+        cost_ok: meta.cost_ok !== false,
+        quality_ok: meta.quality_ok !== false,
+        reason: meta.reason || ''
+      });
+
       const upd = {};
       if (taskName) upd.task_name = taskName;
       if (taskType) upd.task_type = taskType;
-      if (plannedDate) { upd.planned_date = plannedDate; upd.week_number = getISOWeekNum(new Date(plannedDate)); }
-      if (notes !== undefined) upd.notes = notes;
+      if (plannedDate) { 
+        upd.planned_date = plannedDate; 
+        upd.week_number = getISOWeekNum(new Date(plannedDate)); 
+      }
+      upd.notes = updatedNotes;
       if (priority) upd.priority = priority;
       if (time !== undefined) upd.time = time;
       if (recurrence !== undefined) upd.recurrence = recurrence;
+
       const { error } = await sb.from('tasks').update(upd).eq('task_id', taskId);
       if (error) return { success: false, error: error.message };
-      syncToSheet('editTask', params);
+
+      syncToSheet('editTask', { ...params, notes: updatedNotes });
       return { success: true, data: { taskId } };
     }
 
@@ -1046,6 +1222,109 @@ async function supabaseApiFetch(action, params = {}) {
         perf[key].totalCompleted += r.completed || 0;
       });
       return { success: true, data: Object.values(perf).sort((a, b) => a.year !== b.year ? a.year - b.year : a.week - b.week) };
+    }
+
+    case 'saveWeeklyTarget': {
+      const { user, week, year, nextTarget } = params;
+      if (!user || !week || !year || nextTarget === undefined) {
+        return { success: false, error: 'Missing parameters' };
+      }
+
+      const weekNum = Number(week);
+      const yearNum = Number(year);
+      const targetVal = Number(nextTarget);
+
+      // 1. Update/Upsert the current week's record to set next_target
+      const { data: curRow } = await sb.from('weekly_scores')
+        .select('*')
+        .eq('name', user)
+        .eq('week', weekNum)
+        .eq('year', yearNum)
+        .maybeSingle();
+
+      let curSummary = '';
+      let curTarget = 0;
+      let curCommitmentChecked = false;
+      if (curRow) {
+        const parsed = parseWeeklyScoresSummary(curRow.ai_summary);
+        curTarget = parsed.target || 0;
+        curSummary = parsed.summary || '';
+        curCommitmentChecked = parsed.commitment_checked || false;
+      }
+
+      const newCommitmentChecked = params.commitmentChecked !== undefined ? (params.commitmentChecked === true || params.commitmentChecked === 'true') : curCommitmentChecked;
+
+      const curAiSummaryJSON = JSON.stringify({
+        target: curTarget,
+        next_target: targetVal,
+        summary: curSummary,
+        commitment_checked: newCommitmentChecked
+      });
+
+      if (curRow) {
+        await sb.from('weekly_scores')
+          .update({ ai_summary: curAiSummaryJSON })
+          .eq('id', curRow.id);
+      } else {
+        await sb.from('weekly_scores')
+          .insert({
+            name: user,
+            week: weekNum,
+            year: yearNum,
+            assigned: 0,
+            completed: 0,
+            late: 0,
+            missed: 0,
+            score: 0,
+            ai_summary: curAiSummaryJSON
+          });
+      }
+
+      // 2. Update/Upsert next week's record to set its target = targetVal
+      const nextWeek = weekNum === 52 ? 1 : weekNum + 1;
+      const nextYear = weekNum === 52 ? yearNum + 1 : yearNum;
+
+      const { data: nextRow } = await sb.from('weekly_scores')
+        .select('*')
+        .eq('name', user)
+        .eq('week', nextWeek)
+        .eq('year', nextYear)
+        .maybeSingle();
+
+      let nextSummary = '';
+      let nextNextTarget = 0;
+      if (nextRow) {
+        const parsed = parseWeeklyScoresSummary(nextRow.ai_summary);
+        nextNextTarget = parsed.next_target || 0;
+        nextSummary = parsed.summary || '';
+      }
+
+      const nextAiSummaryJSON = JSON.stringify({
+        target: targetVal,
+        next_target: nextNextTarget,
+        summary: nextSummary
+      });
+
+      if (nextRow) {
+        await sb.from('weekly_scores')
+          .update({ ai_summary: nextAiSummaryJSON })
+          .eq('id', nextRow.id);
+      } else {
+        await sb.from('weekly_scores')
+          .insert({
+            name: user,
+            week: nextWeek,
+            year: nextYear,
+            assigned: 0,
+            completed: 0,
+            late: 0,
+            missed: 0,
+            score: 0,
+            ai_summary: nextAiSummaryJSON
+          });
+      }
+
+      return { success: true };
     }
 
     case 'cleanupTasks': {
