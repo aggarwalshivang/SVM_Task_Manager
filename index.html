@@ -529,59 +529,101 @@
 
     <!-- Student Container (Page View) -->
     <div id="student-container" style="display:none; padding: var(--space-lg); max-width: 1000px; margin: 0 auto;">
-      <div class="kpi-card" style="padding: var(--space-xl); background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: var(--radius-lg); box-shadow: var(--shadow-premium); backdrop-filter: blur(20px);">
+      <div class="kpi-card" style="display: flex; flex-direction: column; align-items: stretch; text-align: left; padding: var(--space-xl); background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: var(--radius-lg); box-shadow: var(--shadow-premium); backdrop-filter: blur(20px);">
         
         <!-- Header -->
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--space-md); margin-bottom: var(--space-lg);">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--space-md); margin-bottom: var(--space-lg); width: 100%;">
           <div>
-            <h2 style="font-size: 1.4rem; font-weight: 700; background: var(--gradient-purple); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
+            <h2 id="student-header-title" style="font-size: 1.4rem; font-weight: 700; background: var(--gradient-purple); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
               🎓 Student Management
             </h2>
-            <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">Admin tools for managing student data and syncing lists via webhooks.</p>
+            <p id="student-header-desc" style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">Admin tools for managing student data and syncing lists via webhooks.</p>
           </div>
         </div>
 
-        <!-- Webhook Config / Control Card -->
-        <div class="webhook-actions-card" style="background: rgba(255, 255, 255, 0.015); border: 1px solid var(--border-glass); border-radius: var(--radius-md); padding: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-md); margin-bottom: var(--space-lg);">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
-            <div>
-              <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-                🔗 Webhook Integration
-              </h3>
-              <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">
-                Trigger external automations on <strong>n8n</strong> to compile and distribute student lists.
-              </p>
+        <!-- Admin-Only Webhook controls -->
+        <div id="student-admin-tools" style="display: none; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--space-lg); margin-bottom: var(--space-xl); width: 100%;">
+          <!-- Webhook Config / Control Card -->
+          <div class="webhook-actions-card" style="background: rgba(255, 255, 255, 0.015); border: 1px solid var(--border-glass); border-radius: var(--radius-md); padding: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-md); margin-bottom: var(--space-lg);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                  🔗 Webhook Integration
+                </h3>
+                <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">
+                  Trigger external automations on <strong>n8n</strong> to compile and distribute student lists.
+                </p>
+              </div>
+              <div style="font-size: 0.72rem; padding: 4px 10px; background: rgba(16, 185, 129, 0.12); color: var(--accent-emerald); border-radius: var(--radius-full); border: 1px solid rgba(16, 185, 129, 0.25); font-weight: 700; display: flex; align-items: center; gap: 4px;">
+                <span class="pulse-indicator" style="width: 6px; height: 6px; background: var(--accent-emerald); border-radius: 50%; display: inline-block;"></span> Active Trigger
+              </div>
             </div>
-            <div style="font-size: 0.72rem; padding: 4px 10px; background: rgba(16, 185, 129, 0.12); color: var(--accent-emerald); border-radius: var(--radius-full); border: 1px solid rgba(16, 185, 129, 0.25); font-weight: 700; display: flex; align-items: center; gap: 4px;">
-              <span class="pulse-indicator" style="width: 6px; height: 6px; background: var(--accent-emerald); border-radius: 50%; display: inline-block;"></span> Active Trigger
+
+            <div style="font-size: 0.75rem; background: rgba(0, 0, 0, 0.2); padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-glass); word-break: break-all; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              <span>Endpoint: <code style="color: var(--accent-purple); font-family: monospace;">https://n8n.saraswatividyamandir.com/webhook/list-student</code></span>
+            </div>
+            
+            <div style="display: flex; gap: var(--space-md); flex-wrap: wrap; margin-top: var(--space-sm);">
+              <button class="btn-primary" id="btn-send-submitted" style="flex: 1; min-width: 200px; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 0;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                <span>Send Submitted student list</span>
+              </button>
+              
+              <button class="btn-secondary" id="btn-send-unsubmitted" style="flex: 1; min-width: 200px; display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); color: var(--accent-amber);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <span>Send UnSubmitted student list</span>
+              </button>
             </div>
           </div>
 
-          <div style="font-size: 0.75rem; background: rgba(0, 0, 0, 0.2); padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-glass); word-break: break-all; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-            <span>Endpoint: <code style="color: var(--accent-purple); font-family: monospace;">https://n8n.saraswatividyamandir.com/webhook/list-student</code></span>
+          <!-- History/Audit Log Section -->
+          <div>
+            <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: var(--space-md); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+              📜 Trigger History
+            </h3>
+            <div id="student-webhook-history" style="max-height: 300px; overflow-y: auto; padding-right: 5px; display: flex; flex-direction: column; gap: 8px;">
+              <!-- Rendered by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Student Report Section (Visible to everyone) -->
+        <div id="student-report-section" style="margin-bottom: var(--space-lg); width: 100%;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md); flex-wrap: wrap; gap: 10px;">
+            <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; margin: 0;">
+              📊 Live Student Report
+            </h3>
+            <div style="display: flex; gap: var(--space-md); flex-wrap: wrap; align-items: center;">
+              <button class="btn-secondary" id="btn-toggle-live-report" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; border-radius: var(--radius-md); width: auto; margin-top: 0; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-glass);">
+                👁️ Show Live
+              </button>
+              <a href="https://report.saraswatividyamandir.com/teacher" target="_blank" class="btn-primary" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; text-decoration: none; border-radius: var(--radius-md); box-shadow: var(--shadow-glow-purple); width: auto; margin-top: 0;">
+                <span>Open in New Tab</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+              </a>
+            </div>
           </div>
           
-          <div style="display: flex; gap: var(--space-md); flex-wrap: wrap; margin-top: var(--space-sm);">
-            <button class="btn-primary" id="btn-send-submitted" style="flex: 1; min-width: 200px; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 0;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-              <span>Send Submitted student list</span>
-            </button>
-            
-            <button class="btn-secondary" id="btn-send-unsubmitted" style="flex: 1; min-width: 200px; display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); color: var(--accent-amber);">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-              <span>Send UnSubmitted student list</span>
-            </button>
+          <!-- Placeholder when iframe is not loaded -->
+          <div id="student-report-placeholder" style="background: rgba(255, 255, 255, 0.015); border: 1px dashed var(--border-glass); border-radius: var(--radius-md); padding: var(--space-xl); text-align: center; display: flex; flex-direction: column; align-items: center; gap: var(--space-md); margin-bottom: var(--space-md);">
+            <div style="font-size: 2.5rem; filter: drop-shadow(0 0 10px rgba(192, 132, 252, 0.2));">📊</div>
+            <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 0;">Live Report is Loaded on Demand</h4>
+            <p style="font-size: 0.8rem; color: var(--text-muted); max-width: 420px; margin: 0; line-height: 1.5;">Click the button below to load the live student performance reports and analytics inside this dashboard.</p>
+            <button class="btn-primary" id="btn-load-live-report-placeholder" style="width: auto; padding: 8px var(--space-xl); font-size: 0.8rem; font-weight: bold; border-radius: var(--radius-md); background: var(--gradient-purple); border: none; box-shadow: var(--shadow-glow-purple); margin-top: var(--space-sm);">Show Live</button>
           </div>
-        </div>
 
-        <!-- History/Audit Log Section -->
-        <div>
-          <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: var(--space-md); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
-            📜 Trigger History
-          </h3>
-          <div id="student-webhook-history" style="max-height: 300px; overflow-y: auto; padding-right: 5px; display: flex; flex-direction: column; gap: 8px;">
-            <!-- Rendered by JS -->
+          <div class="iframe-container" id="student-report-iframe-container" style="display: none;">
+            <!-- Loading indicator for iframe -->
+            <div class="iframe-loader" id="student-report-iframe-loader">
+              <div class="loading-spinner"></div>
+              <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">Loading Student Report...</span>
+            </div>
+            <iframe id="student-report-iframe" style="width: 100%; height: 100%; border: none; opacity: 0; transition: opacity var(--transition-base);" onload="handleStudentReportIframeLoad()"></iframe>
           </div>
         </div>
 
@@ -681,16 +723,77 @@
     <div id="weekly-review-container" style="display:none; padding: var(--space-lg); max-width: 1000px; margin: 0 auto;">
       <div class="kpi-card" style="padding: var(--space-xl); background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: var(--radius-lg); box-shadow: var(--shadow-premium); backdrop-filter: blur(20px);">
         <!-- Header -->
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--space-md); margin-bottom: var(--space-lg);">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: var(--space-md); margin-bottom: var(--space-lg); flex-wrap: wrap; gap: var(--space-md);">
           <div>
             <h2 style="font-size: 1.4rem; font-weight: 700; background: var(--gradient-purple); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
               🔄 Weekly Review Ritual
             </h2>
-            <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">Self-set target setting & commitment checklist for next week.</p>
+            <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">
+              Self-set target setting & commitment checklist. 
+              <span style="color: var(--text-secondary); margin-left: 4px; display: inline-block;">
+                💡 <em>Scores show the percentage of tasks missed or completed late (0% is perfect; lower negative values indicate missed tasks).</em>
+              </span>
+            </p>
           </div>
-          <div style="font-size: 0.85rem; font-weight: 700; padding: 4px 12px; background: rgba(124, 58, 237, 0.15); color: var(--accent-purple); border-radius: 99px;" id="weekly-review-week-label">
-            Week
+          <div style="display: flex; align-items: center; gap: var(--space-sm);">
+            <button id="btn-toggle-weekly-help" class="btn-secondary" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; border-radius: var(--radius-md); background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-glass); cursor: pointer; transition: all 0.2s;">
+              ℹ️ Guide
+            </button>
+            <div style="font-size: 0.85rem; font-weight: 700; padding: 4px 12px; background: rgba(124, 58, 237, 0.15); color: var(--accent-purple); border-radius: 99px;" id="weekly-review-week-label">
+              Week
+            </div>
           </div>
+        </div>
+
+        <!-- Help Description Panel -->
+        <div id="weekly-help-panel" class="glass-panel" style="display: none; padding: var(--space-lg); margin-bottom: var(--space-lg); border: 1px solid var(--accent-purple-glow); background: rgba(124, 58, 237, 0.03); border-radius: var(--radius-lg);">
+          <h4 style="margin-top: 0; color: var(--text-primary); font-size: 1rem; display: flex; align-items: center; gap: 8px; font-weight: 700;">
+            📋 SVM Negative Scoring Guide
+          </h4>
+          <p style="margin-bottom: var(--space-md); font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;">
+            The Weekly Review Ritual is built on a <strong>Negative Scoring Accountability System</strong>. Instead of tracking achievements, it focuses on the "gap" of work left unfinished to ensure team alignment and commitment reliability.
+          </p>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-md); margin-top: var(--space-md); margin-bottom: var(--space-md);">
+            <div style="background: rgba(255,255,255,0.02); padding: var(--space-md); border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
+              <strong style="color: var(--accent-purple); display: block; margin-bottom: 4px; font-size: 0.85rem;">% Missed (WND)</strong>
+              <span style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; display: block;">
+                <strong>Work Not Done</strong> = <code>(Tasks Missed / Total Tasks) × -100</code>.<br>Measures the percentage of assigned tasks that were not completed by the end of the week.
+              </span>
+            </div>
+            <div style="background: rgba(255,255,255,0.02); padding: var(--space-md); border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
+              <strong style="color: var(--accent-purple); display: block; margin-bottom: 4px; font-size: 0.85rem;">% Missed/Late</strong>
+              <span style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; display: block;">
+                <strong>WND + Late Tasks</strong> = <code>((Missed + Late Tasks) / Total Tasks) × -100</code>.<br>Calculates the total compliance penalty including late submissions.
+              </span>
+            </div>
+            <div style="background: rgba(255,255,255,0.02); padding: var(--space-md); border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
+              <strong style="color: var(--accent-purple); display: block; margin-bottom: 4px; font-size: 0.85rem;">Committed Goal</strong>
+              <span style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; display: block;">
+                The maximum penalty score the member committed to achieve last week (e.g. <code>-15%</code> means committing to miss no more than 15% of tasks).
+              </span>
+            </div>
+            <div style="background: rgba(255,255,255,0.02); padding: var(--space-md); border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
+              <strong style="color: var(--accent-purple); display: block; margin-bottom: 4px; font-size: 0.85rem;">Actual Score</strong>
+              <span style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; display: block;">
+                The actual score achieved this week. Highlights in <span style="color:var(--accent-emerald); font-weight:600;">green</span> for 0% (perfect compliance) and <span style="color:var(--accent-red); font-weight:600;">red</span> for any missed tasks.
+              </span>
+            </div>
+            <div style="background: rgba(255,255,255,0.02); padding: var(--space-md); border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
+              <strong style="color: var(--accent-purple); display: block; margin-bottom: 4px; font-size: 0.85rem;">Ritual Check</strong>
+              <span style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; display: block;">
+                A verification completed by admins. Checking this box confirms that the team member has successfully completed their weekly review, discussed their targets, and aligned on commitments.
+              </span>
+            </div>
+            <div style="background: rgba(255,255,255,0.02); padding: var(--space-md); border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
+              <strong style="color: var(--accent-purple); display: block; margin-bottom: 4px; font-size: 0.85rem;">Next Week's Goal</strong>
+              <span style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; display: block;">
+                The performance target threshold the member commits to for the next week (between <code>-100%</code> and <code>0%</code>). Click <strong>Save</strong> to record the target.
+              </span>
+            </div>
+          </div>
+          <p style="margin-top: var(--space-md); margin-bottom: 0; font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">
+            💡 <strong>Note on Negative Values:</strong> A score of <code>0%</code> represents perfect task execution. A score of <code>-100%</code> means no assigned work was completed. The goal is to keep scores as close to <code>0%</code> as possible.
+          </p>
         </div>
 
         <!-- Weekly Targets/Scores Table -->
@@ -700,12 +803,12 @@
               <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase;">
                 <th style="padding: 12px var(--space-md);">Member</th>
                 <th style="padding: 12px var(--space-md); text-align: center;">Total Tasks</th>
-                <th style="padding: 12px var(--space-md); text-align: center;">%WND</th>
-                <th style="padding: 12px var(--space-md); text-align: center;">%WND-on-time</th>
-                <th style="padding: 12px var(--space-md); text-align: center;">Target Set</th>
-                <th style="padding: 12px var(--space-md); text-align: center;">Actual %Red</th>
+                <th style="padding: 12px var(--space-md); text-align: center;">% Missed (WND)</th>
+                <th style="padding: 12px var(--space-md); text-align: center;">% Missed/Late</th>
+                <th style="padding: 12px var(--space-md); text-align: center;">Committed Goal</th>
+                <th style="padding: 12px var(--space-md); text-align: center;">Actual Score</th>
                 <th style="padding: 12px var(--space-md); text-align: center;">Ritual Check</th>
-                <th style="padding: 12px var(--space-md); text-align: center;">Next Target</th>
+                <th style="padding: 12px var(--space-md); text-align: center;">Next Week's Goal</th>
                 <th style="padding: 12px var(--space-md); text-align: center;">Action</th>
               </tr>
             </thead>

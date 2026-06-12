@@ -804,6 +804,48 @@ function handleUserSignedIn(userData) {
     sendUnsubmittedBtn.onclick = () => triggerStudentWebhook('unsubmitted');
   }
 
+  // Define and bind student report live toggle
+  window.toggleLiveReport = (show) => {
+    const iframeContainer = $('student-report-iframe-container');
+    const placeholder = $('student-report-placeholder');
+    const btn = $('btn-toggle-live-report');
+    const iframe = $('student-report-iframe');
+
+    if (show) {
+      if (placeholder) placeholder.style.display = 'none';
+      if (iframeContainer) iframeContainer.style.display = 'block';
+      if (btn) btn.innerHTML = '👁️ Hide Live';
+      
+      // Load iframe if not already loaded
+      if (iframe && !iframe.src) {
+        const loader = $('student-report-iframe-loader');
+        if (loader) loader.style.display = 'flex';
+        iframe.style.opacity = '0';
+        iframe.src = 'https://report.saraswatividyamandir.com/teacher';
+      }
+    } else {
+      if (iframeContainer) iframeContainer.style.display = 'none';
+      if (placeholder) placeholder.style.display = 'flex';
+      if (btn) btn.innerHTML = '👁️ Show Live';
+    }
+  };
+
+  const toggleLiveBtn = $('btn-toggle-live-report');
+  if (toggleLiveBtn) {
+    toggleLiveBtn.onclick = () => {
+      const iframeContainer = $('student-report-iframe-container');
+      const isVisible = iframeContainer && iframeContainer.style.display === 'block';
+      window.toggleLiveReport(!isVisible);
+    };
+  }
+
+  const placeholderLoadBtn = $('btn-load-live-report-placeholder');
+  if (placeholderLoadBtn) {
+    placeholderLoadBtn.onclick = () => {
+      window.toggleLiveReport(true);
+    };
+  }
+
   const builderClose = $('custom-fms-builder-close-btn');
   if (builderClose) builderClose.onclick = closeCustomFmsBuilderModal;
 
@@ -815,6 +857,25 @@ function handleUserSignedIn(userData) {
 
   const saveBlueprintBtn = $('btn-save-fms-blueprint');
   if (saveBlueprintBtn) saveBlueprintBtn.onclick = handleFmsBlueprintSubmit;
+
+  const toggleWeeklyHelpBtn = $('btn-toggle-weekly-help');
+  if (toggleWeeklyHelpBtn) {
+    toggleWeeklyHelpBtn.onclick = () => {
+      const panel = $('weekly-help-panel');
+      if (panel) {
+        const isHidden = panel.style.display === 'none';
+        panel.style.display = isHidden ? 'block' : 'none';
+        toggleWeeklyHelpBtn.innerHTML = isHidden ? '❌ Close Guide' : 'ℹ️ Guide';
+        if (isHidden) {
+          toggleWeeklyHelpBtn.style.background = 'rgba(124, 58, 237, 0.2)';
+          toggleWeeklyHelpBtn.style.borderColor = 'var(--accent-purple)';
+        } else {
+          toggleWeeklyHelpBtn.style.background = 'rgba(255, 255, 255, 0.05)';
+          toggleWeeklyHelpBtn.style.borderColor = 'var(--border-glass)';
+        }
+      }
+    };
+  }
 
   checkBroadcast();
 }
@@ -858,14 +919,18 @@ function renderNavigationTabs() {
     <button class="nav-tab ${state.currentView === 'dashboard' ? 'active' : ''}" id="tab-team" style="position:relative; display:${isPrivileged ? 'block' : 'none'};">Team <span id="team-badge" style="display:none; position:absolute; top:-5px; right:-5px; background:var(--accent-red); color:white; font-size:0.6rem; padding:2px 5px; border-radius:10px; border:2px solid var(--bg-primary);">!</span></button>
   `;
 
-  // Append FMS Builder, Student, and Helper tabs beside the team tab, visible to ADMIN ONLY
+  // Append FMS Builder and Helper tabs beside the team tab, visible to ADMIN ONLY
   if (state.userRole === 'admin') {
     html += `
       <button class="nav-tab ${state.currentView === 'fms-builder' ? 'active' : ''}" id="tab-fms-builder">🛠️ FMS Builder</button>
-      <button class="nav-tab ${state.currentView === 'student' ? 'active' : ''}" id="tab-student">🎓 Student</button>
       <button class="nav-tab ${state.currentView === 'helper' ? 'active' : ''}" id="tab-helper">📋 Helper</button>
     `;
   }
+
+  // Student tab is visible to ALL users (admins manage webhooks + view report, others view report only)
+  html += `
+    <button class="nav-tab ${state.currentView === 'student' ? 'active' : ''}" id="tab-student">🎓 Student</button>
+  `;
 
   html += `
     <button class="nav-tab ${state.currentView === 'tests' ? 'active' : ''}" id="tab-tests">Test FMS</button>
@@ -875,7 +940,6 @@ function renderNavigationTabs() {
     <button class="nav-tab ${state.currentView === 'parents' ? 'active' : ''}" id="tab-parents">Parents FMS</button>
   `;
 
-  // Append custom blueprints — admin sees inline × delete button on the pill
   const blueprints = getCustomFmsBlueprints();
   blueprints.forEach(bp => {
     const allowed = bp.roles && bp.roles.length > 0 ? bp.roles.includes(state.userRole) : true;
@@ -1020,7 +1084,7 @@ function bindTabClickListeners() {
     };
   }
 
-  // Bind Student tab (visible to admin only)
+  // Bind Student tab (visible to all users)
   const studentTab = $('tab-student');
   if (studentTab) {
     studentTab.onclick = () => {
@@ -1033,7 +1097,32 @@ function bindTabClickListeners() {
       if ($('student-container')) $('student-container').style.display = 'block';
       if ($('helper-container')) $('helper-container').style.display = 'none';
       if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
-      renderStudentWebhookHistory();
+
+      // Check permissions and customize the view
+      const isAdmin = state.userRole === 'admin';
+      
+      const adminTools = $('student-admin-tools');
+      if (adminTools) adminTools.style.display = isAdmin ? 'block' : 'none';
+
+      const headerTitle = $('student-header-title');
+      if (headerTitle) {
+        headerTitle.innerHTML = isAdmin ? '🎓 Student Management' : '🎓 Student Portal';
+      }
+      const headerDesc = $('student-header-desc');
+      if (headerDesc) {
+        headerDesc.textContent = isAdmin 
+          ? 'Admin tools for managing student data and syncing lists via webhooks.' 
+          : 'Access student reports and performance analytics.';
+      }
+
+      // Reset live report view by default (only load on demand)
+      if (typeof window.toggleLiveReport === 'function') {
+        window.toggleLiveReport(false);
+      }
+
+      if (isAdmin) {
+        renderStudentWebhookHistory();
+      }
     };
   }
 
@@ -4010,8 +4099,8 @@ async function openWeeklyReview() {
       const actualRed = s.score_b !== undefined ? `${s.score_b}%` : '0%';
 
       // styling for positive/negative highlights
-      const scoreAColor = s.score_a < 0 ? 'var(--accent-red)' : 'var(--text-primary)';
-      const scoreBColor = s.score_b < 0 ? 'var(--accent-red)' : 'var(--text-primary)';
+      const scoreAColor = s.score_a < 0 ? 'var(--accent-red)' : 'var(--accent-emerald)';
+      const scoreBColor = s.score_b < 0 ? 'var(--accent-red)' : 'var(--accent-emerald)';
 
       html += `
         <tr style="border-bottom:1px solid var(--border-glass); transition: background 0.2s;">
@@ -8237,6 +8326,18 @@ async function triggerStudentWebhook(status) {
 
 window.renderStudentWebhookHistory = renderStudentWebhookHistory;
 window.triggerStudentWebhook = triggerStudentWebhook;
+
+window.handleStudentReportIframeLoad = function() {
+  const loader = document.getElementById('student-report-iframe-loader');
+  if (loader) {
+    loader.style.opacity = '0';
+    setTimeout(() => {
+      loader.style.display = 'none';
+    }, 300);
+  }
+  const iframe = document.getElementById('student-report-iframe');
+  if (iframe) iframe.style.opacity = '1';
+};
 
 // =============================================
 // TASK CALENDAR VIEW FUNCTIONALITY
