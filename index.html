@@ -623,7 +623,7 @@
               <div class="loading-spinner"></div>
               <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">Loading Student Report...</span>
             </div>
-            <iframe id="student-report-iframe" style="width: 100%; height: 100%; border: none; opacity: 0; transition: opacity var(--transition-base);" onload="handleStudentReportIframeLoad()"></iframe>
+            <iframe id="student-report-iframe" style="width: 100%; height: 100%; border: none; opacity: 0; transition: opacity var(--transition-base);"></iframe>
           </div>
         </div>
 
@@ -1265,6 +1265,7 @@
   <!-- Supabase JS Client v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-api.js"></script>
+
   <!-- Test Settings Modal -->
   <div class="modal-overlay" id="test-settings-modal" style="display:none;">
     <div class="modal-card modal-card-lg">
@@ -1292,7 +1293,7 @@
   </div>
 
 
-  <script src="app.js"></script>
+  <script src="app.js?v=4"></script>
   <!-- Member Actions Modal -->
   <div class="modal-overlay" id="member-actions-modal" style="display:none;">
     <div class="modal-card" style="max-width: 350px;">

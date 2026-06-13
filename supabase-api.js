@@ -554,22 +554,102 @@ async function supabaseApiFetch(action, params = {}) {
       return { success: true, data: scores };
     }
 
+    case 'sendResetOTP': {
+      const email = (params.email || '').toLowerCase().trim();
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      
+      await sb.from('reset_codes').delete().eq('email', email);
+      const { error } = await sb.from('reset_codes').insert([{ email, otp, expires_at: expires }]);
+      if (error) return { success: false, error: 'Failed to generate OTP.' };
+
+      // Async email dispatch
+      fetch(CONFIG.API_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'sendEmail',
+          to: email,
+          subject: 'SVM Task Tracker - Verification Code',
+          text: `Your verification code to reset your password is: ${otp}\n\nThis code will expire in 10 minutes.\n\nRegards,\nSVM Team`
+        })
+      }).catch(console.error);
+
+      return { success: true, message: 'Verification code sent to your email.' };
+    }
+
+    case 'verifyAndResetPassword': {
+      const email = (params.email || '').toLowerCase().trim();
+      const { otp, newPassword } = params;
+      if (!email || !otp || !newPassword) return { success: false, error: 'All fields required.' };
+
+      const { data: codes, error: codeErr } = await sb.from('reset_codes').select('*').eq('email', email);
+      if (codeErr || !codes || codes.length === 0) return { success: false, error: 'No active reset request found. Request a new code.' };
+
+      const record = codes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+      if (record.otp !== otp) return { success: false, error: 'Invalid verification code.' };
+      if (new Date(record.expires_at) < new Date()) return { success: false, error: 'Verification code expired.' };
+
+      const hash = await hashPassword(newPassword);
+      const { error: updateErr } = await sb.from('team').update({ password_hash: hash }).eq('email', email);
+      if (updateErr) return { success: false, error: 'Failed to update password.' };
+
+      await sb.from('reset_codes').delete().eq('email', email);
+      return { success: true, message: 'Password updated successfully! You can now log in.' };
+    }
+
+    case 'forgotPassword': {
+      const email = (params.email || '').toLowerCase().trim();
+      const { data, error } = await sb.from('team').select('*').eq('email', email).maybeSingle();
+      if (error || !data) return { success: false, error: 'This email is not registered in SVM.' };
+
+      const isSpecialAdmin = email === 'admin@saraswatividyamandir.com';
+      const defaultPass = isSpecialAdmin ? 'Admin@12345' : 'Member@12345';
+      const hash = await hashPassword(defaultPass);
+
+      await sb.from('team').update({ password_hash: hash }).eq('email', email);
+
+      // Async email dispatch
+      fetch(CONFIG.API_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'sendEmail',
+          to: email,
+          subject: 'SVM Task Tracker - Password Reset',
+          text: `Hello ${data.name},\n\nYour SVM Task Tracker password has been reset to the default:\n\nPassword: ${defaultPass}\n\nYou can now log in using this password.\n\nRegards,\nSVM Team`
+        })
+      }).catch(console.error);
+
+      return { success: true, message: `Success! Your password is now ${defaultPass}. An email has been sent to you.` };
+    }
+
+    case 'resetAllPasswords': {
+      const fromUser = (params.fromUser || '').toLowerCase().trim();
+      if (fromUser !== 'admin' && fromUser !== 'admin@saraswatividyamandir.com') {
+        return { success: false, error: 'Unauthorized' };
+      }
+
+      const { data: allUsers, error } = await sb.from('team').select('*');
+      if (error || !allUsers) return { success: false, error: 'Failed to fetch team' };
+
+      for (const u of allUsers) {
+        const isSpecial = u.email === 'admin@saraswatividyamandir.com';
+        const defPass = isSpecial ? 'Admin@12345' : 'Member@12345';
+        const hash = await hashPassword(defPass);
+        await sb.from('team').update({ password_hash: hash }).eq('email', u.email);
+      }
+      return { success: true, message: 'All passwords reset to defaults in Supabase.' };
+    }
+
     case 'login': {
       const email = (params.email || '').toLowerCase().trim();
       const { data, error } = await sb.from('team').select('*').eq('email', email).maybeSingle();
       if (error || !data) return { success: false, error: 'Email not found in SVM records.' };
       if (!data.active) return { success: false, error: 'Account pending approval by Admin.' };
-      const isSpecial = email === 'admin@saraswatividyamandir.com';
-      const defaultPass = isSpecial ? 'Admin@12345' : 'Member@12345';
       const inputHash = await hashPassword(params.password || '');
-      const defaultHash = await hashPassword(defaultPass);
-      if (params.password === defaultPass || inputHash === data.password_hash) {
-        if (params.password === defaultPass && data.password_hash !== defaultHash) {
-          await sb.from('team').update({ password_hash: defaultHash }).eq('email', email);
-        }
+      if (inputHash === data.password_hash) {
         return { success: true, data: { name: data.name, role: (data.role || 'member').toLowerCase(), email: data.email } };
       }
-      return { success: false, error: 'Invalid password. Try using ' + defaultPass };
+      return { success: false, error: 'Invalid password.' };
     }
 
     case 'signup':
@@ -582,6 +662,7 @@ async function supabaseApiFetch(action, params = {}) {
       syncToSheet('addMember', { name, email, role: role || 'Member', active: false });
       return { success: true };
     }
+
 
     case 'addMember': {
       const { name, email, role, active, password } = params;

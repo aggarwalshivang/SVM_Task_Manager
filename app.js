@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   // Apps Script URL — kept for email/AI/scoring triggers and Sheet sync
-  API_URL: 'https://script.google.com/macros/s/AKfycbygVjr3gtJUkUrxsGcLwqq1en4S-7YiNljeviu4XIe016HQZzY_t8fzdFyecRdZpEZp/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbwlNn8SK22Ix6D3TgdqrboHyMy5JBUiztgtCsBnIEZsI2jh7W-cVqBmKBumPEZp66c/exec',
 
   // Supabase — PRIMARY data store
   SUPABASE_URL: 'https://nslhzkthcgjyqlejlrxk.supabase.co',
@@ -85,14 +85,14 @@ function isPipelineEditUnlocked() {
 window.requestPipelineApproval = async function () {
   const modal = document.getElementById('pipeline-approval-modal');
   if (!modal) return;
-  
+
   // Show initial state, hide others
   document.getElementById('pipeline-request-initial').style.display = 'block';
   document.getElementById('pipeline-request-pending').style.display = 'none';
   document.getElementById('pipeline-request-rejected').style.display = 'none';
-  
+
   modal.style.display = 'flex';
-  
+
   // Check if there is already an active request or if it's already approved
   try {
     const res = await apiFetch('checkPipelineUnlock', { requestedBy: state.currentUser });
@@ -126,13 +126,13 @@ function showPipelinePendingState() {
   document.getElementById('pipeline-request-initial').style.display = 'none';
   document.getElementById('pipeline-request-pending').style.display = 'block';
   document.getElementById('pipeline-request-rejected').style.display = 'none';
-  
+
   startPipelineApprovalPolling();
 }
 
 function startPipelineApprovalPolling() {
   if (state.pipelineApprovalPollTimer) clearInterval(state.pipelineApprovalPollTimer);
-  
+
   state.pipelineApprovalPollTimer = setInterval(async () => {
     try {
       const res = await apiFetch('checkPipelineUnlock', { requestedBy: state.currentUser });
@@ -140,7 +140,7 @@ function startPipelineApprovalPolling() {
         if (res.status === 'approved') {
           clearInterval(state.pipelineApprovalPollTimer);
           state.pipelineApprovalPollTimer = null;
-          
+
           const approvedAt = new Date(res.newData.approved_at).getTime();
           const TEN_MINUTES = 10 * 60 * 1000;
           if (Date.now() < approvedAt + TEN_MINUTES) {
@@ -154,7 +154,7 @@ function startPipelineApprovalPolling() {
         } else if (res.status === 'rejected') {
           clearInterval(state.pipelineApprovalPollTimer);
           state.pipelineApprovalPollTimer = null;
-          
+
           document.getElementById('pipeline-request-initial').style.display = 'none';
           document.getElementById('pipeline-request-pending').style.display = 'none';
           document.getElementById('pipeline-request-rejected').style.display = 'block';
@@ -171,7 +171,7 @@ window.sendPipelineApprovalRequest = async function () {
   if (!btn) return;
   btn.disabled = true;
   btn.textContent = 'Sending...';
-  
+
   try {
     const res = await apiFetch('requestPipelineUnlock', { requestedBy: state.currentUser }, 'POST');
     if (res.success) {
@@ -193,12 +193,12 @@ window.cancelPipelineApprovalRequest = async function () {
   try {
     await apiFetch('cancelPipelineUnlock', { requestedBy: state.currentUser }, 'POST');
     showToast('Request cancelled.');
-    
+
     if (state.pipelineApprovalPollTimer) {
       clearInterval(state.pipelineApprovalPollTimer);
       state.pipelineApprovalPollTimer = null;
     }
-    
+
     document.getElementById('pipeline-request-initial').style.display = 'block';
     document.getElementById('pipeline-request-pending').style.display = 'none';
     document.getElementById('pipeline-request-rejected').style.display = 'none';
@@ -210,9 +210,9 @@ window.cancelPipelineApprovalRequest = async function () {
 function unlockPipelineForTenMins(approvedAt) {
   const TEN_MINUTES = 10 * 60 * 1000;
   state.pipelineUnlockExpiry = approvedAt + TEN_MINUTES;
-  
+
   if (state.pipelineUnlockTimer) clearInterval(state.pipelineUnlockTimer);
-  
+
   state.pipelineUnlockTimer = setInterval(() => {
     if (!isPipelineEditUnlocked()) {
       clearInterval(state.pipelineUnlockTimer);
@@ -228,7 +228,7 @@ function unlockPipelineForTenMins(approvedAt) {
       if (el) el.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
     }
   }, 1000);
-  
+
   renderIndividualFormStages();
   showToast('Pipeline unlocked for 10 minutes.');
 }
@@ -459,7 +459,7 @@ function getMockBriefing(user, tasks) {
 // =============================================
 const APPS_SCRIPT_ACTIONS = new Set([
   'getBriefing', 'processVoiceTask', 'generateRecurringTasks', 'recalculateScores',
-  'sendResetOTP', 'parseRecurrence', 'resetAllPasswords', 'forgotPassword', 'getWorkflowHealth'
+  'parseRecurrence', 'getWorkflowHealth', 'sendEmail'
 ]);
 
 async function apiFetch(action, params = {}, method = 'GET') {
@@ -815,7 +815,7 @@ function handleUserSignedIn(userData) {
       if (placeholder) placeholder.style.display = 'none';
       if (iframeContainer) iframeContainer.style.display = 'block';
       if (btn) btn.innerHTML = '👁️ Hide Live';
-      
+
       // Load iframe if not already loaded
       if (iframe && !iframe.src) {
         const loader = $('student-report-iframe-loader');
@@ -899,12 +899,17 @@ function getCustomFmsBlueprints() {
       } catch (e) {
         return null;
       }
-    }).filter(Boolean);
+    }).filter(bp => bp && typeof bp.type === 'string');
     localStorage.setItem('svm_custom_fms_blueprints', JSON.stringify(blueprints));
   } else {
-    blueprints = JSON.parse(localStorage.getItem('svm_custom_fms_blueprints') || '[]');
+    try {
+      blueprints = JSON.parse(localStorage.getItem('svm_custom_fms_blueprints') || '[]');
+      if (!Array.isArray(blueprints)) blueprints = [];
+    } catch (e) {
+      blueprints = [];
+    }
   }
-  return blueprints;
+  return blueprints.filter(bp => bp && typeof bp.type === 'string');
 }
 
 function renderNavigationTabs() {
@@ -915,13 +920,13 @@ function renderNavigationTabs() {
 
   let html = `
     <button class="nav-tab ${state.currentView === 'tasks' ? 'active' : ''}" id="tab-my-tasks">My Tasks</button>
-    <button class="nav-tab ${state.currentView === 'weekly-review' ? 'active' : ''}" id="tab-weekly-review">🔄 Weekly Review</button>
     <button class="nav-tab ${state.currentView === 'dashboard' ? 'active' : ''}" id="tab-team" style="position:relative; display:${isPrivileged ? 'block' : 'none'};">Team <span id="team-badge" style="display:none; position:absolute; top:-5px; right:-5px; background:var(--accent-red); color:white; font-size:0.6rem; padding:2px 5px; border-radius:10px; border:2px solid var(--bg-primary);">!</span></button>
   `;
 
   // Append FMS Builder and Helper tabs beside the team tab, visible to ADMIN ONLY
   if (state.userRole === 'admin') {
     html += `
+      <button class="nav-tab ${state.currentView === 'weekly-review' ? 'active' : ''}" id="tab-weekly-review">🔄 Weekly Review</button>
       <button class="nav-tab ${state.currentView === 'fms-builder' ? 'active' : ''}" id="tab-fms-builder">🛠️ FMS Builder</button>
       <button class="nav-tab ${state.currentView === 'helper' ? 'active' : ''}" id="tab-helper">📋 Helper</button>
     `;
@@ -1100,7 +1105,7 @@ function bindTabClickListeners() {
 
       // Check permissions and customize the view
       const isAdmin = state.userRole === 'admin';
-      
+
       const adminTools = $('student-admin-tools');
       if (adminTools) adminTools.style.display = isAdmin ? 'block' : 'none';
 
@@ -1110,8 +1115,8 @@ function bindTabClickListeners() {
       }
       const headerDesc = $('student-header-desc');
       if (headerDesc) {
-        headerDesc.textContent = isAdmin 
-          ? 'Admin tools for managing student data and syncing lists via webhooks.' 
+        headerDesc.textContent = isAdmin
+          ? 'Admin tools for managing student data and syncing lists via webhooks.'
           : 'Access student reports and performance analytics.';
       }
 
@@ -1143,7 +1148,7 @@ function bindTabClickListeners() {
       if (searchInput) searchInput.value = '';
       state.selectedHelperTag = 'all';
       state.editingHelperId = null;
-      
+
       // Reset form panel state
       const form = document.getElementById('add-helper-form');
       if (form) form.reset();
@@ -1151,7 +1156,7 @@ function bindTabClickListeners() {
       if (formPanel) formPanel.style.display = 'none';
       const toggleBtn = document.getElementById('btn-toggle-add-helper');
       if (toggleBtn) toggleBtn.innerHTML = '<span style="font-size: 1.1rem; line-height: 1;">+</span> Add Helper Link';
-      
+
       renderHelpers();
     };
   }
@@ -1725,10 +1730,11 @@ async function openTestTracker(viewType = 'tests', forceRefresh = false) {
         if (testsRes.success) state.tests = testsRes.data;
         sanitizeTestSettings();
         // Only re-render if we are still on an FMS view and the data actually changed!
-        const blueprintsList = getCustomFmsBlueprints();
-        const isCustomView = blueprintsList.some(bp => bp.type.toLowerCase() === state.currentView.toLowerCase());
+        const blueprintsList = getCustomFmsBlueprints() || [];
+        const currentView = state.currentView || '';
+        const isCustomView = blueprintsList.some(bp => bp && bp.type && bp.type.toLowerCase() === currentView.toLowerCase());
         const fmsViews = ['tests', 'videos', 'enquiries', 'admissions', 'parents'];
-        if (fmsViews.includes(state.currentView) || isCustomView) {
+        if ((state.currentView && fmsViews.includes(state.currentView)) || isCustomView) {
           renderTests(state.tests);
         }
       }
@@ -2906,7 +2912,7 @@ function isStageAssignedToUser(stage, userName) {
   const doerLower = stage.doer.toLowerCase();
   const userNameLower = userName.toLowerCase();
   if (doerLower === 'all') return true;
-  
+
   // Split by /, &, comma, or whitespace and filter empty items
   const parts = doerLower.split(/[\/,&\s,]+/).map(p => p.trim()).filter(Boolean);
   return parts.includes(userNameLower);
@@ -2915,17 +2921,17 @@ function isStageAssignedToUser(stage, userName) {
 function getFmsTasksForUser(userName) {
   if (!userName) return [];
   const fmsTasks = [];
-  
+
   (state.tests || []).forEach(test => {
     const stages = getTestStages(test);
     stages.forEach(stage => {
       if (stage.hidden) return;
       if (!isStageAssignedToUser(stage, userName)) return;
-      
+
       const heldOnDate = new Date(test.heldOn);
       const plannedDate = new Date(heldOnDate);
       plannedDate.setDate(heldOnDate.getDate() + (stage.offset || 0));
-      
+
       fmsTasks.push({
         taskId: `fms-stage-${test.testId}-${stage.id}`,
         taskName: `${test.testName} — ${stage.label}`,
@@ -2942,7 +2948,7 @@ function getFmsTasksForUser(userName) {
       });
     });
   });
-  
+
   return fmsTasks;
 }
 
@@ -2954,7 +2960,7 @@ function renderTasks(tasks) {
     const todayDate = getTodayStr();
     displayedTasks = tasks.filter(t => {
       const d = (t.plannedDate || '').substring(0, 10);
-      
+
       const isDaily = t.taskType === 'daily' || t.recurrence === 'daily' || t.recurrence === 'interval:1:days';
       const isWeekly = t.taskType === 'weekly' || t.recurrence === 'weekly' || t.recurrence === 'interval:1:weeks' || (t.recurrence && t.recurrence.startsWith('dayOfWeek:'));
       const isFutureNonDailyWeekly = d > todayDate && !isDaily && !isWeekly;
@@ -3053,20 +3059,20 @@ function renderTasks(tasks) {
   if (state.taskTab === 'pending-fms' || state.taskTab === 'due-fms') {
     const query = state.filters.search.toLowerCase();
     const statusFilter = state.filters.status;
-    
+
     let baseFms = fmsTasks;
     if (state.taskTab === 'pending-fms') {
       baseFms = fmsTasks.filter(t => t.status !== 'done' || t.plannedDate.substring(0, 10) === todayStr);
     } else {
       baseFms = fmsTasks.filter(t => (t.status !== 'done' && t.plannedDate.substring(0, 10) <= todayStr) || (t.status === 'done' && t.plannedDate.substring(0, 10) === todayStr));
     }
-    
+
     tabTasks = baseFms.filter(t => {
       const matchesSearch = t.taskName.toLowerCase().includes(query);
       const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
-    
+
     tabTasks.sort((a, b) => {
       const dateA = a.plannedDate ? a.plannedDate.substring(0, 10) : '9999-12-31';
       const dateB = b.plannedDate ? b.plannedDate.substring(0, 10) : '9999-12-31';
@@ -3274,8 +3280,8 @@ function renderTaskCard(task) {
   }
 
   const badgeClass = task.taskType === 'daily' ? 'badge-daily' :
-                     task.taskType === 'weekly' ? 'badge-weekly' :
-                     task.taskType === 'fms' ? 'badge-fms' : 'badge-one-time';
+    task.taskType === 'weekly' ? 'badge-weekly' :
+      task.taskType === 'fms' ? 'badge-fms' : 'badge-one-time';
   const badgeText = task.taskType === 'fms' ? `FMS: ${task.testType}` : task.taskType;
   const prioClass = `priority-${(task.priority || 'Medium').toLowerCase()}`;
   let displayPriority = task.priority || 'Medium';
@@ -4138,7 +4144,7 @@ async function openWeeklyReview() {
 window.saveWeeklyReviewRow = async function (userName) {
   const isPrivileged = ['admin', 'coordinator', 'process_coordinator'].includes(state.userRole);
   const isSelf = userName.toLowerCase() === state.currentUser.toLowerCase();
-  
+
   if (!isPrivileged && !isSelf) {
     showToast('Permission denied', 'error');
     return;
@@ -4401,9 +4407,9 @@ async function submitTaskCompletion(taskId, reason, quantity_ok, cost_ok, qualit
 
   // Background API call
   try {
-    const res = await apiFetch('completeTask', { 
-      taskId, 
-      user: state.currentUser, 
+    const res = await apiFetch('completeTask', {
+      taskId,
+      user: state.currentUser,
       completedDate: new Date().toISOString(),
       reason,
       quantity_ok,
@@ -5532,7 +5538,7 @@ function openAddTaskModal(defaultAssignee = null) {
 
   // Set default date to today
   $('new-task-date').value = getTodayStr();
-  
+
   const container = $('new-task-times-container');
   if (container) {
     container.innerHTML = `
@@ -5660,7 +5666,7 @@ function openEditTaskModal(taskId) {
   $('new-task-name').value = task.taskName;
   $('new-task-type').value = task.taskType;
   $('new-task-date').value = task.plannedDate;
-  
+
   const container = $('new-task-times-container');
   if (container) {
     container.innerHTML = `
@@ -5743,7 +5749,7 @@ async function handleTaskSubmit(e) {
   const name = $('new-task-name').value.trim();
   const type = $('new-task-type').value;
   const date = $('new-task-date').value || getTodayStr();
-  
+
   const timeInputs = Array.from(document.querySelectorAll('#new-task-times-container .task-time-input'));
   const times = timeInputs.map(input => input.value).filter(val => val !== '');
   const finalTimes = times.length > 0 ? times : [''];
@@ -5756,7 +5762,7 @@ async function handleTaskSubmit(e) {
 
   const submitBtn = $('add-task-submit');
   const isEdit = !!state.editingTaskId;
-  
+
   // Past date/time validation for task creation (using Kolkata time zone)
   if (!isEdit) {
     for (const t of finalTimes) {
@@ -6309,7 +6315,7 @@ $('task-completion-form')?.addEventListener('submit', async (e) => {
   const quantity_ok = $('completion-qty').checked;
   const cost_ok = $('completion-cost').checked;
   const quality_ok = $('completion-quality').checked;
-  
+
   $('task-completion-modal').style.display = 'none';
   await submitTaskCompletion(taskId, reason, quantity_ok, cost_ok, quality_ok);
 });
@@ -7944,10 +7950,11 @@ async function openMemberTasksModal(name) {
 // Synchronization
 function startBackgroundSync() {
   setInterval(async () => {
-    const blueprintsList = getCustomFmsBlueprints();
-    const isCustomView = blueprintsList.some(bp => bp.type.toLowerCase() === state.currentView.toLowerCase());
+    const blueprintsList = getCustomFmsBlueprints() || [];
+    const currentView = state.currentView || '';
+    const isCustomView = blueprintsList.some(bp => bp && bp.type && bp.type.toLowerCase() === currentView.toLowerCase());
     const fmsViews = ['tests', 'videos', 'enquiries', 'admissions', 'parents'];
-    const isFmsView = fmsViews.includes(state.currentView) || isCustomView;
+    const isFmsView = (state.currentView && fmsViews.includes(state.currentView)) || isCustomView;
 
     if (isFmsView) {
       const container = $("test-list-content");
@@ -8327,7 +8334,7 @@ async function triggerStudentWebhook(status) {
 window.renderStudentWebhookHistory = renderStudentWebhookHistory;
 window.triggerStudentWebhook = triggerStudentWebhook;
 
-window.handleStudentReportIframeLoad = function() {
+window.handleStudentReportIframeLoad = function () {
   const loader = document.getElementById('student-report-iframe-loader');
   if (loader) {
     loader.style.opacity = '0';
@@ -8338,6 +8345,13 @@ window.handleStudentReportIframeLoad = function() {
   const iframe = document.getElementById('student-report-iframe');
   if (iframe) iframe.style.opacity = '1';
 };
+
+// Bind iframe onload programmatically
+const studentReportIframe = document.getElementById('student-report-iframe');
+if (studentReportIframe) {
+  studentReportIframe.onload = window.handleStudentReportIframeLoad;
+}
+
 
 // =============================================
 // TASK CALENDAR VIEW FUNCTIONALITY
@@ -8388,14 +8402,14 @@ function renderCalendarView(tasks) {
 
   const todayStr = getTodayStr();
   let cellCount = 0;
-  
+
   // Render previous month's blank/overflow days
   for (let i = firstDay - 1; i >= 0; i--) {
     const d = prevMonthTotalDays - i;
     const prevMonth = month === 0 ? 11 : month - 1;
     const prevYear = month === 0 ? year - 1 : year;
     const cellDateStr = formatYYYYMMDD(prevYear, prevMonth, d);
-    
+
     html += renderCalendarCell(d, cellDateStr, true, todayStr, tasks);
     cellCount++;
   }
@@ -8403,7 +8417,7 @@ function renderCalendarView(tasks) {
   // Render current month days
   for (let d = 1; d <= totalDays; d++) {
     const cellDateStr = formatYYYYMMDD(year, month, d);
-    
+
     html += renderCalendarCell(d, cellDateStr, false, todayStr, tasks);
     cellCount++;
   }
@@ -8439,7 +8453,7 @@ function renderCalendarView(tasks) {
 
 function renderCalendarCell(dayNum, cellDateStr, isOtherMonth, todayStr, tasks) {
   const isToday = cellDateStr === todayStr;
-  
+
   const cellDate = new Date(cellDateStr + 'T00:00:00');
   const isSunday = cellDate.getDay() === 0;
 
@@ -8495,7 +8509,7 @@ function renderCalendarCell(dayNum, cellDateStr, isOtherMonth, todayStr, tasks) 
   `;
 }
 
-window.changeCalendarMonth = function(offset) {
+window.changeCalendarMonth = function (offset) {
   state.calendarMonth += offset;
   if (state.calendarMonth < 0) {
     state.calendarMonth = 11;
@@ -8771,7 +8785,7 @@ function renderFormTagOptions() {
   if (!select) return;
 
   const tags = (state.testSettings || []).filter(s => s.type === 'helper_tag');
-  
+
   // 1. Populate Dropdown
   select.innerHTML = '<option value="">-- Choose Tag --</option>' + tags.map(tag => {
     return `<option value="${tag.id}">${tag.label}</option>`;
@@ -8815,7 +8829,7 @@ function renderSelectedTagsList() {
   }).filter(Boolean).join('');
 }
 
-window.removeFormSelectedTag = function(tagId) {
+window.removeFormSelectedTag = function (tagId) {
   state.formSelectedTagIds = state.formSelectedTagIds.filter(id => id !== tagId);
   renderSelectedTagsList();
 };
@@ -8843,7 +8857,7 @@ function renderTagFilters() {
   filterContainer.innerHTML = html;
 }
 
-window.setHelperTagFilter = function(tagId) {
+window.setHelperTagFilter = function (tagId) {
   state.selectedHelperTag = tagId;
   renderTagFilters();
   renderHelpers(document.getElementById('helper-search-input')?.value || '');
@@ -8896,10 +8910,10 @@ function helperLevenshteinDistance(s1, s2) {
   const m = s1.length;
   const n = s2.length;
   const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
-  
+
   for (let i = 0; i <= m; i++) dp[i][0] = i;
   for (let j = 0; j <= n; j++) dp[0][j] = j;
-  
+
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
       if (s1[i - 1] === s2[j - 1]) {
@@ -8995,9 +9009,9 @@ function renderHelpers(queryText = '') {
 
       return { helper: h, score };
     })
-    .filter(item => item.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .map(item => item.helper);
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(item => item.helper);
   }
 
   if (helpers.length === 0) {

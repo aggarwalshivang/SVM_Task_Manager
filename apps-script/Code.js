@@ -194,6 +194,9 @@ function doPost(e) {
       case 'sendResetOTP':
         result = handleSendResetOTP(body);
         break;
+      case 'sendEmail':
+        result = handleSendEmail(body);
+        break;
       case 'verifyAndResetPassword':
         result = handleVerifyAndResetPassword(body);
         break;
@@ -1012,6 +1015,10 @@ function handleForgotPassword(body) {
       
       // Update the hash in Column F
       sheet.getRange(i + 1, 6).setValue(hashedDefault);
+      
+      // Keep Supabase in sync
+      row[5] = hashedDefault;
+      syncRowToSupabase('Team', row);
 
       // Try to send email
       try {
@@ -1073,6 +1080,23 @@ function handleSendResetOTP(body) {
   }
 }
 
+function handleSendEmail(body) {
+  const { to, subject, text } = body;
+  if (!to || !subject || !text) return { success: false, error: 'Missing required fields for email.' };
+  
+  try {
+    MailApp.sendEmail({
+      to: to,
+      name: 'Owner',
+      subject: subject,
+      body: text
+    });
+    return { success: true };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}
+
 function handleVerifyAndResetPassword(body) {
   const { email, otp, newPassword } = body;
   if (!email || !otp || !newPassword) return { success: false, error: 'All fields required.' };
@@ -1102,7 +1126,13 @@ function handleVerifyAndResetPassword(body) {
   const teamData = teamSheet.getDataRange().getValues();
   for (let i = 1; i < teamData.length; i++) {
     if (String(teamData[i][3]).toLowerCase().trim() === normalizedEmail) {
-      teamSheet.getRange(i + 1, 6).setValue(hashPassword(newPassword));
+      const newHash = hashPassword(newPassword);
+      teamSheet.getRange(i + 1, 6).setValue(newHash);
+      
+      // Keep Supabase in sync
+      teamData[i][5] = newHash;
+      syncRowToSupabase('Team', teamData[i]);
+      
       // Cleanup OTP
       otpSheet.deleteRow(rowIndex);
       return { success: true, message: 'Password updated successfully! You can now log in.' };
@@ -1127,9 +1157,14 @@ function handleResetAllPasswords(body) {
     const defaultPass = isSpecialAdmin ? 'Admin@12345' : 'Member@12345';
     
     // Set hashed default
-    sheet.getRange(i + 1, 6).setValue(hashPassword(defaultPass));
+    const newHash = hashPassword(defaultPass);
+    sheet.getRange(i + 1, 6).setValue(newHash);
+    
+    // Keep Supabase in sync
+    data[i][5] = newHash;
+    syncRowToSupabase('Team', data[i]);
   }
-  return { success: true, message: 'All passwords reset to defaults in GSheet.' };
+  return { success: true, message: 'All passwords reset to defaults and synced to Supabase.' };
 }
 
 function handleReviewMember(body) {
