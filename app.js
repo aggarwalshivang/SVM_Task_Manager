@@ -1914,6 +1914,7 @@ function renderFmsSortDropdownOptions() {
 }
 
 function renderTests(tests) {
+  const isCommonRole = state.userRole === 'common' || (state.currentUser && state.currentUser.toLowerCase() === 'svmambala@gmail.com');
   const container = $('test-list-content');
 
   // Populate dynamic sorting options according to the current FMS view
@@ -2197,6 +2198,7 @@ function renderTests(tests) {
                 ${test.status === 'done' ? '⏳ Reopen' : '✓ Done'}
               </button>
             ` : ''}
+            ${!isCommonRole ? `
             <button class="btn-ghost btn-sm" onclick="handleEditTestDetailsModal('${test.testId}')">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
               Edit
@@ -2205,6 +2207,7 @@ function renderTests(tests) {
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
               Delete
             </button>
+            ` : ''}
             ${showStages ? `
             <div class="expand-chevron" style="transition:transform var(--transition-base); color:var(--text-muted); display:flex; align-items:center;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -2358,14 +2361,62 @@ function renderTests(tests) {
   });
 }
 
-async function handleToggleTestStage(testId, stageId) {
+window.pendingFmsAction = null;
+
+function showFmsDoneModal(action) {
+  window.pendingFmsAction = action;
+  const select = $('fms-done-member-select');
+  select.innerHTML = '<option value="">-- Select Member --</option>';
+  
+  const members = (state.teamMembers || []).filter(m => (m.active === true || String(m.active).toUpperCase().trim() === 'TRUE') && (m.role || '').toLowerCase() !== 'admin');
+  
+  members.forEach(m => {
+    select.innerHTML += `<option value="${m.name}">${m.name}</option>`;
+  });
+  
+  $('fms-done-member-modal').style.display = 'flex';
+}
+
+window.closeFmsDoneModal = function() {
+  window.pendingFmsAction = null;
+  $('fms-done-member-modal').style.display = 'none';
+};
+
+window.confirmFmsDoneMember = async function() {
+  const select = $('fms-done-member-select');
+  const memberName = select.value;
+  if (!memberName) {
+    showToast('Please select a member.', 'error');
+    return;
+  }
+  
+  const action = window.pendingFmsAction;
+  window.closeFmsDoneModal();
+  
+  if (!action) return;
+  
+  if (action.type === 'stage') {
+    await handleToggleTestStage(action.testId, action.stageId, memberName);
+  } else if (action.type === 'card') {
+    await toggleCustomFmsCardStatus(action.testId, memberName);
+  }
+};
+
+async function handleToggleTestStage(testId, stageId, forceMember = null) {
   const test = state.tests.find(t => t.testId === testId);
   if (!test) return;
 
   const stage = (test.stages || []).find(s => s.id === stageId);
   const newStatus = (!stage || stage.status !== 'done') ? 'done' : 'pending';
+
+  const isCommonRole = state.userRole === 'common' || (state.currentUser && state.currentUser.toLowerCase() === 'svmambala@gmail.com');
+  if (isCommonRole && newStatus === 'done' && !forceMember) {
+    showFmsDoneModal({ type: 'stage', testId, stageId });
+    return;
+  }
+
   const newDate = newStatus === 'done' ? new Date().toISOString() : '';
-  const doneBy = newStatus === 'done' ? state.currentUser : '';
+  const doneBy = newStatus === 'done' ? (forceMember || state.currentUser) : '';
   const doneAt = newStatus === 'done' ? new Date().toLocaleString() : '';
 
   // 1. Back up previous stage state in case we need to revert
@@ -2872,9 +2923,19 @@ async function saveTestSettings() {
 }
 
 function renderHeader(user, showFab = true) {
+  const isCommonRole = state.userRole === 'common' || (state.currentUser && state.currentUser.toLowerCase() === 'svmambala@gmail.com');
   $('greeting-text').textContent = `Good ${getTimeOfDay()}, ${user}`;
   $('app-header').style.display = 'flex';
   $('app-footer').style.display = 'block';
+
+  const fab = $('fab-add-task');
+  if (fab) {
+    if (isCommonRole || !showFab) {
+      fab.style.display = 'none';
+    } else {
+      fab.style.display = 'flex';
+    }
+  }
 }
 
 function renderBriefing(html) {
@@ -2952,7 +3013,49 @@ function getFmsTasksForUser(userName) {
   return fmsTasks;
 }
 
+function renderCommonRoleMembersGrid() {
+  const container = $('recurring-section');
+  if (!container) return;
+
+  $('controls-section').style.display = 'none';
+  $('task-type-tabs').style.display = 'none';
+  $('task-calendar-container').style.display = 'none';
+  $('onetime-section').style.display = 'none';
+
+  let html = `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: var(--space-md); padding: var(--space-md);">`;
+
+  const members = (state.teamMembers || []).filter(m => (m.active === true || String(m.active).toUpperCase().trim() === 'TRUE') && (m.role || '').toLowerCase() !== 'admin');
+  
+  if (members.length === 0) {
+    html += `<div style="text-align:center; padding: 40px; color: var(--text-muted); grid-column: 1 / -1;">No active members found.</div>`;
+  } else {
+    members.forEach(m => {
+      html += `
+        <div onclick="handleViewMemberTasks('${m.name}')" class="kpi-card" style="cursor:pointer; display:flex; align-items:center; gap:var(--space-md); padding:var(--space-md); transition:transform 0.2s, box-shadow 0.2s;">
+          <div class="member-avatar" style="width:40px; height:40px; border-radius:50%; background:var(--gradient-purple); color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; flex-shrink:0;">
+            ${getInitials(m.name)}
+          </div>
+          <div style="flex:1; overflow:hidden;">
+            <div style="font-weight:600; font-size:1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.name}</div>
+            <div style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.role || 'Member'}</div>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  html += `</div>`;
+  container.innerHTML = html;
+  container.style.display = 'block';
+}
+
 function renderTasks(tasks) {
+  const isCommonRole = state.userRole === 'common' || (state.currentUser && state.currentUser.toLowerCase() === 'svmambala@gmail.com');
+  if (isCommonRole && !state.tasksFilterUser && state.currentView === 'tasks') {
+    renderCommonRoleMembersGrid();
+    return;
+  }
+
   let displayedTasks = tasks;
 
   // If not in calendar view, only show today's tasks or active/overdue/stuck/missed tasks (emulate legacy backend filter for task lists)
@@ -3289,6 +3392,7 @@ function renderTaskCard(task) {
 
   const isProcessCoord = state.userRole === 'process_coordinator';
   const isAdminOrCoord = state.userRole === 'admin' || state.userRole === 'coordinator' || isProcessCoord;
+  const isCommon = state.userRole === 'common' || (state.currentUser && state.currentUser.toLowerCase() === 'svmambala@gmail.com');
 
   return `
     <div class="task-card ${isDone ? 'done' : ''} ${isOverdue ? 'overdue' : ''} ${isMissed ? 'missed' : ''}" 
@@ -3326,17 +3430,17 @@ function renderTaskCard(task) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
           </a>
         ` : ''}
-        ${!isFms && isProcessCoord ? `
+        ${!isFms && isProcessCoord && !isCommon ? `
           <button class="task-nudge-btn" onclick="handleNudgeMember('${task.taskId}', '${task.assignedTo}', event)" title="Nudge Member" style="background:none; border:none; color:var(--accent-purple); cursor:pointer; padding:4px;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
           </button>
         ` : ''}
-        ${!isFms ? `
+        ${!isFms && !isCommon ? `
           <button class="task-comment-btn" data-comment-id="${task.taskId}" title="Comments" aria-label="Task comments">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 1 1-7.6-13.5 8.38 8.38 0 0 1 3.8.9L21 3z"></path></svg>
           </button>
         ` : ''}
-        ${(!isDone && !isFms) ? `
+        ${(!isDone && !isFms && !isCommon) ? `
           <button onclick="handleUpdateTaskStatus('${task.taskId}', 'in-progress', event)" title="Mark In Progress" style="background:none; border:none; color:var(--accent-blue); cursor:pointer; padding:4px; display:flex; align-items:center;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
           </button>
@@ -3344,14 +3448,14 @@ function renderTaskCard(task) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
           </button>
         ` : ''}
-        ${(!isDone && !isFms) ? `<button class="task-shift-btn" data-shift-id="${task.taskId}" title="Shift task" aria-label="Shift task">
+        ${(!isDone && !isFms && !isCommon) ? `<button class="task-shift-btn" data-shift-id="${task.taskId}" title="Shift task" aria-label="Shift task">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </button>` : ''}
-        ${(isAdminOrCoord || task.assignedTo === state.currentUser) && !isFms ? `
+        ${((isAdminOrCoord || task.assignedTo === state.currentUser) && !isFms && !isCommon) ? `
         <button class="task-edit-btn" data-edit-id="${task.taskId}" title="Edit task" aria-label="Edit task">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>` : ''}
-        ${(isAdminOrCoord || task.assignedTo === state.currentUser) && !isFms ? `
+        ${((isAdminOrCoord || task.assignedTo === state.currentUser) && !isFms && !isCommon) ? `
         <button class="task-delete-btn" data-delete-id="${task.taskId}" title="Delete task" aria-label="Delete task">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
@@ -5226,9 +5330,14 @@ async function initForUser(user) {
   }
 
   try {
+    const isCommonRole = state.userRole === 'common' || (user && user.toLowerCase() === 'svmambala@gmail.com');
+    if (isCommonRole) {
+      state.currentGlobalView = true;
+    }
+
     // Fetch tasks, stats and team in parallel — no sequential blocking
     const [tasksRes, statsRes, teamRes] = await Promise.all([
-      apiFetch('getTasks', { user, allDates: true }),
+      apiFetch('getTasks', isCommonRole ? { all: 'true' } : { user, allDates: true }),
       apiFetch('getScores', { user }),
       apiFetch('getTeam'),
     ]);
@@ -7905,6 +8014,7 @@ async function confirmVoiceTask() {
 }
 
 async function openMemberTasksModal(name) {
+  const isCommonRole = state.userRole === 'common' || (state.currentUser && state.currentUser.toLowerCase() === 'svmambala@gmail.com');
   $('member-actions-modal').style.display = 'none';
   $('member-tasks-title').textContent = `${name}'s Tasks`;
   $('member-tasks-list').innerHTML = '<div class="empty-state">Loading tasks...</div>';
@@ -7927,12 +8037,14 @@ async function openMemberTasksModal(name) {
         <div style="display:flex; justify-content:space-between; align-items:start;">
           <div class="member-task-name">${t.taskName}</div>
           <div style="display:flex; gap:8px;">
+             ${!isCommonRole ? `
              <button onclick="handleEditTask('${t.taskId}')" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; padding:2px;" title="Edit">
                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
              </button>
              <button onclick="handleDeleteTask('${t.taskId}')" style="background:none; border:none; color:var(--accent-red); cursor:pointer; padding:2px;" title="Delete">
                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
              </button>
+             ` : ''}
           </div>
         </div>
         <div class="member-task-meta">
@@ -8103,10 +8215,16 @@ window.onunhandledrejection = function (event) {
   if (loader) loader.classList.add('hidden');
 };
 
-async function toggleCustomFmsCardStatus(testId) {
+async function toggleCustomFmsCardStatus(testId, forceMember = null) {
   const test = (state.tests || []).find(t => t.testId === testId);
   if (!test) return;
   const newStatus = test.status === 'done' ? 'pending' : 'done';
+
+  const isCommonRole = state.userRole === 'common' || (state.currentUser && state.currentUser.toLowerCase() === 'svmambala@gmail.com');
+  if (isCommonRole && newStatus === 'done' && !forceMember) {
+    showFmsDoneModal({ type: 'card', testId });
+    return;
+  }
 
   test.status = newStatus;
 
@@ -9033,8 +9151,10 @@ function renderHelpers(queryText = '') {
     return `
       <div class="glass-panel" style="position: relative; padding: var(--space-xl); display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-md); transition: transform 0.2s, box-shadow 0.2s; border: 1px solid var(--border-glass);">
         <div style="position: absolute; top: 12px; right: 12px; display: flex; gap: 4px; z-index: 10;">
+          ${!isCommonRole ? `
           <button class="nav-tab-delete-btn" onclick="editHelper(${h.id})" title="Edit Helper Link" style="font-size: 0.8rem; padding: 4px 8px; border-radius: var(--radius-md); background: rgba(255,255,255,0.05); color: var(--text-secondary); line-height: 1; border: 1px solid var(--border-glass);">✏️</button>
           <button class="nav-tab-delete-btn" onclick="deleteHelper(${h.id})" title="Delete Helper Link" style="font-size: 0.9rem; padding: 4px 8px; border-radius: var(--radius-md); line-height: 1;">✕</button>
+          ` : ''}
         </div>
         
         <div>

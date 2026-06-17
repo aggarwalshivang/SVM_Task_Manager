@@ -92,6 +92,7 @@
             <option value="coordinator">Coordinator</option>
             <option value="process_coordinator">Process Coordinator</option>
             <option value="admin">Admin</option>
+            <option value="common">Common role</option>
           </select>
         </div>
         
@@ -1015,6 +1016,26 @@
           <input type="text" id="new-comment-text" placeholder="Type your message..." autocomplete="off">
           <button class="btn-primary" id="comment-submit-btn" style="width: auto; padding: 0 20px;">Send</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FMS Done Member Modal -->
+  <div class="modal-overlay" id="fms-done-member-modal" style="display:none; z-index: 2000;">
+    <div class="modal-content" style="max-width:350px; padding:var(--space-xl);">
+      <div class="modal-header">
+        <h3>Select Member</h3>
+        <button class="modal-close" onclick="closeFmsDoneModal()">✕</button>
+      </div>
+      <p class="modal-body-text" style="margin-bottom:var(--space-md);">Who is marking this as Done?</p>
+      <div class="form-group">
+        <select id="fms-done-member-select" class="form-input" style="width: 100%; border: 1px solid var(--border-glass); border-radius: var(--radius-sm); padding: 8px; background: rgba(255,255,255,0.05); color: var(--text-primary);">
+          <!-- Populated dynamically -->
+        </select>
+      </div>
+      <div class="modal-actions" style="margin-top:var(--space-lg); display: flex; justify-content: flex-end; gap: 8px;">
+        <button class="btn-secondary" onclick="closeFmsDoneModal()">Cancel</button>
+        <button class="btn-primary" onclick="confirmFmsDoneMember()">Confirm Done</button>
       </div>
     </div>
   </div>
