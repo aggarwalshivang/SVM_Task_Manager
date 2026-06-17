@@ -462,10 +462,29 @@ const APPS_SCRIPT_ACTIONS = new Set([
   'parseRecurrence', 'getWorkflowHealth', 'sendEmail'
 ]);
 
+function sanitizePayload(obj) {
+  if (typeof obj === 'string') {
+    return obj.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  if (typeof obj === 'object' && obj !== null) {
+    const newObj = Array.isArray(obj) ? [] : {};
+    for (const key in obj) {
+      newObj[key] = sanitizePayload(obj[key]);
+    }
+    return newObj;
+  }
+  return obj;
+}
+
 async function apiFetch(action, params = {}, method = 'GET') {
-  if (CONFIG.DEMO_MODE) return demoHandler(action, params, method);
-  if (APPS_SCRIPT_ACTIONS.has(action)) return apiFetchSheet(action, params, method);
-  return supabaseApiFetch(action, params);
+  if (!params.fromUser && window.state && state.currentUser) {
+    params.fromUser = state.currentUser;
+  }
+  const safeParams = sanitizePayload(params);
+  
+  if (CONFIG.DEMO_MODE) return demoHandler(action, safeParams, method);
+  if (APPS_SCRIPT_ACTIONS.has(action)) return apiFetchSheet(action, safeParams, method);
+  return supabaseApiFetch(action, safeParams);
 }
 
 async function apiFetchSheet(action, params = {}, method = 'GET') {
@@ -781,6 +800,7 @@ function handleUserSignedOut() {
   if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
   if ($('student-container')) $('student-container').style.display = 'none';
   if ($('helper-container')) $('helper-container').style.display = 'none';
+      if ($('logs-container')) $('logs-container').style.display = 'none';
 }
 
 function handleUserSignedIn(userData) {
@@ -825,6 +845,7 @@ function handleUserSignedIn(userData) {
   if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
   if ($('student-container')) $('student-container').style.display = 'none';
   if ($('helper-container')) $('helper-container').style.display = 'none';
+      if ($('logs-container')) $('logs-container').style.display = 'none';
   if ($('task-view-container')) $('task-view-container').style.display = 'block';
 
   renderHeader(state.currentUser);
@@ -973,6 +994,7 @@ function renderNavigationTabs() {
       <button class="nav-tab ${state.currentView === 'weekly-review' ? 'active' : ''}" id="tab-weekly-review">🔄 Weekly Review</button>
       <button class="nav-tab ${state.currentView === 'fms-builder' ? 'active' : ''}" id="tab-fms-builder">🛠️ FMS Builder</button>
       <button class="nav-tab ${state.currentView === 'helper' ? 'active' : ''}" id="tab-helper">📋 Helper</button>
+      <button class="nav-tab ${state.currentView === 'logs' ? 'active' : ''}" id="tab-logs">📜 Audit Logs</button>
     `;
   }
 
@@ -1029,6 +1051,7 @@ function bindTabClickListeners() {
     if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
     if ($('student-container')) $('student-container').style.display = 'none';
     if ($('helper-container')) $('helper-container').style.display = 'none';
+      if ($('logs-container')) $('logs-container').style.display = 'none';
     if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
     $('stats-section').style.display = 'block';
     $('briefing-section').style.display = 'block';
@@ -1045,6 +1068,7 @@ function bindTabClickListeners() {
     if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
     if ($('student-container')) $('student-container').style.display = 'none';
     if ($('helper-container')) $('helper-container').style.display = 'none';
+      if ($('logs-container')) $('logs-container').style.display = 'none';
     if ($('weekly-review-container')) $('weekly-review-container').style.display = 'block';
     openWeeklyReview();
   };
@@ -1059,6 +1083,7 @@ function bindTabClickListeners() {
     if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
     if ($('student-container')) $('student-container').style.display = 'none';
     if ($('helper-container')) $('helper-container').style.display = 'none';
+      if ($('logs-container')) $('logs-container').style.display = 'none';
     if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
   };
 
@@ -1081,6 +1106,7 @@ function bindTabClickListeners() {
       if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
       if ($('student-container')) $('student-container').style.display = 'none';
       if ($('helper-container')) $('helper-container').style.display = 'none';
+      if ($('logs-container')) $('logs-container').style.display = 'none';
       if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
       $('test-tracker-container').style.display = 'block';
     };
@@ -1101,6 +1127,7 @@ function bindTabClickListeners() {
         if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
         if ($('student-container')) $('student-container').style.display = 'none';
         if ($('helper-container')) $('helper-container').style.display = 'none';
+      if ($('logs-container')) $('logs-container').style.display = 'none';
         if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
         $('test-tracker-container').style.display = 'block';
       };
@@ -1127,9 +1154,29 @@ function bindTabClickListeners() {
       if ($('fms-builder-container')) $('fms-builder-container').style.display = 'block';
       if ($('student-container')) $('student-container').style.display = 'none';
       if ($('helper-container')) $('helper-container').style.display = 'none';
+      if ($('logs-container')) $('logs-container').style.display = 'none';
       if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
       renderCustomFmsBlueprintsList();
       closeCustomFmsCreatorSection();
+    };
+  }
+
+  // Bind Audit Logs tab (visible to admin only)
+  const logsTab = $('tab-logs');
+  if (logsTab) {
+    logsTab.onclick = () => {
+      setActiveTab('tab-logs');
+      state.currentView = 'logs';
+      $('task-view-container').style.display = 'none';
+      $('admin-dashboard-container').style.display = 'none';
+      $('test-tracker-container').style.display = 'none';
+      if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+      if ($('student-container')) $('student-container').style.display = 'none';
+      if ($('helper-container')) $('helper-container').style.display = 'none';
+      if ($('logs-container')) $('logs-container').style.display = 'none';
+      if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
+      if ($('logs-container')) $('logs-container').style.display = 'block';
+      renderAuditLogs();
     };
   }
 
@@ -1145,6 +1192,7 @@ function bindTabClickListeners() {
       if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
       if ($('student-container')) $('student-container').style.display = 'block';
       if ($('helper-container')) $('helper-container').style.display = 'none';
+      if ($('logs-container')) $('logs-container').style.display = 'none';
       if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
 
       // Check permissions and customize the view
@@ -1217,6 +1265,7 @@ function openCustomFmsBuilderModal() {
     if ($('fms-builder-container')) $('fms-builder-container').style.display = 'block';
     if ($('student-container')) $('student-container').style.display = 'none';
     if ($('helper-container')) $('helper-container').style.display = 'none';
+      if ($('logs-container')) $('logs-container').style.display = 'none';
     renderCustomFmsBlueprintsList();
     closeCustomFmsCreatorSection();
   }
@@ -1226,6 +1275,7 @@ function closeCustomFmsBuilderModal() {
   if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
   if ($('student-container')) $('student-container').style.display = 'none';
   if ($('helper-container')) $('helper-container').style.display = 'none';
+      if ($('logs-container')) $('logs-container').style.display = 'none';
 }
 
 // Tracks the list of custom field definitions for the blueprint being created
@@ -9337,3 +9387,50 @@ window.initHelperTab = initHelperTab;
 window.renderFormTagOptions = renderFormTagOptions;
 window.renderTagFilters = renderTagFilters;
 window.renderSelectedTagsList = renderSelectedTagsList;
+
+window.renderAuditLogs = async function () {
+  const tbody = $('logs-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Loading logs...</td></tr>';
+  
+  try {
+    const res = await apiFetch('getAuditLogs');
+    if (!res.success) throw new Error(res.error || 'Failed to load logs');
+    
+    if (!res.data || res.data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</td></tr>';
+      return;
+    }
+    
+    tbody.innerHTML = res.data.map(log => {
+      const date = new Date(log.requested_at);
+      const timeStr = date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      
+      let detailsText = '';
+      try {
+        const d = typeof log.new_data === 'string' ? JSON.parse(log.new_data) : log.new_data;
+        // Format to a clean, readable string representation
+        if (d && Object.keys(d).length > 0) {
+          detailsText = `<div style="max-height:60px; overflow-y:auto; font-family:monospace; font-size:0.75rem; background:rgba(0,0,0,0.2); padding:4px; border-radius:4px;">${JSON.stringify(d, null, 2).replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
+        } else {
+          detailsText = '<span style="color:var(--text-muted)">-</span>';
+        }
+      } catch (e) {
+        detailsText = 'Invalid Data';
+      }
+      
+      return `
+        <tr style="border-bottom:1px solid var(--border-glass);">
+          <td style="padding:10px 12px; white-space:nowrap; color:var(--text-primary);">${timeStr}</td>
+          <td style="padding:10px 12px; font-weight:600; color:var(--accent-purple);">${log.requested_by || 'system'}</td>
+          <td style="padding:10px 12px; color:var(--text-secondary);"><span style="background:var(--bg-glass); padding:3px 6px; border-radius:4px; font-size:0.75rem;">${log.type.replace('audit_', '')}</span></td>
+          <td style="padding:10px 12px; color:var(--text-secondary); font-family:monospace; font-size:0.8rem;">${log.task_id || '-'}</td>
+          <td style="padding:10px 12px;">${detailsText}</td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--accent-red);">${err.message}</td></tr>`;
+  }
+};
+

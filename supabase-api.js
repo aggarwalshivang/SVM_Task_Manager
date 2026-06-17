@@ -182,7 +182,7 @@ function calculateNextDate(currentDateStr, pattern) {
   return localDate.toISOString().substring(0, 10);
 }
 
-async function supabaseApiFetch(action, params = {}) {
+async function _supabaseApiFetchInner(action, params = {}) {
   const sb = getSupabase();
 
   switch (action) {
@@ -191,6 +191,16 @@ async function supabaseApiFetch(action, params = {}) {
       const { data, error } = await sb.from('team').select('name,role,active,email');
       if (error) throw new Error(error.message);
       return { success: true, data: data.map(r => ({ name: r.name, role: r.role, active: r.active, email: r.email })) };
+    }
+
+    case 'getAuditLogs': {
+      const { data, error } = await sb.from('modifications')
+        .select('*')
+        .eq('status', 'audit')
+        .order('requested_at', { ascending: false })
+        .limit(200);
+      if (error) throw new Error(error.message);
+      return { success: true, data };
     }
 
     case 'getTasks': {
@@ -1457,4 +1467,31 @@ async function supabaseApiFetch(action, params = {}) {
     default:
       return { success: false, error: 'Unknown action: ' + action };
   }
+}
+
+async function supabaseApiFetch(action, params = {}) {
+  const result = await _supabaseApiFetchInner(action, params);
+  
+  const mutationActions = [
+    'addTask', 'editTask', 'deleteTask', 'shiftTask', 'completeTask', 
+    'updateTaskStatus', 'addTaskComment', 'addTest', 'editTestDetails', 
+    'updateTestStage', 'deleteTestTracker', 'updateTestSettings',
+    'approveMember', 'removeMember', 'approveTaskChange'
+  ];
+  
+  if (mutationActions.includes(action) && result && result.success) {
+    const sb = getSupabase();
+    const taskId = params.taskId || params.testId || '';
+    const requestedBy = params.fromUser || 'system';
+    
+    sb.from('modifications').insert({
+      task_id: taskId,
+      type: 'audit_' + action,
+      new_data: params,
+      requested_by: requestedBy,
+      status: 'audit'
+    }).then(() => {}).catch(e => console.error('Audit log failed', e));
+  }
+  
+  return result;
 }
