@@ -631,6 +631,15 @@ async function handleAuthSubmit(e) {
       const res = await apiFetch('login', { email, password }, 'POST');
       if (!res.success) throw new Error(res.error || 'Login failed');
 
+      if (res.requires2FA) {
+        $('auth-primary-step').style.display = 'none';
+        $('auth-otp-step').style.display = 'block';
+        $('auth-otp-email').textContent = email;
+        state.pendingLoginEmail = email;
+        showToast('Verification code sent to your email.');
+        return; // Don't finalize login yet
+      }
+
       handleUserSignedIn(res.data);
       showToast('Signed in successfully.');
     }
@@ -642,6 +651,41 @@ async function handleAuthSubmit(e) {
     btn.textContent = isSignUp ? 'Sign Up' : 'Sign In';
   }
 }
+
+$('auth-verify-otp-btn')?.addEventListener('click', async () => {
+  const otp = $('auth-otp-input').value.trim();
+  if (!otp) return showToast('Please enter OTP', 'error');
+  
+  const btn = $('auth-verify-otp-btn');
+  btn.disabled = true;
+  btn.textContent = 'Verifying...';
+  $('auth-error').style.display = 'none';
+  
+  try {
+    const res = await apiFetch('verifyLoginOTP', { email: state.pendingLoginEmail, otp }, 'POST');
+    if (!res.success) throw new Error(res.error || 'Invalid OTP');
+    
+    // reset UI for next time
+    $('auth-otp-input').value = '';
+    $('auth-otp-step').style.display = 'none';
+    $('auth-primary-step').style.display = 'block';
+    
+    handleUserSignedIn(res.data);
+    showToast('Signed in successfully.');
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Verify & Sign In';
+  }
+});
+
+$('auth-back-to-login-btn')?.addEventListener('click', () => {
+  $('auth-otp-step').style.display = 'none';
+  $('auth-primary-step').style.display = 'block';
+  $('auth-otp-input').value = '';
+  state.pendingLoginEmail = null;
+});
 
 function openResetPasswordModal() {
   $('reset-step-1').style.display = 'block';

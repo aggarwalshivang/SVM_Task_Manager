@@ -647,9 +647,47 @@ async function supabaseApiFetch(action, params = {}) {
       if (!data.active) return { success: false, error: 'Account pending approval by Admin.' };
       const inputHash = await hashPassword(params.password || '');
       if (inputHash === data.password_hash) {
-        return { success: true, data: { name: data.name, role: (data.role || 'member').toLowerCase(), email: data.email } };
+        // Generate and send OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+        
+        await sb.from('reset_codes').delete().eq('email', email);
+        const { error: otpError } = await sb.from('reset_codes').insert([{ email, otp, expires_at: expires }]);
+        if (otpError) return { success: false, error: 'Failed to generate 2FA OTP.' };
+
+        // Async email dispatch
+        fetch(CONFIG.API_URL, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'sendEmail',
+            to: email,
+            subject: 'SVM Task Tracker - Login Verification Code',
+            text: `Your login verification code is: ${otp}\n\nThis code will expire in 10 minutes.\n\nRegards,\nSVM Team`
+          })
+        }).catch(console.error);
+
+        return { success: true, requires2FA: true, email: data.email };
       }
       return { success: false, error: 'Invalid password.' };
+    }
+
+    case 'verifyLoginOTP': {
+      const email = (params.email || '').toLowerCase().trim();
+      const otp = params.otp;
+
+      const { data: codes, error: codeErr } = await sb.from('reset_codes').select('*').eq('email', email);
+      if (codeErr || !codes || codes.length === 0) return { success: false, error: 'No active login request found. Please login again.' };
+
+      const record = codes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+      if (record.otp !== otp) return { success: false, error: 'Invalid verification code.' };
+      if (new Date(record.expires_at) < new Date()) return { success: false, error: 'Verification code expired.' };
+
+      await sb.from('reset_codes').delete().eq('email', email);
+
+      const { data, error } = await sb.from('team').select('*').eq('email', email).maybeSingle();
+      if (error || !data) return { success: false, error: 'User not found.' };
+
+      return { success: true, data: { name: data.name, role: (data.role || 'member').toLowerCase(), email: data.email } };
     }
 
     case 'signup':
