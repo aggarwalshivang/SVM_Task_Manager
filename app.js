@@ -3013,7 +3013,7 @@ function getFmsTasksForUser(userName) {
   return fmsTasks;
 }
 
-function renderCommonRoleMembersGrid() {
+async function renderCommonRoleMembersGrid() {
   const container = $('recurring-section');
   if (!container) return;
 
@@ -3022,27 +3022,74 @@ function renderCommonRoleMembersGrid() {
   $('task-calendar-container').style.display = 'none';
   $('onetime-section').style.display = 'none';
 
-  let html = `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: var(--space-md); padding: var(--space-md);">`;
-
   const members = (state.teamMembers || []).filter(m => (m.active === true || String(m.active).toUpperCase().trim() === 'TRUE') && (m.role || '').toLowerCase() !== 'admin');
   
   if (members.length === 0) {
-    html += `<div style="text-align:center; padding: 40px; color: var(--text-muted); grid-column: 1 / -1;">No active members found.</div>`;
-  } else {
-    members.forEach(m => {
-      html += `
-        <div onclick="handleViewMemberTasks('${m.name}')" class="kpi-card" style="cursor:pointer; display:flex; align-items:center; gap:var(--space-md); padding:var(--space-md); transition:transform 0.2s, box-shadow 0.2s;">
-          <div class="member-avatar" style="width:40px; height:40px; border-radius:50%; background:var(--gradient-purple); color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; flex-shrink:0;">
-            ${getInitials(m.name)}
+    container.innerHTML = `<div style="padding: 40px; text-align: center; color: var(--text-muted);">No active members found.</div>`;
+    container.style.display = 'block';
+    return;
+  }
+
+  if (!state.memberScoresCache) {
+    try {
+      const res = await apiFetch('getScores');
+      if (res.success) state.memberScoresCache = res.data || [];
+    } catch(e) {
+      console.error('Failed to fetch member scores', e);
+      state.memberScoresCache = [];
+    }
+  }
+
+  const todayStr = getTodayStr();
+  let html = `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-md); padding: var(--space-md);">`;
+
+  members.forEach(m => {
+    // Analytics
+    const memberTasks = state.tasks.filter(t => t.assignedTo === m.name);
+    const todayTasks = memberTasks.filter(t => t.plannedDate && t.plannedDate.substring(0, 10) === todayStr && t.taskType !== 'penalty');
+    
+    const todayTotal = todayTasks.length;
+    const todayDone = todayTasks.filter(t => t.status === 'done').length;
+    const todayLeft = todayTotal - todayDone;
+    const pct = todayTotal > 0 ? Math.round((todayDone / todayTotal) * 100) : 0;
+
+    const memberScoreData = state.memberScoresCache.find(s => s.name === m.name);
+    const score = memberScoreData ? memberScoreData.score : 0;
+
+    html += `
+      <div onclick="handleViewMemberTasks('${m.name}')" class="kpi-card" style="cursor:pointer; display:flex; flex-direction:column; gap:var(--space-md); padding:var(--space-md); transition:transform 0.2s, box-shadow 0.2s; align-items: stretch; text-align: left;">
+        <div style="display:flex; align-items:center; gap:var(--space-md); justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:var(--space-md);">
+            <div class="member-avatar" style="width:40px; height:40px; border-radius:50%; background:var(--gradient-purple); color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; flex-shrink:0;">
+              ${getInitials(m.name)}
+            </div>
+            <div style="flex:1; overflow:hidden;">
+              <div style="font-weight:600; font-size:1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.name}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.role || 'Member'}</div>
+            </div>
           </div>
-          <div style="flex:1; overflow:hidden;">
-            <div style="font-weight:600; font-size:1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.name}</div>
-            <div style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.role || 'Member'}</div>
+          <div style="text-align:right;">
+            <div style="font-size:0.7rem; color:var(--text-muted);">Week Score</div>
+            <div style="font-size:1.2rem; font-weight:800; color:${score < 0 ? 'var(--accent-red)' : 'var(--text-primary)'};">${score}</div>
           </div>
         </div>
-      `;
-    });
-  }
+
+        <div style="border-top: 1px solid var(--border-glass); padding-top: 12px; margin-top: 4px;">
+          <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:4px;">
+            <span style="color:var(--text-secondary);">Today's Tasks</span>
+            <span style="font-weight:700; color: ${todayDone === todayTotal && todayTotal > 0 ? 'var(--accent-emerald)' : 'var(--text-primary)'}">${todayDone} Done</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:var(--text-muted); margin-bottom:8px;">
+            <span>${todayLeft} left to do</span>
+            <span>${pct}%</span>
+          </div>
+          <div style="height:4px; background:rgba(255,255,255,0.05); border-radius:2px; overflow:hidden;">
+            <div style="height:100%; width:${pct}%; background: ${pct === 100 ? 'var(--accent-emerald)' : 'var(--gradient-purple)'}; border-radius:2px; transition:width 0.3s ease;"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
 
   html += `</div>`;
   container.innerHTML = html;
