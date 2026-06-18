@@ -3192,10 +3192,10 @@ async function renderCommonRoleMembersGrid() {
 
 function renderTasks(tasks) {
   const isCommonRole = state.userRole === 'common' || (state.currentUser && state.currentUser.toLowerCase() === 'svmambala@gmail.com');
-  if (isCommonRole && !state.tasksFilterUser && state.currentView === 'tasks') {
-    renderCommonRoleMembersGrid();
-    return;
-  }
+  // if (isCommonRole && !state.tasksFilterUser && state.currentView === 'tasks') {
+  //   renderCommonRoleMembersGrid();
+  //   return;
+  // }
 
   let displayedTasks = tasks;
 
@@ -3543,15 +3543,17 @@ function renderTaskCard(task) {
         <span class="check-icon">✓</span>
       </div>
       <div class="task-info">
-        <div class="task-name">${task.taskName}</div>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+          <div class="task-name">${task.taskName}</div>
+          ${task.assignedTo && (isAdminOrCoord || state.currentView === 'tasks' || isCommon) ? `
+            <div style="flex-shrink:0; background:rgba(255,255,255,0.05); padding:2px 8px; border-radius:12px; font-size:0.7rem; color:var(--accent-purple); font-weight:600; border:1px solid var(--border-glass); white-space:nowrap;">
+              @${task.assignedTo} ${(task.assignedTo !== state.currentUser && !state.tasksFilterUser && !isCommon) ? '(Buddy)' : ''}
+            </div>
+          ` : ''}
+        </div>
         <div class="task-meta">
           <span class="task-badge ${badgeClass}">${badgeText}</span>
           <span class="priority-badge ${prioClass}">${displayPriority}</span>
-          ${task.assignedTo && (isAdminOrCoord || state.currentView === 'tasks') ? `
-            <span style="color:var(--accent-purple); font-weight:600;">
-              @${task.assignedTo} ${task.assignedTo !== state.currentUser && !state.tasksFilterUser ? '(Buddy Task)' : ''}
-            </span>
-          ` : ''}
           ${task.plannedDate ? `<span class="task-date-text" style="color:var(--text-dim); font-size:0.75rem;">• ${formatDate(task.plannedDate, task.time)}</span>` : ''}
           ${isOverdue ? `<span class="task-badge badge-overdue">overdue</span>` : ''}
           ${isInProgress ? `<span class="task-badge badge-in-progress">in progress</span>` : ''}
