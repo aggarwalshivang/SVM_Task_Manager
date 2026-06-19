@@ -9381,20 +9381,64 @@ window.renderAuditLogs = async function () {
     tbody.innerHTML = res.data.map(log => {
       const date = new Date(log.requested_at);
       const timeStr = date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      
-      let detailsText = '';
-      try {
-        const d = typeof log.new_data === 'string' ? JSON.parse(log.new_data) : log.new_data;
-        // Format to a clean, readable string representation
-        if (d && Object.keys(d).length > 0) {
-          detailsText = `<div style="max-height:60px; overflow-y:auto; font-family:monospace; font-size:0.75rem; background:rgba(0,0,0,0.2); padding:4px; border-radius:4px;">${JSON.stringify(d, null, 2).replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
-        } else {
-          detailsText = '<span style="color:var(--text-muted)">-</span>';
-        }
-      } catch (e) {
-        detailsText = 'Invalid Data';
+
+      // ── Human-readable detail renderer ───────────────────────────────────
+      function formatAuditDetails(raw) {
+        let d;
+        try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return '<span style="color:var(--text-muted)">-</span>'; }
+        if (!d || typeof d !== 'object' || Object.keys(d).length === 0) return '<span style="color:var(--text-muted)">-</span>';
+
+        // Field display config: key → { label, icon, color, format }
+        const FIELD_MAP = {
+          user:           { icon: '👤', label: 'User',         color: '#a78bfa' },
+          assignedTo:     { icon: '👤', label: 'Assigned To',  color: '#a78bfa' },
+          requested_by:   { icon: '👤', label: 'By',           color: '#a78bfa' },
+          taskName:       { icon: '📌', label: 'Task',         color: '#e2e8f0' },
+          taskId:         { icon: '🔖', label: 'Task ID',      color: '#94a3b8' },
+          reason:         { icon: '💬', label: 'Reason',       color: '#fbbf24' },
+          notes:          { icon: '📝', label: 'Notes',        color: '#94a3b8' },
+          status:         { icon: '🔄', label: 'Status',       color: '#34d399' },
+          taskType:       { icon: '🗂️',  label: 'Type',        color: '#60a5fa' },
+          priority:       { icon: '⚡', label: 'Priority',     color: '#fb923c' },
+          plannedDate:    { icon: '📅', label: 'Planned',      color: '#38bdf8' },
+          completedDate:  { icon: '✅', label: 'Completed',    color: '#34d399' },
+          quantity_ok:    { icon: '✔️',  label: 'Qty OK',      color: '#34d399', format: v => v === true || v === 'true' ? 'Yes' : 'No' },
+          time:           { icon: '🕐', label: 'Time',         color: '#f472b6' },
+          recurrence:     { icon: '🔁', label: 'Recurrence',   color: '#c084fc' },
+          score:          { icon: '🏆', label: 'Score',        color: '#fbbf24' },
+          action:         { icon: '⚙️',  label: 'Action',      color: '#94a3b8' },
+        };
+
+        const SKIP_KEYS = new Set(['__v', 'updated_at', 'created_at']);
+        const chips = Object.entries(d)
+          .filter(([k]) => !SKIP_KEYS.has(k))
+          .map(([k, v]) => {
+            if (v === null || v === undefined || v === '') return null;
+            const cfg = FIELD_MAP[k];
+            const icon  = cfg ? cfg.icon  : '•';
+            const label = cfg ? cfg.label : k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const color = cfg ? cfg.color : '#94a3b8';
+            let display = cfg && cfg.format ? cfg.format(v) : String(v);
+            // Shorten ISO dates to readable
+            if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v)) {
+              try { display = new Date(v).toLocaleString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }); } catch {}
+            }
+            if (display.length > 60) display = display.slice(0, 57) + '…';
+            return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;margin:2px;border-radius:99px;font-size:0.72rem;font-weight:500;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:${color};white-space:nowrap;">
+              <span style="opacity:0.85;">${icon}</span>
+              <span style="color:rgba(255,255,255,0.4);font-weight:400;">${label}:</span>
+              <span>${display}</span>
+            </span>`;
+          })
+          .filter(Boolean);
+
+        return chips.length
+          ? `<div style="display:flex;flex-wrap:wrap;gap:1px;max-height:72px;overflow-y:auto;">${chips.join('')}</div>`
+          : '<span style="color:var(--text-muted)">-</span>';
       }
-      
+
+      const detailsText = formatAuditDetails(log.new_data);
+
       return `
         <tr style="border-bottom:1px solid var(--border-glass);">
           <td style="padding:10px 12px; white-space:nowrap; color:var(--text-primary);">${timeStr}</td>
@@ -9416,59 +9460,132 @@ window.renderAuditLogs = async function () {
 window.loadVideoEditsData = async function () {
   const tbody = $('video-edits-table-body');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">Loading videos...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Loading videos...</td></tr>';
+
+  // Update headers to match schema
+  const thead = tbody.closest('table')?.querySelector('thead tr');
+  if (thead) {
+    thead.innerHTML = `
+      <th style="padding:12px; color:var(--text-secondary); font-weight:600; white-space:nowrap;">#ID</th>
+      <th style="padding:12px; color:var(--text-secondary); font-weight:600;">Type</th>
+      <th style="padding:12px; color:var(--text-secondary); font-weight:600;">Topic</th>
+      <th style="padding:12px; color:var(--text-secondary); font-weight:600;">Description</th>
+      <th style="padding:12px; color:var(--text-secondary); font-weight:600; text-align:center;">Actions</th>
+    `;
+  }
 
   try {
     const res = await apiFetch('getVideoEdits');
+
     if (!res.success) throw new Error(res.error);
 
-    if (res.data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No videos found.</td></tr>';
+    if (!res.data || res.data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No videos found.</td></tr>';
       return;
     }
 
-    // Process and display data
     tbody.innerHTML = res.data.map(row => {
-      // Parse description for Hashtag, Bio, Topic
-      const desc = row.Description || '';
-      let hashtag = '';
-      let bio = '';
-      let topic = '';
+      const escapedData = encodeURIComponent(JSON.stringify(row))
+        .replace(/'/g, '%27')
+        .replace(/\(/g, '%28')
+        .replace(/\)/g, '%29')
+        .replace(/!/g, '%21')
+        .replace(/~/g, '%7E')
+        .replace(/\*/g, '%2A');
+      const id          = row.id || '-';
+      const type        = row['Type'] || '-';
+      const topic       = row['Topic'] || '-';
+      const desc        = row['Description'] || '';
+      const driveLink   = row['DriveLink'] || '';
 
-      // Simple extraction 
-      const hashtagMatch = desc.match(/(#[\\w]+)/g);
-      if (hashtagMatch) hashtag = hashtagMatch.join(' ');
-      
-      const bioMatch = desc.match(/Bio:\\s*(.*?)(?:\\n|$|Topic:|Hashtag:)/i);
-      if (bioMatch) bio = bioMatch[1].trim();
-      
-      const topicMatch = desc.match(/Topic:\\s*(.*?)(?:\\n|$|Bio:|Hashtag:)/i);
-      if (topicMatch) topic = topicMatch[1].trim();
+      // ── Smart Description Parser ──────────────────────────────────────
+      function renderDescription(raw) {
+        if (!raw || raw === '-') return '<span style="color:var(--text-muted);font-size:0.8rem;">No description</span>';
 
-      const escapedData = encodeURIComponent(JSON.stringify(row));
-      const rowId = row.id || row.row_id || row.Row_ID || '-';
-      const link = row.video_link || row.link || row.Link || '';
-      
+        // Section icons for known labels
+        const sectionIcons = {
+          'description': '📝',
+          'caption':     '💬',
+          'hashtag':     '#️⃣',
+          'hashtags':    '#️⃣',
+          'bio':         '👤',
+          'title':       '🎯',
+          'hook':        '🪝',
+          'cta':         '📣',
+          'note':        '📌',
+          'script':      '🎬',
+          'thumbnail':   '🖼️',
+          'tags':        '🏷️',
+        };
+
+        // Check if structured with <<< markers
+        if (raw.includes('<<<')) {
+          const parts = raw.split(/<<</).filter(Boolean);
+          return parts.map(part => {
+            const firstLine = part.split(/\n/)[0].trim();
+            const rest = part.slice(firstLine.length).trim();
+            const key = firstLine.toLowerCase().replace(/[^a-z]/g, '');
+            const icon = sectionIcons[key] || '•';
+            const label = firstLine;
+            return `
+              <div style="margin-bottom:10px;">
+                <div style="font-size:0.68rem; font-weight:700; color:var(--accent-purple); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:3px; display:flex; align-items:center; gap:4px;">
+                  <span>${icon}</span> ${label}
+                </div>
+                <div style="font-size:0.82rem; color:var(--text-primary); line-height:1.6; background:rgba(255,255,255,0.03); padding:8px 10px; border-radius:6px; border-left:2px solid rgba(124,58,237,0.4); white-space:pre-wrap; word-break:break-word;">${rest || '—'}</div>
+              </div>`;
+          }).join('');
+        }
+
+        // Plain text: split on newlines, render each as a paragraph
+        const lines = raw.split(/\n+/).filter(l => l.trim());
+        if (lines.length > 1) {
+          return lines.map(l => `<div style="font-size:0.82rem; color:var(--text-primary); line-height:1.6; margin-bottom:4px;">${l.trim()}</div>`).join('');
+        }
+
+        // Single line — just show it
+        return `<div style="font-size:0.82rem; color:var(--text-primary); line-height:1.6;">${raw}</div>`;
+      }
+      // ─────────────────────────────────────────────────────────────────
+
+
+
+      // Type badge color
+      const typeColors = {
+        'short': '#a78bfa',
+        'shorts': '#a78bfa',
+        'youtube': '#f87171',
+        'video': '#60a5fa',
+        'reel': '#fb923c',
+      };
+      const typeLower = type.toLowerCase();
+      const typeColor = typeColors[typeLower] || '#94a3b8';
+
       return `
-        <tr style="border-bottom: 1px solid var(--border-glass);">
-          <td style="padding:12px; color:var(--text-primary); font-weight:600;">${rowId}</td>
-          <td style="padding:12px; color:var(--accent-purple);">${hashtag || '-'}</td>
-          <td style="padding:12px; color:var(--text-primary); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${bio.replace(/"/g, '&quot;')}">${bio || '-'}</td>
-          <td style="padding:12px; color:var(--text-primary);">${topic || '-'}</td>
-          <td style="padding:12px;">
-            ${link ? `<a href="${link}" target="_blank" class="btn-link" style="font-size:0.8rem;">View Link</a>` : '-'}
+        <tr style="border-bottom: 1px solid var(--border-glass); vertical-align:top;">
+          <td style="padding:14px 12px; color:var(--accent-purple); font-weight:700; font-size:0.85rem; white-space:nowrap;">#${id}</td>
+          <td style="padding:14px 12px; white-space:nowrap;">
+            <span style="display:inline-block; padding:3px 10px; border-radius:99px; font-size:0.72rem; font-weight:700; background:rgba(255,255,255,0.05); border:1px solid ${typeColor}40; color:${typeColor};">${type}</span>
           </td>
-          <td style="padding:12px; text-align:center;">
-            <div style="display:flex; gap:8px; justify-content:center;">
-              <button onclick="triggerOpusCheckWebhook('${rowId}', 'approve', '${escapedData}')" class="btn-primary btn-sm" style="background:var(--accent-emerald); font-size:0.75rem; padding:4px 10px;">Approve</button>
-              <button onclick="triggerOpusCheckWebhook('${rowId}', 'reject', '${escapedData}')" class="btn-primary btn-sm" style="background:var(--accent-red); font-size:0.75rem; padding:4px 10px;">Reject</button>
+          <td style="padding:14px 12px; color:var(--text-primary); font-size:0.85rem; max-width:200px;">${topic}</td>
+          <td style="padding:14px 12px; max-width:340px;">
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              ${renderDescription(desc)}
+            </div>
+          </td>
+          <td style="padding:14px 12px; text-align:center;">
+            <div style="display:flex; flex-direction:column; gap:6px; align-items:center;">
+              ${driveLink ? `<a href="${driveLink}" target="_blank" class="btn-primary btn-sm" style="font-size:0.75rem; padding:4px 12px; text-decoration:none; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; width:100%; justify-content:center;">🔗 Drive</a>` : ''}
+              <button onclick="triggerOpusCheckWebhook('${id}', 'approve', '${escapedData}')" class="btn-primary btn-sm" style="background:var(--accent-emerald); font-size:0.75rem; padding:4px 10px; white-space:nowrap; width:100%;">✅ Approve</button>
+              <button onclick="triggerOpusCheckWebhook('${id}', 'reject', '${escapedData}')" class="btn-primary btn-sm" style="background:var(--accent-red); font-size:0.75rem; padding:4px 10px; white-space:nowrap; width:100%;">❌ Reject</button>
             </div>
           </td>
         </tr>
       `;
     }).join('');
+
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--accent-red);">Error loading videos: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--accent-red);">Error: ${err.message}</td></tr>`;
   }
 };
 
