@@ -678,6 +678,52 @@
       </div>
     </main>
 
+    <!-- Video Edit Container -->
+    <main class="dashboard-content" id="video-edit-container" style="display:none;">
+      <div style="padding:var(--space-xl); max-width:1200px; margin:0 auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-lg);">
+          <h2 style="font-size:1.5rem; font-weight:800; color:var(--text-primary);">🎬 Video Edit</h2>
+          <button class="btn-primary" onclick="loadVideoEditsData()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l5.25-5.25"></path></svg>
+            Refresh
+          </button>
+        </div>
+
+        <!-- Upload Options -->
+        <div class="kpi-card" style="margin-bottom: var(--space-xl); padding: var(--space-lg); background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: var(--radius-lg);">
+          <div style="display: flex; gap: var(--space-md); margin-bottom: var(--space-md);">
+            <a href="https://drive.google.com/drive/u/1/folders/1yOLFnhZ5Tm5ouzjq3tN_kXCuE7J27cwf" target="_blank" class="btn-primary" style="text-decoration:none; display:flex; align-items:center; gap:8px;">
+              📱 Shorts
+            </a>
+            <a href="https://drive.google.com/drive/u/1/folders/1tNjIh10DR6ftAWPESF2R-EXacFegV3tP" target="_blank" class="btn-primary" style="text-decoration:none; display:flex; align-items:center; gap:8px; background:var(--accent-red);">
+              ▶️ youtube video
+            </a>
+          </div>
+          <p style="font-size: 0.9rem; color: var(--text-muted); margin: 0;">Just paste or upload the video u want to edit</p>
+        </div>
+
+        <!-- Check Videos Table -->
+        <div class="glass-panel" style="overflow-x:auto;">
+          <h3 style="font-size: 1rem; margin-bottom: var(--space-md); color: var(--text-primary);">Check Videos</h3>
+          <table style="width:100%; text-align:left; border-collapse:collapse; font-size:0.85rem;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border-glass);">
+                <th style="padding:12px; color:var(--text-secondary); font-weight:600;">Row ID</th>
+                <th style="padding:12px; color:var(--text-secondary); font-weight:600;">Hashtag</th>
+                <th style="padding:12px; color:var(--text-secondary); font-weight:600;">Bio</th>
+                <th style="padding:12px; color:var(--text-secondary); font-weight:600;">Topic</th>
+                <th style="padding:12px; color:var(--text-secondary); font-weight:600;">Link</th>
+                <th style="padding:12px; color:var(--text-secondary); font-weight:600; text-align:center;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="video-edits-table-body">
+              <tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">Loading videos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
     <!-- Helper Container (Admin Only) -->
     <div id="helper-container" style="display:none; padding: var(--space-lg); max-width: 1000px; margin: 0 auto;">
       <div class="glass-panel" style="padding: var(--space-xl); margin-bottom: var(--space-xl);">
@@ -1361,7 +1407,7 @@
   </div>
 
 
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=7"></script>
   <!-- Member Actions Modal -->
   <div class="modal-overlay" id="member-actions-modal" style="display:none;">
     <div class="modal-card" style="max-width: 350px;">

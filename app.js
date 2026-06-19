@@ -995,6 +995,7 @@ function renderNavigationTabs() {
       <button class="nav-tab ${state.currentView === 'fms-builder' ? 'active' : ''}" id="tab-fms-builder">🛠️ FMS Builder</button>
       <button class="nav-tab ${state.currentView === 'helper' ? 'active' : ''}" id="tab-helper">📋 Helper</button>
       <button class="nav-tab ${state.currentView === 'logs' ? 'active' : ''}" id="tab-logs">📜 Audit Logs</button>
+      <button class="nav-tab ${state.currentView === 'video-edit' ? 'active' : ''}" id="tab-video-edit">🎬 Video Edit</button>
     `;
   }
 
@@ -1038,21 +1039,25 @@ function renderNavigationTabs() {
 function bindTabClickListeners() {
   const isPrivileged = ['admin', 'coordinator', 'process_coordinator'].includes(state.userRole);
 
+  // ── Central helper: hide every switchable container ──────────────────────
+  function hideAllContainers() {
+    const ids = [
+      'task-view-container', 'admin-dashboard-container', 'test-tracker-container',
+      'fms-builder-container', 'student-container', 'helper-container',
+      'logs-container', 'weekly-review-container', 'video-edit-container',
+      'stats-section', 'briefing-section', 'monitoring-header'
+    ];
+    ids.forEach(id => { const el = $(id); if (el) el.style.display = 'none'; });
+  }
+
   const myTasks = $('tab-my-tasks');
   if (myTasks) myTasks.onclick = () => {
     state.currentView = 'tasks';
     state.tasksFilterUser = null;
     state.currentGlobalView = false;
     setActiveTab('tab-my-tasks');
-    if ($('monitoring-header')) $('monitoring-header').style.display = 'none';
+    hideAllContainers();
     $('task-view-container').style.display = 'block';
-    $('admin-dashboard-container').style.display = 'none';
-    $('test-tracker-container').style.display = 'none';
-    if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
-    if ($('student-container')) $('student-container').style.display = 'none';
-    if ($('helper-container')) $('helper-container').style.display = 'none';
-      if ($('logs-container')) $('logs-container').style.display = 'none';
-    if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
     $('stats-section').style.display = 'block';
     $('briefing-section').style.display = 'block';
     initForUser(state.currentUser);
@@ -1062,13 +1067,7 @@ function bindTabClickListeners() {
   if (weeklyReviewTab) weeklyReviewTab.onclick = () => {
     setActiveTab('tab-weekly-review');
     state.currentView = 'weekly-review';
-    $('task-view-container').style.display = 'none';
-    $('admin-dashboard-container').style.display = 'none';
-    $('test-tracker-container').style.display = 'none';
-    if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
-    if ($('student-container')) $('student-container').style.display = 'none';
-    if ($('helper-container')) $('helper-container').style.display = 'none';
-      if ($('logs-container')) $('logs-container').style.display = 'none';
+    hideAllContainers();
     if ($('weekly-review-container')) $('weekly-review-container').style.display = 'block';
     openWeeklyReview();
   };
@@ -1077,14 +1076,8 @@ function bindTabClickListeners() {
   if (teamTab) teamTab.onclick = () => {
     setActiveTab('tab-team');
     state.currentView = 'dashboard';
+    hideAllContainers();
     openDashboard();
-    $('task-view-container').style.display = 'none';
-    $('test-tracker-container').style.display = 'none';
-    if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
-    if ($('student-container')) $('student-container').style.display = 'none';
-    if ($('helper-container')) $('helper-container').style.display = 'none';
-      if ($('logs-container')) $('logs-container').style.display = 'none';
-    if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
   };
 
   const staticFms = [
@@ -1100,14 +1093,8 @@ function bindTabClickListeners() {
     if (el) el.onclick = () => {
       setActiveTab(f.id);
       state.testFmsFilter = 'all';
+      hideAllContainers();
       openTestTracker(f.view);
-      $('task-view-container').style.display = 'none';
-      $('admin-dashboard-container').style.display = 'none';
-      if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
-      if ($('student-container')) $('student-container').style.display = 'none';
-      if ($('helper-container')) $('helper-container').style.display = 'none';
-      if ($('logs-container')) $('logs-container').style.display = 'none';
-      if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
       $('test-tracker-container').style.display = 'block';
     };
   });
@@ -1121,14 +1108,8 @@ function bindTabClickListeners() {
       el.onclick = () => {
         setActiveTab(`tab-custom-${lowerSlug}`);
         state.testFmsFilter = 'all';
+        hideAllContainers();
         openTestTracker(lowerSlug);
-        $('task-view-container').style.display = 'none';
-        $('admin-dashboard-container').style.display = 'none';
-        if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
-        if ($('student-container')) $('student-container').style.display = 'none';
-        if ($('helper-container')) $('helper-container').style.display = 'none';
-      if ($('logs-container')) $('logs-container').style.display = 'none';
-        if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
         $('test-tracker-container').style.display = 'block';
       };
     }
@@ -1148,14 +1129,8 @@ function bindTabClickListeners() {
     fmsBuilderTab.onclick = () => {
       setActiveTab('tab-fms-builder');
       state.currentView = 'fms-builder';
-      $('task-view-container').style.display = 'none';
-      $('admin-dashboard-container').style.display = 'none';
-      $('test-tracker-container').style.display = 'none';
+      hideAllContainers();
       if ($('fms-builder-container')) $('fms-builder-container').style.display = 'block';
-      if ($('student-container')) $('student-container').style.display = 'none';
-      if ($('helper-container')) $('helper-container').style.display = 'none';
-      if ($('logs-container')) $('logs-container').style.display = 'none';
-      if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
       renderCustomFmsBlueprintsList();
       closeCustomFmsCreatorSection();
     };
@@ -1167,16 +1142,21 @@ function bindTabClickListeners() {
     logsTab.onclick = () => {
       setActiveTab('tab-logs');
       state.currentView = 'logs';
-      $('task-view-container').style.display = 'none';
-      $('admin-dashboard-container').style.display = 'none';
-      $('test-tracker-container').style.display = 'none';
-      if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
-      if ($('student-container')) $('student-container').style.display = 'none';
-      if ($('helper-container')) $('helper-container').style.display = 'none';
-      if ($('logs-container')) $('logs-container').style.display = 'none';
-      if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
+      hideAllContainers();
       if ($('logs-container')) $('logs-container').style.display = 'block';
       renderAuditLogs();
+    };
+  }
+
+  // Bind Video Edit tab (visible to admin only)
+  const videoEditTab = $('tab-video-edit');
+  if (videoEditTab) {
+    videoEditTab.onclick = () => {
+      setActiveTab('tab-video-edit');
+      state.currentView = 'video-edit';
+      hideAllContainers();
+      if ($('video-edit-container')) $('video-edit-container').style.display = 'block';
+      loadVideoEditsData();
     };
   }
 
@@ -9197,6 +9177,7 @@ function helperWordSimilarity(queryWord, targetWord) {
 }
 
 function renderHelpers(queryText = '') {
+  const isCommonRole = state.userRole === 'common';
   const grid = document.getElementById('helpers-grid');
   if (!grid) return;
 
@@ -9433,6 +9414,97 @@ window.renderAuditLogs = async function () {
     }).join('');
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--accent-red);">${err.message}</td></tr>`;
+  }
+};
+
+// =============================================
+// VIDEO EDITS
+// =============================================
+window.loadVideoEditsData = async function () {
+  const tbody = $('video-edits-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">Loading videos...</td></tr>';
+
+  try {
+    const res = await apiFetch('getVideoEdits');
+    if (!res.success) throw new Error(res.error);
+
+    if (res.data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No videos found.</td></tr>';
+      return;
+    }
+
+    // Process and display data
+    tbody.innerHTML = res.data.map(row => {
+      // Parse description for Hashtag, Bio, Topic
+      const desc = row.Description || '';
+      let hashtag = '';
+      let bio = '';
+      let topic = '';
+
+      // Simple extraction 
+      const hashtagMatch = desc.match(/(#[\\w]+)/g);
+      if (hashtagMatch) hashtag = hashtagMatch.join(' ');
+      
+      const bioMatch = desc.match(/Bio:\\s*(.*?)(?:\\n|$|Topic:|Hashtag:)/i);
+      if (bioMatch) bio = bioMatch[1].trim();
+      
+      const topicMatch = desc.match(/Topic:\\s*(.*?)(?:\\n|$|Bio:|Hashtag:)/i);
+      if (topicMatch) topic = topicMatch[1].trim();
+
+      const escapedData = encodeURIComponent(JSON.stringify(row));
+      const rowId = row.id || row.row_id || row.Row_ID || '-';
+      const link = row.video_link || row.link || row.Link || '';
+      
+      return `
+        <tr style="border-bottom: 1px solid var(--border-glass);">
+          <td style="padding:12px; color:var(--text-primary); font-weight:600;">${rowId}</td>
+          <td style="padding:12px; color:var(--accent-purple);">${hashtag || '-'}</td>
+          <td style="padding:12px; color:var(--text-primary); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${bio.replace(/"/g, '&quot;')}">${bio || '-'}</td>
+          <td style="padding:12px; color:var(--text-primary);">${topic || '-'}</td>
+          <td style="padding:12px;">
+            ${link ? `<a href="${link}" target="_blank" class="btn-link" style="font-size:0.8rem;">View Link</a>` : '-'}
+          </td>
+          <td style="padding:12px; text-align:center;">
+            <div style="display:flex; gap:8px; justify-content:center;">
+              <button onclick="triggerOpusCheckWebhook('${rowId}', 'approve', '${escapedData}')" class="btn-primary btn-sm" style="background:var(--accent-emerald); font-size:0.75rem; padding:4px 10px;">Approve</button>
+              <button onclick="triggerOpusCheckWebhook('${rowId}', 'reject', '${escapedData}')" class="btn-primary btn-sm" style="background:var(--accent-red); font-size:0.75rem; padding:4px 10px;">Reject</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--accent-red);">Error loading videos: ${err.message}</td></tr>`;
+  }
+};
+
+window.triggerOpusCheckWebhook = async function (rowId, action, escapedData) {
+  try {
+    const rawData = JSON.parse(decodeURIComponent(escapedData));
+    const payload = {
+      action: action,
+      row_id: rowId,
+      user: state.currentUser,
+      data: rawData
+    };
+
+    showToast(`Sending ${action} request...`);
+    const res = await fetch('https://n8n.saraswatividyamandir.com/webhook/opus-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      showToast(`Successfully processed: ${action}`, 'success');
+      loadVideoEditsData();
+    } else {
+      showToast(`Failed to process: ${res.statusText}`, 'error');
+    }
+  } catch (err) {
+    console.error('Webhook error:', err);
+    showToast(`Error triggering webhook.`, 'error');
   }
 };
 

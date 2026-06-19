@@ -193,6 +193,12 @@ async function _supabaseApiFetchInner(action, params = {}) {
       return { success: true, data: data.map(r => ({ name: r.name, role: r.role, active: r.active, email: r.email })) };
     }
 
+    case 'getVideoEdits': {
+      const { data, error } = await sb.from('edits_video').select('*');
+      if (error) throw new Error(error.message);
+      return { success: true, data };
+    }
+
     case 'getAuditLogs': {
       const { data, error } = await sb.from('modifications')
         .select('*')

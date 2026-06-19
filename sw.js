@@ -1,4 +1,4 @@
-const CACHE_NAME = 'svm-tasks-v4';
+const CACHE_NAME = 'svm-tasks-v6';
 
 // Only cache truly static assets — NOT app.js (so API URL always loads fresh)
 const ASSETS = [
