@@ -800,7 +800,9 @@ function handleUserSignedOut() {
   if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
   if ($('student-container')) $('student-container').style.display = 'none';
   if ($('helper-container')) $('helper-container').style.display = 'none';
-      if ($('logs-container')) $('logs-container').style.display = 'none';
+  if ($('logs-container')) $('logs-container').style.display = 'none';
+  if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
+  if ($('video-edit-container')) $('video-edit-container').style.display = 'none';
 }
 
 function handleUserSignedIn(userData) {
@@ -845,7 +847,9 @@ function handleUserSignedIn(userData) {
   if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
   if ($('student-container')) $('student-container').style.display = 'none';
   if ($('helper-container')) $('helper-container').style.display = 'none';
-      if ($('logs-container')) $('logs-container').style.display = 'none';
+  if ($('logs-container')) $('logs-container').style.display = 'none';
+  if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
+  if ($('video-edit-container')) $('video-edit-container').style.display = 'none';
   if ($('task-view-container')) $('task-view-container').style.display = 'block';
 
   renderHeader(state.currentUser);
