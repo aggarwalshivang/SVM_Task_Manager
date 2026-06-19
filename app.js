@@ -1166,14 +1166,8 @@ function bindTabClickListeners() {
     studentTab.onclick = () => {
       setActiveTab('tab-student');
       state.currentView = 'student';
-      $('task-view-container').style.display = 'none';
-      $('admin-dashboard-container').style.display = 'none';
-      $('test-tracker-container').style.display = 'none';
-      if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
+      hideAllContainers();
       if ($('student-container')) $('student-container').style.display = 'block';
-      if ($('helper-container')) $('helper-container').style.display = 'none';
-      if ($('logs-container')) $('logs-container').style.display = 'none';
-      if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
 
       // Check permissions and customize the view
       const isAdmin = state.userRole === 'admin';
@@ -1209,13 +1203,8 @@ function bindTabClickListeners() {
     helperTab.onclick = () => {
       setActiveTab('tab-helper');
       state.currentView = 'helper';
-      $('task-view-container').style.display = 'none';
-      $('admin-dashboard-container').style.display = 'none';
-      $('test-tracker-container').style.display = 'none';
-      if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
-      if ($('student-container')) $('student-container').style.display = 'none';
+      hideAllContainers();
       if ($('helper-container')) $('helper-container').style.display = 'block';
-      if ($('weekly-review-container')) $('weekly-review-container').style.display = 'none';
       const searchInput = document.getElementById('helper-search-input');
       if (searchInput) searchInput.value = '';
       state.selectedHelperTag = 'all';
