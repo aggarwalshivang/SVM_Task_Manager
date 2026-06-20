@@ -674,7 +674,7 @@ body::before {
   justify-content: safe center; /* Centered when it fits, safe left-aligned when it overflows to prevent clipping */
   gap: var(--space-xs);
   background: var(--bg-card);
-  padding: 4px 8px;
+  padding: 6px 8px;
   border-radius: var(--radius-full);
   border: 1px solid var(--border-glass);
   overflow-x: auto;

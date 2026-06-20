@@ -989,7 +989,10 @@ function renderNavigationTabs() {
 
   let html = `
     <button class="nav-tab ${state.currentView === 'tasks' ? 'active' : ''}" id="tab-my-tasks">My Tasks</button>
-    <button class="nav-tab ${state.currentView === 'dashboard' ? 'active' : ''}" id="tab-team" style="position:relative; display:${isPrivileged ? 'block' : 'none'};">Team <span id="team-badge" style="display:none; position:absolute; top:-5px; right:-5px; background:var(--accent-red); color:white; font-size:0.6rem; padding:2px 5px; border-radius:10px; border:2px solid var(--bg-primary);">!</span></button>
+    <div style="position:relative; display:${isPrivileged ? 'inline-block' : 'none'};">
+      <button class="nav-tab ${state.currentView === 'dashboard' ? 'active' : ''}" id="tab-team">Team</button>
+      <span id="team-badge" style="display:none; position:absolute; top:-4px; right:-4px; background:var(--accent-red); color:white; font-size:0.6rem; padding:2px 5px; border-radius:10px; border:2px solid var(--bg-primary); pointer-events:none;">!</span>
+    </div>
   `;
 
   // Append FMS Builder and Helper tabs beside the team tab, visible to ADMIN ONLY
@@ -9457,6 +9460,10 @@ window.renderAuditLogs = async function () {
 // =============================================
 // VIDEO EDITS
 // =============================================
+window.globalVideoEditsData = [];
+window.currentVideoEditsFilter = 'all';
+window.currentVideoEditsSort = 'newest';
+
 window.loadVideoEditsData = async function () {
   const tbody = $('video-edits-table-body');
   if (!tbody) return;
@@ -9484,109 +9491,160 @@ window.loadVideoEditsData = async function () {
       return;
     }
 
-    tbody.innerHTML = res.data.map(row => {
-      const escapedData = encodeURIComponent(JSON.stringify(row))
-        .replace(/'/g, '%27')
-        .replace(/\(/g, '%28')
-        .replace(/\)/g, '%29')
-        .replace(/!/g, '%21')
-        .replace(/~/g, '%7E')
-        .replace(/\*/g, '%2A');
-      const id          = row.id || '-';
-      const type        = row['Type'] || '-';
-      const topic       = row['Topic'] || '-';
-      const desc        = row['Description'] || '';
-      const driveLink   = row['DriveLink'] || '';
-
-      // ── Smart Description Parser ──────────────────────────────────────
-      function renderDescription(raw) {
-        if (!raw || raw === '-') return '<span style="color:var(--text-muted);font-size:0.8rem;">No description</span>';
-
-        // Section icons for known labels
-        const sectionIcons = {
-          'description': '📝',
-          'caption':     '💬',
-          'hashtag':     '#️⃣',
-          'hashtags':    '#️⃣',
-          'bio':         '👤',
-          'title':       '🎯',
-          'hook':        '🪝',
-          'cta':         '📣',
-          'note':        '📌',
-          'script':      '🎬',
-          'thumbnail':   '🖼️',
-          'tags':        '🏷️',
-        };
-
-        // Check if structured with <<< markers
-        if (raw.includes('<<<')) {
-          const parts = raw.split(/<<</).filter(Boolean);
-          return parts.map(part => {
-            const firstLine = part.split(/\n/)[0].trim();
-            const rest = part.slice(firstLine.length).trim();
-            const key = firstLine.toLowerCase().replace(/[^a-z]/g, '');
-            const icon = sectionIcons[key] || '•';
-            const label = firstLine;
-            return `
-              <div style="margin-bottom:10px;">
-                <div style="font-size:0.68rem; font-weight:700; color:var(--accent-purple); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:3px; display:flex; align-items:center; gap:4px;">
-                  <span>${icon}</span> ${label}
-                </div>
-                <div style="font-size:0.82rem; color:var(--text-primary); line-height:1.6; background:rgba(255,255,255,0.03); padding:8px 10px; border-radius:6px; border-left:2px solid rgba(124,58,237,0.4); white-space:pre-wrap; word-break:break-word;">${rest || '—'}</div>
-              </div>`;
-          }).join('');
-        }
-
-        // Plain text: split on newlines, render each as a paragraph
-        const lines = raw.split(/\n+/).filter(l => l.trim());
-        if (lines.length > 1) {
-          return lines.map(l => `<div style="font-size:0.82rem; color:var(--text-primary); line-height:1.6; margin-bottom:4px;">${l.trim()}</div>`).join('');
-        }
-
-        // Single line — just show it
-        return `<div style="font-size:0.82rem; color:var(--text-primary); line-height:1.6;">${raw}</div>`;
-      }
-      // ─────────────────────────────────────────────────────────────────
-
-
-
-      // Type badge color
-      const typeColors = {
-        'short': '#a78bfa',
-        'shorts': '#a78bfa',
-        'youtube': '#f87171',
-        'video': '#60a5fa',
-        'reel': '#fb923c',
-      };
-      const typeLower = type.toLowerCase();
-      const typeColor = typeColors[typeLower] || '#94a3b8';
-
-      return `
-        <tr style="border-bottom: 1px solid var(--border-glass); vertical-align:top;">
-          <td style="padding:14px 12px; color:var(--accent-purple); font-weight:700; font-size:0.85rem; white-space:nowrap;">#${id}</td>
-          <td style="padding:14px 12px; white-space:nowrap;">
-            <span style="display:inline-block; padding:3px 10px; border-radius:99px; font-size:0.72rem; font-weight:700; background:rgba(255,255,255,0.05); border:1px solid ${typeColor}40; color:${typeColor};">${type}</span>
-          </td>
-          <td style="padding:14px 12px; color:var(--text-primary); font-size:0.85rem; max-width:200px;">${topic}</td>
-          <td style="padding:14px 12px; max-width:340px;">
-            <div style="display:flex; flex-direction:column; gap:2px;">
-              ${renderDescription(desc)}
-            </div>
-          </td>
-          <td style="padding:14px 12px; text-align:center;">
-            <div style="display:flex; flex-direction:column; gap:6px; align-items:center;">
-              ${driveLink ? `<a href="${driveLink}" target="_blank" class="btn-primary btn-sm" style="font-size:0.75rem; padding:4px 12px; text-decoration:none; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; width:100%; justify-content:center;">🔗 Drive</a>` : ''}
-              <button onclick="triggerOpusCheckWebhook('${id}', 'approve', '${escapedData}')" class="btn-primary btn-sm" style="background:var(--accent-emerald); font-size:0.75rem; padding:4px 10px; white-space:nowrap; width:100%;">✅ Approve</button>
-              <button onclick="triggerOpusCheckWebhook('${id}', 'reject', '${escapedData}')" class="btn-primary btn-sm" style="background:var(--accent-red); font-size:0.75rem; padding:4px 10px; white-space:nowrap; width:100%;">❌ Reject</button>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join('');
+    window.globalVideoEditsData = res.data;
+    renderVideoEditsTable();
 
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--accent-red);">Error: ${err.message}</td></tr>`;
   }
+};
+
+window.filterVideoEdits = function(type) {
+  window.currentVideoEditsFilter = type;
+  document.getElementById('video-filter-all').classList.toggle('active', type === 'all');
+  document.getElementById('video-filter-youtube').classList.toggle('active', type === 'youtube');
+  document.getElementById('video-filter-shorts').classList.toggle('active', type === 'shorts');
+  renderVideoEditsTable();
+};
+
+window.sortVideoEdits = function(sort) {
+  window.currentVideoEditsSort = sort;
+  renderVideoEditsTable();
+};
+
+window.renderVideoEditsTable = function() {
+  const tbody = $('video-edits-table-body');
+  if (!tbody) return;
+
+  if (!window.globalVideoEditsData || window.globalVideoEditsData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No videos found.</td></tr>';
+    return;
+  }
+
+  let data = [...window.globalVideoEditsData];
+
+  // Apply Filter
+  if (window.currentVideoEditsFilter !== 'all') {
+    data = data.filter(row => {
+      const t = (row['Type'] || '').toLowerCase();
+      if (window.currentVideoEditsFilter === 'youtube') return t.includes('youtube');
+      if (window.currentVideoEditsFilter === 'shorts') return t.includes('short');
+      return true;
+    });
+  }
+
+  // Apply Sort
+  data.sort((a, b) => {
+    // ID is usually numeric, sort by ID properly
+    const valA = parseInt(String(a.id).replace(/\D/g, '')) || 0;
+    const valB = parseInt(String(b.id).replace(/\D/g, '')) || 0;
+    if (window.currentVideoEditsSort === 'newest') return valB - valA;
+    return valA - valB;
+  });
+
+  if (data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No videos match criteria.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = data.map(row => {
+    const escapedData = encodeURIComponent(JSON.stringify(row))
+      .replace(/'/g, '%27')
+      .replace(/\(/g, '%28')
+      .replace(/\)/g, '%29')
+      .replace(/!/g, '%21')
+      .replace(/~/g, '%7E')
+      .replace(/\*/g, '%2A');
+    const id          = row.id || '-';
+    const type        = row['Type'] || '-';
+    const topic       = row['Topic'] || '-';
+    const desc        = row['Description'] || '';
+    const driveLink   = row['DriveLink'] || '';
+
+    // ── Smart Description Parser ──────────────────────────────────────
+    function renderDescription(raw) {
+      if (!raw || raw === '-') return '<span style="color:var(--text-muted);font-size:0.8rem;">No description</span>';
+
+      // Section icons for known labels
+      const sectionIcons = {
+        'description': '📝',
+        'caption':     '💬',
+        'hashtag':     '#️⃣',
+        'hashtags':    '#️⃣',
+        'bio':         '👤',
+        'title':       '🎯',
+        'hook':        '🪝',
+        'cta':         '📣',
+        'note':        '📌',
+        'script':      '🎬',
+        'thumbnail':   '🖼️',
+        'tags':        '🏷️',
+      };
+
+      // Check if structured with <<< markers
+      if (raw.includes('<<<')) {
+        const parts = raw.split(/<<</).filter(Boolean);
+        return parts.map(part => {
+          const firstLine = part.split(/\n/)[0].trim();
+          if (firstLine.toUpperCase().includes('ENDDESCRIPTION') || firstLine.toUpperCase().startsWith('END')) return '';
+          const rest = part.slice(firstLine.length).trim();
+          const key = firstLine.toLowerCase().replace(/[^a-z]/g, '');
+          const icon = sectionIcons[key] || '•';
+          const label = firstLine.replace(/>>>/g, '').trim();
+          return `
+            <div style="margin-bottom:10px;">
+              <div style="font-size:0.68rem; font-weight:700; color:var(--accent-purple); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:3px; display:flex; align-items:center; gap:4px;">
+                <span>${icon}</span> ${label}
+              </div>
+              <div style="font-size:0.82rem; color:var(--text-primary); line-height:1.6; background:rgba(255,255,255,0.03); padding:8px 10px; border-radius:6px; border-left:2px solid rgba(124,58,237,0.4); white-space:pre-wrap; word-break:break-word;">${rest || '—'}</div>
+            </div>`;
+        }).join('');
+      }
+
+      // Plain text: split on newlines, render each as a paragraph
+      const lines = raw.split(/\n+/).filter(l => l.trim());
+      if (lines.length > 1) {
+        return lines.map(l => `<div style="font-size:0.82rem; color:var(--text-primary); line-height:1.6; margin-bottom:4px;">${l.trim()}</div>`).join('');
+      }
+
+      // Single line — just show it
+      return `<div style="font-size:0.82rem; color:var(--text-primary); line-height:1.6;">${raw}</div>`;
+    }
+    // ─────────────────────────────────────────────────────────────────
+
+    // Type badge color
+    const typeColors = {
+      'short': '#a78bfa',
+      'shorts': '#a78bfa',
+      'youtube': '#f87171',
+      'video': '#60a5fa',
+      'reel': '#fb923c',
+    };
+    const typeLower = type.toLowerCase();
+    const typeColor = typeColors[typeLower] || '#94a3b8';
+
+    return `
+      <tr style="border-bottom: 1px solid var(--border-glass); vertical-align:top;">
+        <td style="padding:14px 12px; color:var(--accent-purple); font-weight:700; font-size:0.85rem; white-space:nowrap;">#${id}</td>
+        <td style="padding:14px 12px; white-space:nowrap;">
+          <span style="display:inline-block; padding:3px 10px; border-radius:99px; font-size:0.72rem; font-weight:700; background:rgba(255,255,255,0.05); border:1px solid ${typeColor}40; color:${typeColor};">${type}</span>
+        </td>
+        <td style="padding:14px 12px; color:var(--text-primary); font-size:0.85rem; max-width:200px;">${topic}</td>
+        <td style="padding:14px 12px; max-width:500px; min-width:300px;">
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            ${renderDescription(desc)}
+          </div>
+        </td>
+        <td style="padding:14px 12px; text-align:center;">
+          <div style="display:flex; flex-direction:column; gap:6px; align-items:center;">
+            ${driveLink ? `<a href="${driveLink}" target="_blank" class="btn-primary btn-sm" style="font-size:0.75rem; padding:4px 12px; text-decoration:none; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; width:100%; justify-content:center;">🔗 Show Drive Video</a>` : ''}
+            <button onclick="triggerOpusCheckWebhook('${id}', 'approve', '${escapedData}')" class="btn-primary btn-sm" style="background:var(--accent-emerald); font-size:0.75rem; padding:4px 10px; white-space:nowrap; width:100%;">✅ Approve</button>
+            <button onclick="triggerOpusCheckWebhook('${id}', 'reject', '${escapedData}')" class="btn-primary btn-sm" style="background:var(--accent-red); font-size:0.75rem; padding:4px 10px; white-space:nowrap; width:100%;">❌ Reject</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
 };
 
 window.triggerOpusCheckWebhook = async function (rowId, action, escapedData) {

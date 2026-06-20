@@ -179,7 +179,10 @@
 
       <div class="header-center" id="header-nav" style="display:none;">
         <button class="nav-tab active" id="tab-my-tasks">My Tasks</button>
-        <button class="nav-tab" id="tab-team" style="position:relative;">Team <span id="team-badge" style="display:none; position:absolute; top:-5px; right:-5px; background:var(--accent-red); color:white; font-size:0.6rem; padding:2px 5px; border-radius:10px; border:2px solid var(--bg-primary);">!</span></button>
+        <div style="position:relative; display:inline-block;">
+          <button class="nav-tab" id="tab-team">Team</button>
+          <span id="team-badge" style="display:none; position:absolute; top:-4px; right:-4px; background:var(--accent-red); color:white; font-size:0.6rem; padding:2px 5px; border-radius:10px; border:2px solid var(--bg-primary); pointer-events:none;">!</span>
+        </div>
         <button class="nav-tab" id="tab-logs" style="display:none;">Audit Logs</button>
         <button class="nav-tab" id="tab-tests">Test FMS</button>
         <button class="nav-tab" id="tab-videos">Video FMS</button>
@@ -681,30 +684,44 @@
     <!-- Video Edit Container -->
     <main class="dashboard-content" id="video-edit-container" style="display:none;">
       <div style="padding:var(--space-xl); max-width:1200px; margin:0 auto;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-lg);">
-          <h2 style="font-size:1.5rem; font-weight:800; color:var(--text-primary);">🎬 Video Edit</h2>
-          <button class="btn-primary" onclick="loadVideoEditsData()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l5.25-5.25"></path></svg>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-lg); flex-wrap:wrap; gap:var(--space-md);">
+          <h2 style="font-size:1.5rem; font-weight:800; color:var(--text-primary); margin:0; white-space:nowrap;">🎬 Video Edit</h2>
+          <button class="btn-primary" onclick="loadVideoEditsData()" style="width:auto; margin:0; display:flex; align-items:center; gap:6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l5.25-5.25"></path></svg>
             Refresh
           </button>
         </div>
 
         <!-- Upload Options -->
         <div class="kpi-card" style="margin-bottom: var(--space-xl); padding: var(--space-lg); background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: var(--radius-lg);">
-          <div style="display: flex; gap: var(--space-md); margin-bottom: var(--space-md);">
-            <a href="https://drive.google.com/drive/u/1/folders/1yOLFnhZ5Tm5ouzjq3tN_kXCuE7J27cwf" target="_blank" class="btn-primary" style="text-decoration:none; display:flex; align-items:center; gap:8px;">
+          <div style="display: flex; gap: var(--space-md); margin-bottom: var(--space-md); flex-wrap: wrap;">
+            <a href="https://drive.google.com/drive/u/1/folders/1yOLFnhZ5Tm5ouzjq3tN_kXCuE7J27cwf" target="_blank" class="btn-primary" style="flex:1; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px; margin:0; white-space:nowrap;">
               📱 Shorts
             </a>
-            <a href="https://drive.google.com/drive/u/1/folders/1tNjIh10DR6ftAWPESF2R-EXacFegV3tP" target="_blank" class="btn-primary" style="text-decoration:none; display:flex; align-items:center; gap:8px; background:var(--accent-red);">
-              ▶️ youtube video
+            <a href="https://drive.google.com/drive/u/1/folders/1tNjIh10DR6ftAWPESF2R-EXacFegV3tP" target="_blank" class="btn-primary" style="flex:1; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px; background:var(--accent-red); margin:0; white-space:nowrap;">
+              ▶️ YouTube Video
             </a>
           </div>
-          <p style="font-size: 0.9rem; color: var(--text-muted); margin: 0;">Just paste or upload the video u want to edit</p>
+          <p style="font-size: 0.9rem; color: var(--text-muted); margin: 0; line-height:1.5;">Just paste or upload the video you want to edit. <br><strong style="color:var(--accent-purple);">Note:</strong> Each upload will generate 3 small YouTube videos or 3 Shorts.</p>
         </div>
 
         <!-- Check Videos Table -->
         <div class="glass-panel" style="overflow-x:auto;">
-          <h3 style="font-size: 1rem; margin-bottom: var(--space-md); color: var(--text-primary);">Check Videos</h3>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-md); flex-wrap:wrap; gap:var(--space-sm);">
+            <h3 style="font-size: 1rem; color: var(--text-primary); margin:0;">Check Videos</h3>
+            
+            <div style="display:flex; gap:var(--space-sm); align-items:center; flex-wrap:wrap;">
+              <div style="display:flex; background:rgba(0,0,0,0.2); border-radius:var(--radius-full); padding:2px;">
+                <button class="nav-tab active" id="video-filter-all" onclick="filterVideoEdits('all')" style="padding:4px 12px;">All</button>
+                <button class="nav-tab" id="video-filter-youtube" onclick="filterVideoEdits('youtube')" style="padding:4px 12px;">YouTube</button>
+                <button class="nav-tab" id="video-filter-shorts" onclick="filterVideoEdits('shorts')" style="padding:4px 12px;">Shorts</button>
+              </div>
+              <select id="video-sort-select" onchange="sortVideoEdits(this.value)" style="padding:6px 12px; border-radius:var(--radius-md); background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-glass); font-size:0.8rem; outline:none;">
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+              </select>
+            </div>
+          </div>
           <table style="width:100%; text-align:left; border-collapse:collapse; font-size:0.85rem;">
             <thead>
               <tr style="border-bottom:1px solid var(--border-glass);">
