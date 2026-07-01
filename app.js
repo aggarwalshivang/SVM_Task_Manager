@@ -2006,12 +2006,17 @@ function renderTests(tests) {
   const videoPill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="video"]');
   const beforeFeePill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="beforefee"]');
   const afterFeePill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="afterfee"]');
+  const class9Pill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="class9"]');
+  const class10Pill = document.querySelector('.test-fms-tabs .tab-btn[data-filter="class10"]');
 
   if (sheetPill) sheetPill.style.display = isTestView ? 'inline-block' : 'none';
   if (appPill) appPill.style.display = isTestView ? 'inline-block' : 'none';
   if (videoPill) videoPill.style.display = 'none';
   if (beforeFeePill) beforeFeePill.style.display = 'none';
   if (afterFeePill) afterFeePill.style.display = 'none';
+  
+  if (class9Pill) class9Pill.style.display = (isAdmissionView || isEnquiryView || isTestView) ? 'inline-block' : 'none';
+  if (class10Pill) class10Pill.style.display = (isAdmissionView || isEnquiryView || isTestView) ? 'inline-block' : 'none';
 
   // Show/Hide FMS Toolbar (search/sort) and FMS subtabs for Parents FMS
   const toolbar = document.querySelector('.test-fms-toolbar');
@@ -2028,7 +2033,7 @@ function renderTests(tests) {
     }
   } else {
     if (toolbar) toolbar.style.display = 'flex';
-    if (filterTabs) filterTabs.style.display = isTestView ? 'flex' : 'none';
+    if (filterTabs) filterTabs.style.display = (isTestView || isAdmissionView || isEnquiryView) ? 'flex' : 'none';
     if (settingsBtn) {
       const canEditSettings = state.userRole === 'admin' || state.userRole === 'coordinator' || state.userRole === 'process_coordinator';
       settingsBtn.style.display = canEditSettings ? 'flex' : 'none';
@@ -2171,7 +2176,8 @@ function renderTests(tests) {
     if (filter === 'app' && testTypeLower !== 'app') return false;
     if (filter === 'beforefee' && !isBeforeFee) return false;
     if (filter === 'afterfee' && !isAfterFee) return false;
-
+    if (filter === 'class9' && String(test.className) !== '9') return false;
+    if (filter === 'class10' && String(test.className) !== '10') return false;
     // 3. Search Query Filter
     if (searchQuery) {
       const nameMatch = (test.testName || '').toLowerCase().includes(searchQuery);
@@ -2790,21 +2796,31 @@ function toggleAcademicFields(type) {
     else { minLabel.textContent = 'Min Marks'; }
   }
 
-  if (isAcademic) {
+  const classGroup = classSubRow ? classSubRow.children[0] : null;
+  const subjectGroup = classSubRow ? classSubRow.children[1] : null;
+
+  if (isAcademic || type === 'AfterFee' || type === 'BeforeFee') {
     if (classSubRow) classSubRow.style.display = 'flex';
+    if (classGroup) classGroup.style.display = 'block';
+    if (subjectGroup) subjectGroup.style.display = isAcademic ? 'block' : 'none';
+
+    if (classSel) classSel.setAttribute('required', 'required');
+  } else {
+    if (classSubRow) classSubRow.style.display = 'none';
+    if (classSel) classSel.removeAttribute('required');
+  }
+
+  if (isAcademic) {
     if (chapterRow) chapterRow.style.display = 'flex';
     if (marksRow) marksRow.style.display = 'flex';
 
-    if (classSel) classSel.setAttribute('required', 'required');
     if (subjectSel) subjectSel.setAttribute('required', 'required');
     if (chapterInput) chapterInput.setAttribute('required', 'required');
     if (maxInput) maxInput.setAttribute('required', 'required');
   } else {
-    if (classSubRow) classSubRow.style.display = 'none';
     if (chapterRow) chapterRow.style.display = 'none';
     if (customChapterGrp) customChapterGrp.style.display = 'none';
 
-    if (classSel) classSel.removeAttribute('required');
     if (subjectSel) subjectSel.removeAttribute('required');
     if (chapterInput) chapterInput.removeAttribute('required');
     if (customChapterInput) customChapterInput.removeAttribute('required');
@@ -5188,35 +5204,46 @@ function initTestFormSyllabus() {
 }
 
 // ── Custom Class & Subject Dropdowns ────────────────
-window.toggleClassDropdown = function () {
-  const menu = $('class-dropdown-menu');
-  const chev = $('class-dropdown-chevron');
-  if (!menu) return;
-  const isOpen = menu.style.display !== 'none';
-  menu.style.display = isOpen ? 'none' : 'block';
-  if (chev) chev.style.transform = isOpen ? '' : 'rotate(180deg)';
-};
-
-window.selectClassOption = function (el) {
-  const value = el.dataset.value;
-  const label = $('class-dropdown-label');
-  const btn = $('class-dropdown-btn');
+window.selectClassSegment = function (value) {
   const input = $('test-form-class');
+  
+  // Reset all segment buttons
+  const seg9 = $('class-segment-9');
+  const seg10 = $('class-segment-10');
+  
+  if (seg9) {
+    if (value === '9') {
+      seg9.classList.add('active');
+      seg9.style.background = 'var(--accent-purple)';
+      seg9.style.color = '#ffffff';
+      seg9.style.boxShadow = 'var(--shadow-glow-purple)';
+    } else {
+      seg9.classList.remove('active');
+      seg9.style.background = 'none';
+      seg9.style.color = 'var(--text-muted)';
+      seg9.style.boxShadow = 'none';
+    }
+  }
+  
+  if (seg10) {
+    if (value === '10') {
+      seg10.classList.add('active');
+      seg10.style.background = 'var(--accent-purple)';
+      seg10.style.color = '#ffffff';
+      seg10.style.boxShadow = 'var(--shadow-glow-purple)';
+    } else {
+      seg10.classList.remove('active');
+      seg10.style.background = 'none';
+      seg10.style.color = 'var(--text-muted)';
+      seg10.style.boxShadow = 'none';
+    }
+  }
 
-  document.querySelectorAll('.class-option').forEach(o => o.classList.remove('selected'));
-  el.classList.add('selected');
-
-  if (label) label.textContent = el.textContent;
   if (input) {
     input.value = value;
     // Trigger chapter update
     if (window._updateTestFormChapters) window._updateTestFormChapters();
   }
-
-  const menu = $('class-dropdown-menu');
-  if (menu) menu.style.display = 'none';
-  const chev = $('class-dropdown-chevron');
-  if (chev) chev.style.transform = '';
 };
 
 window.toggleSubjectDropdown = function () {
@@ -7341,8 +7368,7 @@ function openAddTestModal() {
   $('test-form-held-on').value = getTodayStr();
 
   // Reset custom Class dropdown to default (Class 10)
-  const defaultClassOption = Array.from(document.querySelectorAll('.class-option')).find(o => o.dataset.value === '10');
-  if (defaultClassOption) selectClassOption(defaultClassOption);
+  selectClassSegment('10');
 
   // Reset custom Subject dropdown to default (empty)
   const defaultSubjectOption = Array.from(document.querySelectorAll('.subject-option')).find(o => o.dataset.value === '');
@@ -7537,7 +7563,17 @@ function openAddTestModal() {
     if (pipelineSection) pipelineSection.style.display = currentFmsBp && currentFmsBp.stagesNeeded ? 'block' : 'none';
   } else {
     // Standard FMS — show all standard rows
-    if (formRowClassSubject) formRowClassSubject.style.display = isEnquiryView || isAdmissionView || isVideoView || isParentsView ? 'none' : 'flex';
+    if (formRowClassSubject) {
+      if (isVideoView || isParentsView) {
+        formRowClassSubject.style.display = 'none';
+      } else {
+        formRowClassSubject.style.display = 'flex';
+        const classGroup = formRowClassSubject.children[0];
+        const subjectGroup = formRowClassSubject.children[1];
+        if (classGroup) classGroup.style.display = 'block';
+        if (subjectGroup) subjectGroup.style.display = (isEnquiryView || isAdmissionView) ? 'none' : 'block';
+      }
+    }
     if (formRowChapter) formRowChapter.style.display = isEnquiryView || isAdmissionView || isVideoView || isParentsView ? 'none' : 'flex';
     if (formRowMarks) formRowMarks.style.display = isEnquiryView || isParentsView ? 'none' : 'flex';
     if (customFieldsContainer) { customFieldsContainer.innerHTML = ''; customFieldsContainer.style.display = 'none'; }
@@ -7766,8 +7802,7 @@ function handleEditTestDetailsModal(testId) {
   const clsVal = test.className || '10';
   let subVal = test.subject || '';
 
-  const classOption = Array.from(document.querySelectorAll('.class-option')).find(o => o.dataset.value === clsVal);
-  if (classOption) selectClassOption(classOption);
+  selectClassSegment(clsVal);
 
   const subjectOption = Array.from(document.querySelectorAll('.subject-option')).find(o => o.dataset.value === subVal);
   if (subjectOption) selectSubjectOption(subjectOption);
@@ -7858,7 +7893,7 @@ function handleEditTestDetailsModal(testId) {
   const isAdmission = isBeforeFee || isAfterFee;
 
   const typeFormGroup = $('test-type-form-group');
-  if (typeFormGroup) typeFormGroup.style.display = (isVideo || isParents || isCustom) ? 'none' : 'block';
+  if (typeFormGroup) typeFormGroup.style.display = (isVideo || isParents || isCustom || isAdmission) ? 'none' : 'block';
 
   const sheetSeg = $('type-segment-sheet');
   const appSeg = $('type-segment-app');
@@ -7955,7 +7990,17 @@ function handleEditTestDetailsModal(testId) {
     if (customFieldsContainerEdit) { customFieldsContainerEdit.innerHTML = ''; customFieldsContainerEdit.style.display = 'none'; }
     if (pipelineSectionEdit) pipelineSectionEdit.style.display = activeCustomBlueprint.stagesNeeded ? 'block' : 'none';
   } else {
-    if (formRowCSEdit) formRowCSEdit.style.display = isAdmission || isVideo || isParents ? 'none' : 'flex';
+    if (formRowCSEdit) {
+      if (isVideo || isParents) {
+        formRowCSEdit.style.display = 'none';
+      } else {
+        formRowCSEdit.style.display = 'flex';
+        const classGroup = formRowCSEdit.children[0];
+        const subjectGroup = formRowCSEdit.children[1];
+        if (classGroup) classGroup.style.display = 'block';
+        if (subjectGroup) subjectGroup.style.display = isAdmission ? 'none' : 'block';
+      }
+    }
     if (formRowChEdit) formRowChEdit.style.display = isAdmission || isVideo || isParents ? 'none' : 'flex';
     if (formRowMkEdit) formRowMkEdit.style.display = isParents ? 'none' : 'flex';
     if (customFieldsContainerEdit) { customFieldsContainerEdit.innerHTML = ''; customFieldsContainerEdit.style.display = 'none'; }

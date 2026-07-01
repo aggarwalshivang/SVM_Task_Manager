@@ -365,6 +365,8 @@
         <button class="tab-btn" data-filter="video" onclick="setTestFmsFilter('video')">🎬 Video</button>
         <button class="tab-btn" data-filter="beforefee" onclick="setTestFmsFilter('beforefee')">⏳ Enquiry</button>
         <button class="tab-btn" data-filter="afterfee" onclick="setTestFmsFilter('afterfee')">💳 Admission</button>
+        <button class="tab-btn" data-filter="class9" onclick="setTestFmsFilter('class9')">Class 9</button>
+        <button class="tab-btn" data-filter="class10" onclick="setTestFmsFilter('class10')">Class 10</button>
       </div>
 
       <div id="test-list-content" class="dashboard-content" style="padding-top:0;">
@@ -1285,8 +1287,7 @@
             <button type="button" class="segment-btn active" id="type-segment-sheet" onclick="selectTypeSegment('Sheet')" style="flex: 1; padding: 10px; border: none; background: var(--accent-purple); color: #ffffff; box-shadow: var(--shadow-glow-purple); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">📄 Sheet Test</button>
             <button type="button" class="segment-btn" id="type-segment-app" onclick="selectTypeSegment('App')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">📱 App Test</button>
             <button type="button" class="segment-btn" id="type-segment-video" onclick="selectTypeSegment('Video')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">🎬 Video</button>
-            <button type="button" class="segment-btn" id="type-segment-beforefee" onclick="selectTypeSegment('BeforeFee')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">⏳ Enquiry</button>
-            <button type="button" class="segment-btn" id="type-segment-afterfee" onclick="selectTypeSegment('AfterFee')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">💳 Admission</button>
+
             <button type="button" class="segment-btn" id="type-segment-parents" onclick="selectTypeSegment('Parents')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">👪 Parents</button>
           </div>
           <input type="hidden" id="test-form-type" value="Sheet">
@@ -1295,17 +1296,11 @@
         <div class="form-row" id="form-row-class-subject">
           <div class="form-group">
             <label>Class</label>
-            <div id="class-dropdown-wrapper" style="position: relative;">
-              <input type="hidden" id="test-form-class" value="10" required>
-              <button type="button" id="class-dropdown-btn" onclick="toggleClassDropdown()" class="custom-dropdown-btn">
-                <span id="class-dropdown-label" style="flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Class 10</span>
-                <svg id="class-dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; transition:transform 0.2s;"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button>
-              <div id="class-dropdown-menu" class="custom-dropdown-menu" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:200px; overflow-y:auto; z-index:500;">
-                <div class="class-option" data-value="9" onclick="selectClassOption(this)">Class 9</div>
-                <div class="class-option selected" data-value="10" onclick="selectClassOption(this)">Class 10</div>
-              </div>
+            <div class="segmented-control" style="display: flex; background: rgba(255,255,255,0.04); padding: 4px; border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
+              <button type="button" class="segment-btn" id="class-segment-9" onclick="selectClassSegment('9')" style="flex: 1; padding: 10px; border: none; background: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">Class 9</button>
+              <button type="button" class="segment-btn active" id="class-segment-10" onclick="selectClassSegment('10')" style="flex: 1; padding: 10px; border: none; background: var(--accent-purple); color: #ffffff; box-shadow: var(--shadow-glow-purple); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s;">Class 10</button>
             </div>
+            <input type="hidden" id="test-form-class" value="10" required>
           </div>
           <div class="form-group">
             <label>Subject</label>
