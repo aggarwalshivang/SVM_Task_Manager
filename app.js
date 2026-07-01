@@ -4168,20 +4168,26 @@ function createDashboardCardHTML(s, rank) {
       <div class="dashboard-card-header">
         <div class="dashboard-rank rank-${rank}">${rank}</div>
         <div class="avatar avatar-sm">${getInitials(s.name)}</div>
-        <div class="dashboard-card-name" onclick="handleViewMemberTasks('${s.name}')" style="cursor:pointer; text-decoration:underline; text-decoration-style:dotted; flex:1; word-break:break-word; line-height:1.2;" title="${s.name}">${s.name}</div>
-        ${state.userRole === 'admin' ? `
-          <button onclick="handleAdminResetScore('${s.name}', event)" class="member-reset-btn" title="Reset Score" style="background:none; border:none; color:var(--accent-purple); cursor:pointer; padding:4px; margin-right:4px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
-          </button>
-          <button onclick="handleRemoveMemberPrompt('${s.name}', event)" class="member-remove-btn" title="Remove Member">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-          </button>
-        ` : ''}
-        ${(state.userRole === 'admin' || state.userRole === 'coordinator' || state.userRole === 'process_coordinator') ? `
-          <button onclick="handleAdminPenalty('${s.name}', event)" class="member-penalty-btn" title="Give -20 Penalty" style="background:none; border:none; color:var(--accent-red); cursor:pointer; padding:4px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg>
-          </button>
-        ` : ''}
+        <div style="display:flex; flex-direction:column; flex:1; min-width:0;">
+          <div class="dashboard-card-name" onclick="handleViewMemberTasks('${s.name}')" style="cursor:pointer; text-decoration:underline; text-decoration-style:dotted; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${s.name}">${s.name}</div>
+          ${(state.userRole === 'admin' || state.userRole === 'coordinator' || state.userRole === 'process_coordinator') ? `
+            <div style="display:flex; gap:8px; margin-top:4px;">
+              ${state.userRole === 'admin' ? `
+                <button onclick="handleAdminResetScore('${s.name}', event)" class="member-reset-btn" title="Reset Score" style="background:none; border:none; color:var(--accent-purple); cursor:pointer; padding:4px 4px 4px 0;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+                </button>
+                <button onclick="handleRemoveMemberPrompt('${s.name}', event)" class="member-remove-btn" title="Remove Member" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+              ` : ''}
+              ${(state.userRole === 'admin' || state.userRole === 'coordinator' || state.userRole === 'process_coordinator') ? `
+                <button onclick="handleAdminPenalty('${s.name}', event)" class="member-penalty-btn" title="Give -20 Penalty" style="background:none; border:none; color:var(--accent-red); cursor:pointer; padding:4px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                </button>
+              ` : ''}
+            </div>
+          ` : ''}
+        </div>
       </div>
 
       <div class="dashboard-scores-summary" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-xs); text-align: center; background: var(--bg-glass); padding: 8px; border-radius: var(--radius-md); border: 1px solid var(--border-glass); margin-bottom: var(--space-xs);">
