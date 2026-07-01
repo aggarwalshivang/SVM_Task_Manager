@@ -7,7 +7,7 @@
 // =============================================
 const CONFIG = {
   // Apps Script URL — kept for email/AI/scoring triggers and Sheet sync
-  API_URL: 'https://script.google.com/macros/s/AKfycbwlNn8SK22Ix6D3TgdqrboHyMy5JBUiztgtCsBnIEZsI2jh7W-cVqBmKBumPEZp66c/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbxTWack80EOqWdieSm7LROUrXPOV3Uc9P_UQoEwdWzJ8zp_ICinhfDRqKtuwR3MJZWs/exec',
 
   // Supabase — PRIMARY data store
   SUPABASE_URL: 'https://nslhzkthcgjyqlejlrxk.supabase.co',
@@ -481,7 +481,7 @@ async function apiFetch(action, params = {}, method = 'GET') {
     params.fromUser = state.currentUser;
   }
   const safeParams = sanitizePayload(params);
-  
+
   if (CONFIG.DEMO_MODE) return demoHandler(action, safeParams, method);
   if (APPS_SCRIPT_ACTIONS.has(action)) return apiFetchSheet(action, safeParams, method);
   return supabaseApiFetch(action, safeParams);
@@ -674,21 +674,21 @@ async function handleAuthSubmit(e) {
 $('auth-verify-otp-btn')?.addEventListener('click', async () => {
   const otp = $('auth-otp-input').value.trim();
   if (!otp) return showToast('Please enter OTP', 'error');
-  
+
   const btn = $('auth-verify-otp-btn');
   btn.disabled = true;
   btn.textContent = 'Verifying...';
   $('auth-error').style.display = 'none';
-  
+
   try {
     const res = await apiFetch('verifyLoginOTP', { email: state.pendingLoginEmail, otp }, 'POST');
     if (!res.success) throw new Error(res.error || 'Invalid OTP');
-    
+
     // reset UI for next time
     $('auth-otp-input').value = '';
     $('auth-otp-step').style.display = 'none';
     $('auth-primary-step').style.display = 'block';
-    
+
     handleUserSignedIn(res.data);
     showToast('Signed in successfully.');
   } catch (err) {
@@ -1241,7 +1241,7 @@ function openCustomFmsBuilderModal() {
     if ($('fms-builder-container')) $('fms-builder-container').style.display = 'block';
     if ($('student-container')) $('student-container').style.display = 'none';
     if ($('helper-container')) $('helper-container').style.display = 'none';
-      if ($('logs-container')) $('logs-container').style.display = 'none';
+    if ($('logs-container')) $('logs-container').style.display = 'none';
     renderCustomFmsBlueprintsList();
     closeCustomFmsCreatorSection();
   }
@@ -1251,7 +1251,7 @@ function closeCustomFmsBuilderModal() {
   if ($('fms-builder-container')) $('fms-builder-container').style.display = 'none';
   if ($('student-container')) $('student-container').style.display = 'none';
   if ($('helper-container')) $('helper-container').style.display = 'none';
-      if ($('logs-container')) $('logs-container').style.display = 'none';
+  if ($('logs-container')) $('logs-container').style.display = 'none';
 }
 
 // Tracks the list of custom field definitions for the blueprint being created
@@ -2437,34 +2437,34 @@ function showFmsDoneModal(action) {
   window.pendingFmsAction = action;
   const select = $('fms-done-member-select');
   select.innerHTML = '<option value="">-- Select Member --</option>';
-  
+
   const members = (state.teamMembers || []).filter(m => (m.active === true || String(m.active).toUpperCase().trim() === 'TRUE') && (m.role || '').toLowerCase() !== 'admin');
-  
+
   members.forEach(m => {
     select.innerHTML += `<option value="${m.name}">${m.name}</option>`;
   });
-  
+
   $('fms-done-member-modal').style.display = 'flex';
 }
 
-window.closeFmsDoneModal = function() {
+window.closeFmsDoneModal = function () {
   window.pendingFmsAction = null;
   $('fms-done-member-modal').style.display = 'none';
 };
 
-window.confirmFmsDoneMember = async function() {
+window.confirmFmsDoneMember = async function () {
   const select = $('fms-done-member-select');
   const memberName = select.value;
   if (!memberName) {
     showToast('Please select a member.', 'error');
     return;
   }
-  
+
   const action = window.pendingFmsAction;
   window.closeFmsDoneModal();
-  
+
   if (!action) return;
-  
+
   if (action.type === 'stage') {
     await handleToggleTestStage(action.testId, action.stageId, memberName);
   } else if (action.type === 'card') {
@@ -3093,7 +3093,7 @@ async function renderCommonRoleMembersGrid() {
   $('onetime-section').style.display = 'none';
 
   const members = (state.teamMembers || []).filter(m => (m.active === true || String(m.active).toUpperCase().trim() === 'TRUE') && (m.role || '').toLowerCase() !== 'admin');
-  
+
   if (members.length === 0) {
     container.innerHTML = `<div style="padding: 40px; text-align: center; color: var(--text-muted);">No active members found.</div>`;
     container.style.display = 'block';
@@ -3104,7 +3104,7 @@ async function renderCommonRoleMembersGrid() {
     try {
       const res = await apiFetch('getScores');
       if (res.success) state.memberScoresCache = res.data || [];
-    } catch(e) {
+    } catch (e) {
       console.error('Failed to fetch member scores', e);
       state.memberScoresCache = [];
     }
@@ -3117,7 +3117,7 @@ async function renderCommonRoleMembersGrid() {
     // Analytics
     const memberTasks = state.tasks.filter(t => t.assignedTo === m.name);
     const todayTasks = memberTasks.filter(t => t.plannedDate && t.plannedDate.substring(0, 10) === todayStr && t.taskType !== 'penalty');
-    
+
     const todayTotal = todayTasks.length;
     const todayDone = todayTasks.filter(t => t.status === 'done').length;
     const todayLeft = todayTotal - todayDone;
@@ -4170,6 +4170,9 @@ function createDashboardCardHTML(s, rank) {
         <div class="avatar avatar-sm">${getInitials(s.name)}</div>
         <div class="dashboard-card-name" onclick="handleViewMemberTasks('${s.name}')" style="cursor:pointer; text-decoration:underline; text-decoration-style:dotted; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${s.name}">${s.name}</div>
         ${state.userRole === 'admin' ? `
+          <button onclick="handleAdminResetScore('${s.name}', event)" class="member-reset-btn" title="Reset Score" style="background:none; border:none; color:var(--accent-purple); cursor:pointer; padding:4px; margin-right:4px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+          </button>
           <button onclick="handleRemoveMemberPrompt('${s.name}', event)" class="member-remove-btn" title="Remove Member">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
           </button>
@@ -4417,6 +4420,25 @@ window.saveWeeklyReviewRow = async function (userName) {
     showToast('Failed to save target', 'error');
   }
 };
+
+window.handleAdminResetScore = async function (memberName, e) {
+  e.stopPropagation();
+  if (!confirm(`Are you sure you want to recalculate and reset the score for ${memberName}?`)) return;
+
+  showToast(`Resetting score for ${memberName}...`, 'info');
+  try {
+    const res = await apiFetch('recalculateScores', { user: memberName }, 'POST');
+    if (res.success) {
+      showToast(`Score reset successfully for ${memberName}.`);
+      openDashboard(); // Refresh dashboard
+    } else {
+      showToast(res.error || 'Failed to reset score', 'error');
+    }
+  } catch (err) {
+    showToast('Network error resetting score', 'error');
+  }
+};
+
 
 async function handleAdminPenalty(memberName, e) {
   e.stopPropagation();
@@ -9371,16 +9393,16 @@ window.renderAuditLogs = async function () {
   const tbody = $('logs-table-body');
   if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Loading logs...</td></tr>';
-  
+
   try {
     const res = await apiFetch('getAuditLogs');
     if (!res.success) throw new Error(res.error || 'Failed to load logs');
-    
+
     if (!res.data || res.data.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</td></tr>';
       return;
     }
-    
+
     tbody.innerHTML = res.data.map(log => {
       const date = new Date(log.requested_at);
       const timeStr = date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -9393,23 +9415,23 @@ window.renderAuditLogs = async function () {
 
         // Field display config: key → { label, icon, color, format }
         const FIELD_MAP = {
-          user:           { icon: '👤', label: 'User',         color: '#a78bfa' },
-          assignedTo:     { icon: '👤', label: 'Assigned To',  color: '#a78bfa' },
-          requested_by:   { icon: '👤', label: 'By',           color: '#a78bfa' },
-          taskName:       { icon: '📌', label: 'Task',         color: '#e2e8f0' },
-          taskId:         { icon: '🔖', label: 'Task ID',      color: '#94a3b8' },
-          reason:         { icon: '💬', label: 'Reason',       color: '#fbbf24' },
-          notes:          { icon: '📝', label: 'Notes',        color: '#94a3b8' },
-          status:         { icon: '🔄', label: 'Status',       color: '#34d399' },
-          taskType:       { icon: '🗂️',  label: 'Type',        color: '#60a5fa' },
-          priority:       { icon: '⚡', label: 'Priority',     color: '#fb923c' },
-          plannedDate:    { icon: '📅', label: 'Planned',      color: '#38bdf8' },
-          completedDate:  { icon: '✅', label: 'Completed',    color: '#34d399' },
-          quantity_ok:    { icon: '✔️',  label: 'Qty OK',      color: '#34d399', format: v => v === true || v === 'true' ? 'Yes' : 'No' },
-          time:           { icon: '🕐', label: 'Time',         color: '#f472b6' },
-          recurrence:     { icon: '🔁', label: 'Recurrence',   color: '#c084fc' },
-          score:          { icon: '🏆', label: 'Score',        color: '#fbbf24' },
-          action:         { icon: '⚙️',  label: 'Action',      color: '#94a3b8' },
+          user: { icon: '👤', label: 'User', color: '#a78bfa' },
+          assignedTo: { icon: '👤', label: 'Assigned To', color: '#a78bfa' },
+          requested_by: { icon: '👤', label: 'By', color: '#a78bfa' },
+          taskName: { icon: '📌', label: 'Task', color: '#e2e8f0' },
+          taskId: { icon: '🔖', label: 'Task ID', color: '#94a3b8' },
+          reason: { icon: '💬', label: 'Reason', color: '#fbbf24' },
+          notes: { icon: '📝', label: 'Notes', color: '#94a3b8' },
+          status: { icon: '🔄', label: 'Status', color: '#34d399' },
+          taskType: { icon: '🗂️', label: 'Type', color: '#60a5fa' },
+          priority: { icon: '⚡', label: 'Priority', color: '#fb923c' },
+          plannedDate: { icon: '📅', label: 'Planned', color: '#38bdf8' },
+          completedDate: { icon: '✅', label: 'Completed', color: '#34d399' },
+          quantity_ok: { icon: '✔️', label: 'Qty OK', color: '#34d399', format: v => v === true || v === 'true' ? 'Yes' : 'No' },
+          time: { icon: '🕐', label: 'Time', color: '#f472b6' },
+          recurrence: { icon: '🔁', label: 'Recurrence', color: '#c084fc' },
+          score: { icon: '🏆', label: 'Score', color: '#fbbf24' },
+          action: { icon: '⚙️', label: 'Action', color: '#94a3b8' },
         };
 
         const SKIP_KEYS = new Set(['__v', 'updated_at', 'created_at']);
@@ -9418,13 +9440,13 @@ window.renderAuditLogs = async function () {
           .map(([k, v]) => {
             if (v === null || v === undefined || v === '') return null;
             const cfg = FIELD_MAP[k];
-            const icon  = cfg ? cfg.icon  : '•';
+            const icon = cfg ? cfg.icon : '•';
             const label = cfg ? cfg.label : k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
             const color = cfg ? cfg.color : '#94a3b8';
             let display = cfg && cfg.format ? cfg.format(v) : String(v);
             // Shorten ISO dates to readable
             if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v)) {
-              try { display = new Date(v).toLocaleString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }); } catch {}
+              try { display = new Date(v).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch { }
             }
             if (display.length > 60) display = display.slice(0, 57) + '…';
             return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;margin:2px;border-radius:99px;font-size:0.72rem;font-weight:500;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:${color};white-space:nowrap;">
@@ -9499,7 +9521,7 @@ window.loadVideoEditsData = async function () {
   }
 };
 
-window.filterVideoEdits = function(type) {
+window.filterVideoEdits = function (type) {
   window.currentVideoEditsFilter = type;
   document.getElementById('video-filter-all').classList.toggle('active', type === 'all');
   document.getElementById('video-filter-youtube').classList.toggle('active', type === 'youtube');
@@ -9507,12 +9529,12 @@ window.filterVideoEdits = function(type) {
   renderVideoEditsTable();
 };
 
-window.sortVideoEdits = function(sort) {
+window.sortVideoEdits = function (sort) {
   window.currentVideoEditsSort = sort;
   renderVideoEditsTable();
 };
 
-window.renderVideoEditsTable = function() {
+window.renderVideoEditsTable = function () {
   const tbody = $('video-edits-table-body');
   if (!tbody) return;
 
@@ -9555,11 +9577,11 @@ window.renderVideoEditsTable = function() {
       .replace(/!/g, '%21')
       .replace(/~/g, '%7E')
       .replace(/\*/g, '%2A');
-    const id          = row.id || '-';
-    const type        = row['Type'] || '-';
-    const topic       = row['Topic'] || '-';
-    const desc        = row['Description'] || '';
-    const driveLink   = row['DriveLink'] || '';
+    const id = row.id || '-';
+    const type = row['Type'] || '-';
+    const topic = row['Topic'] || '-';
+    const desc = row['Description'] || '';
+    const driveLink = row['DriveLink'] || '';
 
     // ── Smart Description Parser ──────────────────────────────────────
     function renderDescription(raw) {
@@ -9568,17 +9590,17 @@ window.renderVideoEditsTable = function() {
       // Section icons for known labels
       const sectionIcons = {
         'description': '📝',
-        'caption':     '💬',
-        'hashtag':     '#️⃣',
-        'hashtags':    '#️⃣',
-        'bio':         '👤',
-        'title':       '🎯',
-        'hook':        '🪝',
-        'cta':         '📣',
-        'note':        '📌',
-        'script':      '🎬',
-        'thumbnail':   '🖼️',
-        'tags':        '🏷️',
+        'caption': '💬',
+        'hashtag': '#️⃣',
+        'hashtags': '#️⃣',
+        'bio': '👤',
+        'title': '🎯',
+        'hook': '🪝',
+        'cta': '📣',
+        'note': '📌',
+        'script': '🎬',
+        'thumbnail': '🖼️',
+        'tags': '🏷️',
       };
 
       // Check if structured with <<< markers

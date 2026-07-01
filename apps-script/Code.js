@@ -267,7 +267,7 @@ function doPost(e) {
         result = handleManualGenerateRecurringTasks();
         break;
       case 'recalculateScores':
-        result = handleRecalculateScores();
+        result = handleRecalculateScores(body);
         break;
       case 'addTest':
         result = handleAddTest(body);
@@ -1253,9 +1253,10 @@ function handleRemoveMember(body) {
   }
 }
 
-function handleRecalculateScores() {
-  recalculateWeeklyScores();
-  return { success: true, data: { message: 'Scores recalculated' } };
+function handleRecalculateScores(body) {
+  var user = (body && body.user) ? body.user : null;
+  recalculateWeeklyScores(user);
+  return { success: true, data: { message: user ? 'Score recalculated for ' + user : 'Scores recalculated' } };
 }
 
 function handleAdminPenalty(body) {
